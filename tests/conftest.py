@@ -64,7 +64,6 @@ def dsn() -> Iterator[str]:
         from testcontainers.postgres import PostgresContainer
     except ImportError:  # pragma: no cover
         pytest.skip("testcontainers no instalado y KC_ADMIN_TEST_DSN sin definir")
-        return
     with PostgresContainer("pgvector/pgvector:pg16", driver=None) as pg:
         yield pg.get_connection_url().replace("postgresql://", "postgresql://")
 
@@ -94,6 +93,7 @@ def esquema(dsn: str) -> str:
     if not BACKEND_DB.is_dir():
         pytest.skip(f"no se encuentra el esquema de la plataforma en {BACKEND_DB}")
 
+    _psql(dsn, "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pg_trgm;")
     # Contraseñas de prueba de los roles: las crea el propio script y aquí solo se
     # fijan para poder conectarse con cada uno.
     for f in sorted(BACKEND_DB.glob("0[1-5]_*.sql")):

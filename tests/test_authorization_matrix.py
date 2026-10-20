@@ -337,7 +337,7 @@ async def test_jti_revocado_no_vuelve_a_servir(
                               headers=cabeceras)).status_code == 200
 
     datos = verificar_token_staff(acceso)
-    restante = int(datos["exp"]) - int(datetime.now(UTC).timestamp())
+    restante = int(str(datos["exp"])) - int(datetime.now(UTC).timestamp())
     await revocar_jti(str(datos["jti"]), max(restante, 1))
 
     r = await cliente.get("/admin/v1/staff/me", headers=cabeceras)
