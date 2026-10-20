@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kallicode Console</title>
+<style>
+:root{
+  --bg:#f4f5f9; --surface:#ffffff; --surface2:#eef0f6; --text:#171a26; --muted:#6b7280;
+  --border:#e3e6ee; --accent:#4f46e5; --accent-soft:#eef0ff; --good:#16a34a; --good-bg:#e8f7ee;
+  --warn:#d97706; --warn-bg:#fdf3e3; --bad:#dc2626; --bad-bg:#fdecec; --shadow:0 1px 3px rgba(20,24,40,.08);
+}
+[data-theme="dark"]{
+  --bg:#0e1016; --surface:#161923; --surface2:#1e2230; --text:#e6e8f0; --muted:#8b91a5;
+  --border:#262b3a; --accent:#818cf8; --accent-soft:#232746; --good:#4ade80; --good-bg:#12301d;
+  --warn:#fbbf24; --warn-bg:#33270e; --bad:#f87171; --bad-bg:#3a1414; --shadow:0 1px 3px rgba(0,0,0,.4);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+/* ---------- Sidebar ---------- */
+.sidebar{width:236px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:0;bottom:0;display:flex;flex-direction:column;z-index:20}
+.logo{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid var(--border)}
+.logo-mark{width:34px;height:34px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+.logo b{font-size:15px;display:block;line-height:1.1}
+.logo span{font-size:11px;color:var(--muted)}
+.nav{flex:1;overflow-y:auto;padding:10px 8px}
+.nav-group{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);padding:14px 10px 6px;font-weight:600}
+.nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;color:var(--text);text-decoration:none;margin-bottom:2px;font-size:13.5px;cursor:pointer}
+.nav a:hover{background:var(--surface2)}
+.nav a.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav a .ic{width:18px;text-align:center;font-size:14px;opacity:.85}
+.nav a .cnt{margin-left:auto;background:var(--bad-bg);color:var(--bad);font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px}
+.side-foot{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+/* ---------- Main ---------- */
+.main{flex:1;margin-left:236px;display:flex;flex-direction:column;min-width:0}
+.topbar{position:sticky;top:0;background:var(--bg);z-index:10;display:flex;align-items:center;gap:14px;padding:14px 24px;border-bottom:1px solid var(--border)}
+.topbar h1{font-size:17px;font-weight:650}
+.topbar .sub{font-size:12px;color:var(--muted)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.search{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);width:210px;font-size:13px}
+.search::placeholder{color:var(--muted)}
+select.lang{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 8px;color:var(--text);font-size:13px;cursor:pointer}
+.icon-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;width:34px;height:34px;cursor:pointer;color:var(--text);font-size:15px}
+.icon-btn:hover{background:var(--surface2)}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#c084fc);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.content{padding:22px 24px 40px;max-width:1400px}
+/* ---------- Components ---------- */
+.view{display:none}.view.active{display:block}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:1100px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.kpi .lbl{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.kpi .val{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.kpi .delta{font-size:12px;margin-top:5px;font-weight:600}
+.up{color:var(--good)}.down{color:var(--bad)}.flat{color:var(--muted)}
+.card h3{font-size:13.5px;font-weight:650;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.card h3 .hint{font-size:11px;color:var(--muted);font-weight:500}
+.section-title{font-size:15px;font-weight:650;margin:26px 0 12px}
+.section-title:first-child{margin-top:0}
+/* badges */
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:20px;padding:2px 10px}
+.b-good{background:var(--good-bg);color:var(--good)}.b-warn{background:var(--warn-bg);color:var(--warn)}
+.b-bad{background:var(--bad-bg);color:var(--bad)}.b-mut{background:var(--surface2);color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.d-good{background:var(--good)}.d-warn{background:var(--warn)}.d-bad{background:var(--bad)}
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--border)}
+td{padding:9px 10px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+/* bar charts */
+.bars{display:flex;align-items:flex-end;gap:8px;height:130px;padding-top:8px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end}
+.bar{width:100%;max-width:38px;background:var(--accent);border-radius:5px 5px 2px 2px;opacity:.85}
+.bar.alt{background:var(--good)}.bar.neg{background:var(--bad)}.bar.warn{background:var(--warn)}
+.bar-col small{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.bar-col .bv{font-size:10.5px;font-weight:600}
+.duo{display:flex;gap:3px;align-items:flex-end;height:100%;width:100%;justify-content:center}
+.duo .bar{max-width:16px}
+/* h-bars */
+.hbar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px}
+.hbar-row .hl{width:110px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbar-track{flex:1;height:10px;background:var(--surface2);border-radius:6px;overflow:hidden}
+.hbar-fill{height:100%;background:var(--accent);border-radius:6px}
+.hbar-row .hv{width:78px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+/* donut */
+.donut-wrap{display:flex;align-items:center;gap:18px}
+.donut{width:120px;height:120px;border-radius:50%;flex-shrink:0;position:relative}
+.donut::after{content:"";position:absolute;inset:26px;background:var(--surface);border-radius:50%}
+.legend{font-size:12.5px;display:flex;flex-direction:column;gap:7px}
+.legend .li{display:flex;align-items:center;gap:8px}
+.legend .sw{width:10px;height:10px;border-radius:3px}
+.legend b{margin-left:auto;padding-left:14px}
+/* misc */
+.banner{display:flex;align-items:center;gap:10px;background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn);border-radius:10px;padding:11px 14px;font-size:13px;font-weight:600;margin-bottom:16px}
+.pills{display:flex;gap:8px;margin-bottom:14px}
+.pill{border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:20px;padding:5px 14px;font-size:12.5px;cursor:pointer;font-weight:600}
+.pill.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.spark{width:100%;height:46px;margin-top:8px}
+.progress{height:8px;background:var(--surface2);border-radius:5px;overflow:hidden;min-width:70px}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.progress i.warn{background:var(--warn)}.progress i.bad{background:var(--bad)}
+.mt{margin-top:14px}
+/* clickable KPI + modal */
+.kpi.clickable{cursor:pointer;transition:border-color .15s, transform .1s;position:relative}
+.kpi.clickable:hover{border-color:var(--accent)}
+.kpi.clickable::after{content:"›";position:absolute;top:12px;right:14px;color:var(--muted);font-size:16px}
+.kpi.clickable .drill{font-size:10.5px;color:var(--accent);margin-top:6px;font-weight:600}
+.modal-overlay{position:fixed;inset:0;background:rgba(10,12,20,.55);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(2px)}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(760px,94vw);max-height:82vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)}
+.modal-head h2{font-size:15px;font-weight:650}
+.modal-head .x{background:var(--surface2);border:none;border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text);font-size:14px}
+.modal-body{padding:14px 20px 20px}
+.modal-foot{padding:0 20px 16px;font-size:12px;color:var(--muted)}
+.muted{color:var(--muted)}
+.flex-between{display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark" style="background:transparent"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 140" width="30" height="21" style="display:block"><defs><linearGradient id="gv" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00F2FE"/><stop offset="100%" stop-color="#4FACFE"/></linearGradient><linearGradient id="gp" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF0844"/><stop offset="100%" stop-color="#FFB199"/></linearGradient></defs><g transform="translate(100,70)"><path d="M -40,-60 L -90,0 L -40,60" fill="none" stroke="url(#gv)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M 40,-60 L 90,0 L 40,60" fill="none" stroke="url(#gp)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M -20,-20 C 10,-20 10,20 -20,20" fill="none" stroke="url(#gv)" stroke-width="8" stroke-linecap="round" opacity="0.8"/><path d="M 20,20 C -10,20 -10,-20 20,-20" fill="none" stroke="url(#gp)" stroke-width="8" stroke-linecap="round" opacity="0.8"/></g></svg></div>
+    <div><b data-i18n="appTitle">Kallicode</b><span data-i18n="appSub">Management Console</span></div>
+  </div>
+  <nav class="nav">
+    <div class="nav-group" data-i18n="navBusiness">Business</div>
+    <a data-view="biz-overview" class="active"><span class="ic">📊</span><span data-i18n="navOverview">Overview</span></a>
+    <a data-view="biz-customers"><span class="ic">👥</span><span data-i18n="navCustomers">Customers</span><span class="cnt">4</span></a>
+    <a data-view="biz-subs"><span class="ic">💳</span><span data-i18n="navSubs">Subscriptions &amp; Revenue</span></a>
+    <a data-view="biz-tokens"><span class="ic">🪙</span><span data-i18n="navTokens">Tokens &amp; Costs</span></a>
+    <div class="nav-group" data-i18n="navOperations">Operations</div>
+    <a data-view="ops-agents"><span class="ic">🤖</span><span data-i18n="navAgents">Agents</span></a>
+    <a data-view="ops-models"><span class="ic">🧠</span><span data-i18n="navModels">Models &amp; Services</span></a>
+    <a data-view="ops-sla"><span class="ic">🛡️</span><span data-i18n="navSla">SLA &amp; Incidents</span><span class="cnt">2</span></a>
+  </nav>
+  <div class="side-foot" data-i18n="wireframeNote">Functional wireframe · mock data</div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div>
+      <h1 id="viewTitle" data-i18n="navOverview">Overview</h1>
+      <div class="sub"><span data-i18n="lastUpdate">Last updated</span>: 10 Jul 2026, 09:42 UTC · <span data-i18n="scope">Scope</span>: <b id="scopeLbl">Global</b></div>
+    </div>
+    <div class="top-right">
+      <input class="search" data-i18n-ph="searchPh" placeholder="Search customers, projects, agents…">
+      <select class="lang" id="regionSel" title="Region">
+        <option value="global">🌍 Global</option>
+        <optgroup label="Regions" data-i18n-og="ogRegions">
+          <option value="na" data-i18n-opt="regionNA">North America</option>
+          <option value="emea" data-i18n-opt="regionEMEA">EMEA</option>
+          <option value="latam" data-i18n-opt="regionLATAM">LATAM</option>
+          <option value="apac" data-i18n-opt="regionAPAC">APAC</option>
+        </optgroup>
+        <optgroup label="Countries" data-i18n-og="ogCountries">
+          <option value="us" data-i18n-opt="cUS">United States</option>
+          <option value="uk" data-i18n-opt="cUK">United Kingdom</option>
+          <option value="es" data-i18n-opt="cES">Spain</option>
+          <option value="pt" data-i18n-opt="cPT">Portugal</option>
+          <option value="mx" data-i18n-opt="cMX">Mexico</option>
+          <option value="br" data-i18n-opt="cBR">Brazil</option>
+        </optgroup>
+      </select>
+      <select class="lang" id="langSel">
+        <option value="en">🌐 EN</option><option value="es">🌐 ES</option><option value="pt">🌐 PT</option>
+      </select>
+      <button class="icon-btn" id="themeBtn" title="Theme">☀️</button>
+      <div class="avatar">MX</div>
+    </div>
+  </header>
+  <div class="content">
+    <!-- ============ BUSINESS · OVERVIEW ============ -->
+    <section class="view active" id="biz-overview">
+      <div class="grid g4">
+        <div class="card kpi"><div class="lbl" data-i18n="kCustomers">Total customers</div><div class="val">128</div><div class="delta up">▲ +6 <span data-i18n="vsLastMonth">vs last month</span></div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kMrr">MRR</div><div class="val">$412.6K</div><div class="delta up">▲ 4.8%</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kArr">ARR (run-rate)</div><div class="val">$4.95M</div><div class="delta up">▲ 11.2% YoY</div></div>
+        <div class="card kpi clickable" data-modal="modal-alerts"><div class="lbl" data-i18n="kUsageAlerts">Usage alerts</div><div class="val" style="color:var(--warn)">4</div><div class="delta flat" data-i18n="noTickets14d">no tickets in 14 days</div><div class="drill" data-i18n="drillHint">View affected customers</div></div>
+      </div>
+      <div class="grid g4 mt">
+        <div class="card kpi"><div class="lbl" data-i18n="kProjects">Projects running</div><div class="val">342</div><div class="delta up">▲ +18</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kLoc">LOC generated (30d)</div><div class="val">9.4M</div><div class="delta up">▲ 7.1%</div></div>
+        <div class="card kpi clickable" data-modal="modal-churn"><div class="lbl" data-i18n="kChurn">Churn rate</div><div class="val">1.9%</div><div class="delta up">▼ 0.3 pp</div><div class="drill" data-i18n="drillChurn">View lost customers</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kNrr">Net revenue retention</div><div class="val">114%</div><div class="delta up">▲ 2 pp</div></div>
+      </div>
+      <div class="grid g2 mt">
+        <div class="card"><h3><span data-i18n="mrrTrend">MRR trend</span><span class="hint" data-i18n="m12">12 months</span></h3>
+          <div class="bars">
+            <div class="bar-col"><span class="bv">318</span><div class="bar" style="height:52%"></div><small>Aug</small></div>
+            <div class="bar-col"><span class="bv">324</span><div class="bar" style="height:54%"></div><small>Sep</small></div>
+            <div class="bar-col"><span class="bv">331</span><div class="bar" style="height:56%"></div><small>Oct</small></div>
+            <div class="bar-col"><span class="bv">347</span><div class="bar" style="height:60%"></div><small>Nov</small></div>
+            <div class="bar-col"><span class="bv">352</span><div class="bar" style="height:62%"></div><small>Dec</small></div>
+            <div class="bar-col"><span class="bv">360</span><div class="bar" style="height:64%"></div><small>Jan</small></div>
+            <div class="bar-col"><span class="bv">371</span><div class="bar" style="height:68%"></div><small>Feb</small></div>
+            <div class="bar-col"><span class="bv">378</span><div class="bar" style="height:70%"></div><small>Mar</small></div>
+            <div class="bar-col"><span class="bv">385</span><div class="bar" style="height:73%"></div><small>Apr</small></div>
+            <div class="bar-col"><span class="bv">394</span><div class="bar" style="height:77%"></div><small>May</small></div>
+            <div class="bar-col"><span class="bv">402</span><div class="bar" style="height:81%"></div><small>Jun</small></div>
+            <div class="bar-col"><span class="bv">413</span><div class="bar alt" style="height:86%"></div><small>Jul</small></div>
+          </div>
+        </div>
+        <div class="card"><h3><span data-i18n="projPerCust">Projects per customer</span><span class="hint">Top 8</span></h3>
+          <div class="hbar-row"><span class="hl">Acme Corp</span><div class="hbar-track"><div class="hbar-fill" style="width:96%"></div></div><span class="hv">24</span></div>
+          <div class="hbar-row"><span class="hl">Nortech</span><div class="hbar-track"><div class="hbar-fill" style="width:80%"></div></div><span class="hv">20</span></div>
+          <div class="hbar-row"><span class="hl">Vela Bank</span><div class="hbar-track"><div class="hbar-fill" style="width:68%"></div></div><span class="hv">17</span></div>
+          <div class="hbar-row"><span class="hl">Grupo Andes</span><div class="hbar-track"><div class="hbar-fill" style="width:56%"></div></div><span class="hv">14</span></div>
+          <div class="hbar-row"><span class="hl">Lumio Health</span><div class="hbar-track"><div class="hbar-fill" style="width:48%"></div></div><span class="hv">12</span></div>
+          <div class="hbar-row"><span class="hl">Ferro Log</span><div class="hbar-track"><div class="hbar-fill" style="width:40%"></div></div><span class="hv">10</span></div>
+          <div class="hbar-row"><span class="hl">Kappa Retail</span><div class="hbar-track"><div class="hbar-fill" style="width:32%"></div></div><span class="hv">8</span></div>
+          <div class="hbar-row"><span class="hl">Zentrix</span><div class="hbar-track"><div class="hbar-fill" style="width:28%"></div></div><span class="hv">7</span></div>
+        </div>
+      </div>
+      <div class="grid g3 mt">
+        <div class="card kpi"><div class="lbl" data-i18n="kUpgrades">Upgrades (30d)</div><div class="val up">17</div><div class="delta up">▲ +$28.4K MRR</div></div>
+        <div class="card kpi clickable" data-modal="modal-down"><div class="lbl" data-i18n="kDowngrades">Downgrades (30d)</div><div class="val down">5</div><div class="delta down">▼ −$9.1K MRR</div><div class="drill" data-i18n="drillDown">View downgrades</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kArpu">ARPU</div><div class="val">$3,224</div><div class="delta up">▲ 1.6%</div></div>
+      </div>
+    </section>
+
+    <!-- ============ BUSINESS · CUSTOMERS ============ -->
+    <section class="view" id="biz-customers">
+      <div class="banner">⚠️ <span><b>4</b> <span data-i18n="alertBanner">customers have generated no tickets in the last 14 days — review engagement</span></span></div>
+      <div class="grid g4">
+        <div class="card kpi"><div class="lbl" data-i18n="kCustomers">Total customers</div><div class="val">128</div><div class="delta up">▲ +6</div></div>
+        <div class="card kpi clickable" data-modal="modal-active"><div class="lbl" data-i18n="kActive">Active (30d)</div><div class="val">119</div><div class="delta flat">93%</div><div class="drill" data-i18n="drillActive">View active customers</div></div>
+        <div class="card kpi clickable" data-modal="modal-trials"><div class="lbl" data-i18n="kTrials">Trials in progress</div><div class="val">11</div><div class="delta up">▲ +3</div><div class="drill" data-i18n="drillTrials">View trials</div></div>
+        <div class="card kpi clickable" data-modal="modal-alerts"><div class="lbl" data-i18n="kAtRisk">At risk</div><div class="val" style="color:var(--bad)">4</div><div class="delta down" data-i18n="noActivity">no activity</div><div class="drill" data-i18n="drillAtRisk">View at-risk customers</div></div>
+      </div>
+      <div class="card mt">
+        <div class="pills">
+          <button class="pill active" data-filter="all" data-i18n="filterAll">All</button>
+          <button class="pill" data-filter="alert" data-i18n="filterAlerts">Usage alerts</button>
+          <button class="pill" data-filter="trial" data-i18n="filterTrials">Trials</button>
+        </div>
+        <table id="custTable">
+          <thead><tr>
+            <th data-i18n="thCustomer">Customer</th><th data-i18n="thPlan">Plan</th>
+            <th class="num" data-i18n="thProjects">Projects</th><th class="num" data-i18n="thTickets30">Tickets (30d)</th>
+            <th class="num" data-i18n="thLoc30">LOC (30d)</th><th class="num" data-i18n="thTokens30">Tokens (30d)</th>
+            <th class="num" data-i18n="thCost30">Token cost</th><th data-i18n="thStatus">Status</th>
+          </tr></thead>
+          <tbody>
+            <tr data-tag="ok"><td><b>Acme Corp</b></td><td>Enterprise</td><td class="num">24</td><td class="num">312</td><td class="num">1.82M</td><td class="num">640M</td><td class="num">$9,860</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stActive">Active</span></span></td></tr>
+            <tr data-tag="ok"><td><b>Nortech</b></td><td>Scale</td><td class="num">20</td><td class="num">228</td><td class="num">1.31M</td><td class="num">495M</td><td class="num">$7,210</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stActive">Active</span></span></td></tr>
+            <tr data-tag="alert"><td><b>Vela Bank</b></td><td>Enterprise</td><td class="num">17</td><td class="num">0</td><td class="num">0</td><td class="num">2M</td><td class="num">$38</td><td><span class="badge b-warn"><span class="dot d-warn"></span><span data-i18n="stNoTickets">No tickets 14d</span></span></td></tr>
+            <tr data-tag="ok"><td><b>Grupo Andes</b></td><td>Scale</td><td class="num">14</td><td class="num">176</td><td class="num">988K</td><td class="num">310M</td><td class="num">$4,750</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stActive">Active</span></span></td></tr>
+            <tr data-tag="alert"><td><b>Lumio Health</b></td><td>Growth</td><td class="num">12</td><td class="num">0</td><td class="num">12K</td><td class="num">8M</td><td class="num">$126</td><td><span class="badge b-warn"><span class="dot d-warn"></span><span data-i18n="stNoTickets">No tickets 14d</span></span></td></tr>
+            <tr data-tag="trial"><td><b>Ferro Log</b></td><td>Trial</td><td class="num">10</td><td class="num">64</td><td class="num">240K</td><td class="num">88M</td><td class="num">$1,320</td><td><span class="badge b-mut"><span data-i18n="stTrial">Trial · 9d left</span></span></td></tr>
+            <tr data-tag="alert"><td><b>Kappa Retail</b></td><td>Growth</td><td class="num">8</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">$0</td><td><span class="badge b-bad"><span class="dot d-bad"></span><span data-i18n="stInactive">Inactive 30d</span></span></td></tr>
+            <tr data-tag="ok"><td><b>Zentrix</b></td><td>Starter</td><td class="num">7</td><td class="num">91</td><td class="num">402K</td><td class="num">122M</td><td class="num">$1,890</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stActive">Active</span></span></td></tr>
+            <tr data-tag="alert"><td><b>Baltic Soft</b></td><td>Starter</td><td class="num">3</td><td class="num">0</td><td class="num">4K</td><td class="num">1M</td><td class="num">$16</td><td><span class="badge b-warn"><span class="dot d-warn"></span><span data-i18n="stNoTickets">No tickets 14d</span></span></td></tr>
+            <tr data-tag="trial"><td><b>Ohana Labs</b></td><td>Trial</td><td class="num">2</td><td class="num">18</td><td class="num">61K</td><td class="num">21M</td><td class="num">$310</td><td><span class="badge b-mut"><span data-i18n="stTrial2">Trial · 3d left</span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ BUSINESS · SUBSCRIPTIONS ============ -->
+    <section class="view" id="biz-subs">
+      <div class="grid g4">
+        <div class="card kpi"><div class="lbl" data-i18n="kSubs">Active subscriptions</div><div class="val">117</div><div class="delta up">▲ +4</div></div>
+        <div class="card kpi clickable" data-modal="modal-up"><div class="lbl" data-i18n="kUpgrades">Upgrades (30d)</div><div class="val up">17</div><div class="delta up">▲ +$28.4K MRR</div><div class="drill" data-i18n="drillUp">View upgrades</div></div>
+        <div class="card kpi clickable" data-modal="modal-down"><div class="lbl" data-i18n="kDowngrades">Downgrades (30d)</div><div class="val down">5</div><div class="delta down">▼ −$9.1K MRR</div><div class="drill" data-i18n="drillDown">View downgrades</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kNetMove">Net MRR movement</div><div class="val up">+$19.3K</div><div class="delta up" data-i18n="expansionLed">expansion-led</div></div>
+      </div>
+      <div class="grid g2 mt">
+        <div class="card"><h3><span data-i18n="subsByTier">Subscriptions by tier</span></h3>
+          <div class="donut-wrap">
+            <div class="donut" style="background:conic-gradient(var(--accent) 0 34%, var(--good) 34% 62%, var(--warn) 62% 84%, var(--bad) 84% 100%)"></div>
+            <div class="legend">
+              <div class="li"><span class="sw" style="background:var(--accent)"></span>Starter <b>40 · $48K</b></div>
+              <div class="li"><span class="sw" style="background:var(--good)"></span>Growth <b>33 · $99K</b></div>
+              <div class="li"><span class="sw" style="background:var(--warn)"></span>Scale <b>26 · $130K</b></div>
+              <div class="li"><span class="sw" style="background:var(--bad)"></span>Enterprise <b>18 · $135K</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="card"><h3><span data-i18n="upDown">Upgrades vs downgrades</span><span class="hint" data-i18n="m6">6 months</span></h3>
+          <div class="bars">
+            <div class="bar-col"><div class="duo"><div class="bar alt" style="height:45%"></div><div class="bar neg" style="height:25%"></div></div><small>Feb</small></div>
+            <div class="bar-col"><div class="duo"><div class="bar alt" style="height:55%"></div><div class="bar neg" style="height:30%"></div></div><small>Mar</small></div>
+            <div class="bar-col"><div class="duo"><div class="bar alt" style="height:50%"></div><div class="bar neg" style="height:20%"></div></div><small>Apr</small></div>
+            <div class="bar-col"><div class="duo"><div class="bar alt" style="height:65%"></div><div class="bar neg" style="height:35%"></div></div><small>May</small></div>
+            <div class="bar-col"><div class="duo"><div class="bar alt" style="height:70%"></div><div class="bar neg" style="height:22%"></div></div><small>Jun</small></div>
+            <div class="bar-col"><div class="duo"><div class="bar alt" style="height:85%"></div><div class="bar neg" style="height:25%"></div></div><small>Jul</small></div>
+          </div>
+          <div class="legend mt" style="flex-direction:row;gap:18px">
+            <div class="li"><span class="sw" style="background:var(--good)"></span><span data-i18n="kUpgrades">Upgrades</span></div>
+            <div class="li"><span class="sw" style="background:var(--bad)"></span><span data-i18n="kDowngrades">Downgrades</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card mt"><h3><span data-i18n="marginByTier">Revenue &amp; gross margin by tier</span><span class="hint" data-i18n="last30">Last 30 days</span></h3>
+        <table>
+          <thead><tr><th data-i18n="thTier">Tier</th><th class="num" data-i18n="thSubsN">Subs</th><th class="num">MRR</th><th class="num" data-i18n="thTokenCost">Token cost</th><th class="num" data-i18n="thMargin">Gross margin</th><th data-i18n="thTrend">Trend</th></tr></thead>
+          <tbody>
+            <tr><td>Starter</td><td class="num">40</td><td class="num">$48.0K</td><td class="num">$11.2K</td><td class="num up">77%</td><td><div class="progress"><i style="width:77%"></i></div></td></tr>
+            <tr><td>Growth</td><td class="num">33</td><td class="num">$99.0K</td><td class="num">$26.4K</td><td class="num up">73%</td><td><div class="progress"><i style="width:73%"></i></div></td></tr>
+            <tr><td>Scale</td><td class="num">26</td><td class="num">$130.0K</td><td class="num">$44.1K</td><td class="num">66%</td><td><div class="progress"><i style="width:66%"></i></div></td></tr>
+            <tr><td>Enterprise</td><td class="num">18</td><td class="num">$135.6K</td><td class="num">$57.9K</td><td class="num" style="color:var(--warn)">57%</td><td><div class="progress"><i class="warn" style="width:57%"></i></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ BUSINESS · TOKENS & COSTS ============ -->
+    <section class="view" id="biz-tokens">
+      <div class="grid g4">
+        <div class="card kpi"><div class="lbl" data-i18n="kTokens30">Tokens generated (30d)</div><div class="val">2.14B</div><div class="delta up">▲ 9.4%</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kCost30">Token cost (30d)</div><div class="val">$139.6K</div><div class="delta down">▲ 6.1% <span data-i18n="vsBudget">vs budget</span></div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kBudget">Monthly budget used</div><div class="val">82%</div><div class="delta flat">$139.6K / $170K</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kCostKloc">Cost per KLOC</div><div class="val">$14.85</div><div class="delta up">▼ 2.2%</div></div>
+      </div>
+      <div class="card mt"><h3><span data-i18n="tokensByModel">Tokens &amp; cost by model</span><span class="hint" data-i18n="last30">Last 30 days</span></h3>
+        <table>
+          <thead><tr><th data-i18n="thModel">Model</th><th data-i18n="thProvider">Provider</th><th class="num" data-i18n="thTokIn">Tokens in</th><th class="num" data-i18n="thTokOut">Tokens out</th><th class="num" data-i18n="thCostPerM">$ / 1M out</th><th class="num" data-i18n="thTotalCost">Total cost</th><th class="num" data-i18n="thShare">Share</th></tr></thead>
+          <tbody>
+            <tr><td><b>claude-fable-5</b></td><td>Anthropic</td><td class="num">412M</td><td class="num">298M</td><td class="num">$85.00</td><td class="num">$58.4K</td><td class="num">42%</td></tr>
+            <tr><td><b>claude-sonnet-5</b></td><td>Anthropic</td><td class="num">596M</td><td class="num">387M</td><td class="num">$22.50</td><td class="num">$41.9K</td><td class="num">30%</td></tr>
+            <tr><td><b>gpt-5.2</b></td><td>OpenAI</td><td class="num">204M</td><td class="num">131M</td><td class="num">$36.00</td><td class="num">$19.5K</td><td class="num">14%</td></tr>
+            <tr><td><b>claude-haiku-4.5</b></td><td>Anthropic</td><td class="num">488M</td><td class="num">240M</td><td class="num">$6.00</td><td class="num">$12.6K</td><td class="num">9%</td></tr>
+            <tr><td><b>llama-4-maverick (self-host)</b></td><td>On-prem</td><td class="num">96M</td><td class="num">58M</td><td class="num">$3.10</td><td class="num">$7.2K</td><td class="num">5%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid g2 mt">
+        <div class="card"><h3><span data-i18n="costTrend">Daily cost vs budget</span><span class="hint" data-i18n="d14">14 days</span></h3>
+          <svg class="spark" viewBox="0 0 300 46" preserveAspectRatio="none">
+            <line x1="0" y1="16" x2="300" y2="16" stroke="var(--bad)" stroke-dasharray="4 4" stroke-width="1"/>
+            <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="0,36 22,34 44,35 66,30 88,31 110,27 132,28 154,24 176,25 198,21 220,22 242,19 264,17 286,14"/>
+          </svg>
+          <div class="muted" style="font-size:11.5px"><span style="color:var(--bad)">— —</span> <span data-i18n="dailyBudgetLine">daily budget ($5.6K)</span> · <span data-i18n="lastDaysOver">last 2 days over budget</span></div>
+        </div>
+        <div class="card"><h3><span data-i18n="topCostCust">Top customers by token cost</span></h3>
+          <div class="hbar-row"><span class="hl">Acme Corp</span><div class="hbar-track"><div class="hbar-fill" style="width:100%"></div></div><span class="hv">$9,860</span></div>
+          <div class="hbar-row"><span class="hl">Nortech</span><div class="hbar-track"><div class="hbar-fill" style="width:73%"></div></div><span class="hv">$7,210</span></div>
+          <div class="hbar-row"><span class="hl">Grupo Andes</span><div class="hbar-track"><div class="hbar-fill" style="width:48%"></div></div><span class="hv">$4,750</span></div>
+          <div class="hbar-row"><span class="hl">Zentrix</span><div class="hbar-track"><div class="hbar-fill" style="width:19%"></div></div><span class="hv">$1,890</span></div>
+          <div class="hbar-row"><span class="hl">Ferro Log</span><div class="hbar-track"><div class="hbar-fill" style="width:13%"></div></div><span class="hv">$1,320</span></div>
+        </div>
+      </div>
+    </section>
+    <!-- ============ OPS · AGENTS ============ -->
+    <section class="view" id="ops-agents">
+      <div class="grid g4">
+        <div class="card kpi"><div class="lbl" data-i18n="kAgents">Total agents</div><div class="val">480</div><div class="delta flat">64 <span data-i18n="pools">pools</span></div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kAgentsActive">Active</div><div class="val up">391</div><div class="delta flat">81%</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kAgentsIdle">Idle</div><div class="val">76</div><div class="delta flat">16%</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kAgentsError">Error / stalled</div><div class="val" style="color:var(--bad)">13</div><div class="delta down">▲ +5 <span data-i18n="lastHour">last hour</span></div></div>
+      </div>
+      <div class="grid g4 mt">
+        <div class="card kpi"><div class="lbl" data-i18n="kSuccess">Task success rate (24h)</div><div class="val">96.2%</div><div class="delta up">▲ 0.4 pp</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kAvgTime">Avg task completion</div><div class="val">4m 12s</div><div class="delta up">▼ 18s</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kRetry">Retry rate</div><div class="val">3.1%</div><div class="delta down">▲ 0.6 pp</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kQueue">Queue depth (total)</div><div class="val">1,204</div><div class="delta down">▲ 210 <span data-i18n="tasks">tasks</span></div></div>
+      </div>
+      <div class="card mt"><h3><span data-i18n="poolTable">Agent pools</span><span class="hint" data-i18n="realtime">Real-time</span></h3>
+        <table>
+          <thead><tr><th data-i18n="thPool">Pool</th><th data-i18n="thStage">Stage</th><th class="num" data-i18n="thAgentsN">Agents</th><th class="num" data-i18n="thRunning">Running</th><th class="num" data-i18n="thQueue">Queue</th><th class="num" data-i18n="thSuccess24">Success (24h)</th><th class="num" data-i18n="thAvgT">Avg time</th><th data-i18n="thStatus">Status</th></tr></thead>
+          <tbody>
+            <tr><td><b>spec-writers</b></td><td data-i18n="stgSpec">Specification</td><td class="num">48</td><td class="num">39</td><td class="num">86</td><td class="num">98.1%</td><td class="num">2m 40s</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stHealthy">Healthy</span></span></td></tr>
+            <tr><td><b>code-gen-a</b></td><td data-i18n="stgCode">Code generation</td><td class="num">160</td><td class="num">148</td><td class="num">512</td><td class="num">96.8%</td><td class="num">5m 05s</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stHealthy">Healthy</span></span></td></tr>
+            <tr><td><b>code-gen-b</b></td><td data-i18n="stgCode">Code generation</td><td class="num">120</td><td class="num">102</td><td class="num">418</td><td class="num">93.4%</td><td class="num">6m 22s</td><td><span class="badge b-warn"><span class="dot d-warn"></span><span data-i18n="stDegraded">Degraded</span></span></td></tr>
+            <tr><td><b>test-runners</b></td><td data-i18n="stgTest">Testing</td><td class="num">88</td><td class="num">64</td><td class="num">122</td><td class="num">97.5%</td><td class="num">3m 48s</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stHealthy">Healthy</span></span></td></tr>
+            <tr><td><b>reviewers</b></td><td data-i18n="stgReview">Code review</td><td class="num">40</td><td class="num">28</td><td class="num">51</td><td class="num">98.9%</td><td class="num">1m 58s</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stHealthy">Healthy</span></span></td></tr>
+            <tr><td><b>deployers</b></td><td data-i18n="stgDeploy">Deployment</td><td class="num">24</td><td class="num">10</td><td class="num">15</td><td class="num">88.2%</td><td class="num">7m 44s</td><td><span class="badge b-bad"><span class="dot d-bad"></span><span data-i18n="stAttention">Needs attention</span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid g2 mt">
+        <div class="card"><h3><span data-i18n="throughput">Pipeline throughput</span><span class="hint" data-i18n="h24">24 hours · tasks/h</span></h3>
+          <svg class="spark" viewBox="0 0 300 46" preserveAspectRatio="none">
+            <polyline fill="none" stroke="var(--good)" stroke-width="2" points="0,30 25,28 50,32 75,25 100,20 125,22 150,15 175,18 200,12 225,16 250,10 275,13 300,8"/>
+          </svg>
+          <div class="flex-between muted" style="font-size:11.5px"><span>00:00</span><span data-i18n="peak">peak: 1,840 tasks/h</span><span>23:00</span></div>
+        </div>
+        <div class="card"><h3><span data-i18n="failReasons">Failure reasons (24h)</span></h3>
+          <div class="hbar-row"><span class="hl" data-i18n="frTimeout">Timeout</span><div class="hbar-track"><div class="hbar-fill" style="width:88%;background:var(--bad)"></div></div><span class="hv">41%</span></div>
+          <div class="hbar-row"><span class="hl" data-i18n="frRateLimit">Rate limit</span><div class="hbar-track"><div class="hbar-fill" style="width:60%;background:var(--warn)"></div></div><span class="hv">28%</span></div>
+          <div class="hbar-row"><span class="hl" data-i18n="frTestFail">Tests failing</span><div class="hbar-track"><div class="hbar-fill" style="width:40%"></div></div><span class="hv">19%</span></div>
+          <div class="hbar-row"><span class="hl" data-i18n="frCtx">Context overflow</span><div class="hbar-track"><div class="hbar-fill" style="width:17%"></div></div><span class="hv">8%</span></div>
+          <div class="hbar-row"><span class="hl" data-i18n="frOther">Other</span><div class="hbar-track"><div class="hbar-fill" style="width:9%"></div></div><span class="hv">4%</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ OPS · MODELS ============ -->
+    <section class="view" id="ops-models">
+      <div class="grid g4">
+        <div class="card kpi"><div class="lbl" data-i18n="kModels">Models in service</div><div class="val">5</div><div class="delta flat">3 <span data-i18n="providers">providers</span></div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kTokMin">Tokens / min (now)</div><div class="val">49.6K</div><div class="delta up">▲ 6%</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kErrRate">Error rate (1h)</div><div class="val">0.8%</div><div class="delta up">▼ 0.2 pp</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kQuotaMax">Highest quota usage</div><div class="val" style="color:var(--warn)">91%</div><div class="delta flat">claude-sonnet-5</div></div>
+      </div>
+      <div class="card mt"><h3><span data-i18n="modelHealth">Model &amp; service status</span><span class="hint" data-i18n="realtime">Real-time</span></h3>
+        <table>
+          <thead><tr><th data-i18n="thModel">Model</th><th data-i18n="thProvider">Provider</th><th data-i18n="thStatus">Status</th><th class="num">p50</th><th class="num">p95</th><th class="num" data-i18n="thErr1h">Errors (1h)</th><th class="num" data-i18n="thTokMinC">Tok/min</th><th data-i18n="thQuota">Quota used</th></tr></thead>
+          <tbody>
+            <tr><td><b>claude-fable-5</b></td><td>Anthropic</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stOperational">Operational</span></span></td><td class="num">1.9s</td><td class="num">4.8s</td><td class="num">0.3%</td><td class="num">11.2K</td><td><div class="progress"><i style="width:64%"></i></div></td></tr>
+            <tr><td><b>claude-sonnet-5</b></td><td>Anthropic</td><td><span class="badge b-warn"><span class="dot d-warn"></span><span data-i18n="stDegraded">Degraded</span></span></td><td class="num">2.4s</td><td class="num">9.1s</td><td class="num">2.1%</td><td class="num">18.9K</td><td><div class="progress"><i class="warn" style="width:91%"></i></div></td></tr>
+            <tr><td><b>gpt-5.2</b></td><td>OpenAI</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stOperational">Operational</span></span></td><td class="num">2.1s</td><td class="num">5.6s</td><td class="num">0.6%</td><td class="num">6.4K</td><td><div class="progress"><i style="width:47%"></i></div></td></tr>
+            <tr><td><b>claude-haiku-4.5</b></td><td>Anthropic</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stOperational">Operational</span></span></td><td class="num">0.7s</td><td class="num">1.9s</td><td class="num">0.2%</td><td class="num">10.8K</td><td><div class="progress"><i style="width:38%"></i></div></td></tr>
+            <tr><td><b>llama-4-maverick</b></td><td>On-prem</td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stOperational">Operational</span></span></td><td class="num">1.2s</td><td class="num">3.4s</td><td class="num">0.4%</td><td class="num">2.3K</td><td><div class="progress"><i style="width:52%"></i></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card mt"><h3><span data-i18n="coreServices">Core platform services</span></h3>
+        <table>
+          <thead><tr><th data-i18n="thService">Service</th><th data-i18n="thStatus">Status</th><th class="num" data-i18n="thUptime30">Uptime (30d)</th><th class="num" data-i18n="thLatency">Latency p95</th><th data-i18n="thNote">Note</th></tr></thead>
+          <tbody>
+            <tr><td><b>Orchestrator API</b></td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stOperational">Operational</span></span></td><td class="num">99.98%</td><td class="num">142ms</td><td class="muted">—</td></tr>
+            <tr><td><b>Task queue (Kafka)</b></td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stOperational">Operational</span></span></td><td class="num">99.99%</td><td class="num">18ms</td><td class="muted" data-i18n="lagNormal">consumer lag normal</td></tr>
+            <tr><td><b>Vector store</b></td><td><span class="badge b-warn"><span class="dot d-warn"></span><span data-i18n="stDegraded">Degraded</span></span></td><td class="num">99.71%</td><td class="num">610ms</td><td class="muted" data-i18n="reindexing">re-indexing in progress</td></tr>
+            <tr><td><b>Git service</b></td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stOperational">Operational</span></span></td><td class="num">99.95%</td><td class="num">96ms</td><td class="muted">—</td></tr>
+            <tr><td><b>CI runners</b></td><td><span class="badge b-good"><span class="dot d-good"></span><span data-i18n="stOperational">Operational</span></span></td><td class="num">99.90%</td><td class="num">—</td><td class="muted" data-i18n="capacity78">78% capacity</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ OPS · SLA ============ -->
+    <section class="view" id="ops-sla">
+      <div class="grid g4">
+        <div class="card kpi"><div class="lbl" data-i18n="kUptime">Platform uptime (30d)</div><div class="val">99.94%</div><div class="delta flat">SLA: 99.9%</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kOpenInc">Open incidents</div><div class="val" style="color:var(--warn)">2</div><div class="delta flat">1 <span data-i18n="sevHigh">high</span> · 1 <span data-i18n="sevLow">low</span></div></div>
+        <div class="card kpi"><div class="lbl">MTTR (30d)</div><div class="val">38m</div><div class="delta up">▼ 12m</div></div>
+        <div class="card kpi"><div class="lbl" data-i18n="kP95">Platform p95 latency</div><div class="val">4.2s</div><div class="delta up">▼ 0.3s</div></div>
+      </div>
+      <div class="card mt"><h3><span data-i18n="incidents">Recent incidents</span><span class="hint" data-i18n="d30">Last 30 days</span></h3>
+        <table>
+          <thead><tr><th>ID</th><th data-i18n="thSeverity">Severity</th><th data-i18n="thTitle">Title</th><th data-i18n="thAffected">Affected</th><th data-i18n="thStarted">Started</th><th data-i18n="thDuration">Duration</th><th data-i18n="thStatus">Status</th></tr></thead>
+          <tbody>
+            <tr><td class="muted">INC-241</td><td><span class="badge b-bad" data-i18n="sevHighB">High</span></td><td data-i18n="inc1">Sonnet quota exhaustion — code-gen-b throttled</td><td>code-gen-b</td><td>10 Jul 08:12</td><td class="num">1h 30m</td><td><span class="badge b-warn" data-i18n="stInvestigating">Investigating</span></td></tr>
+            <tr><td class="muted">INC-240</td><td><span class="badge b-mut" data-i18n="sevLowB">Low</span></td><td data-i18n="inc2">Vector store slow queries during re-index</td><td>Vector store</td><td>09 Jul 22:40</td><td class="num">11h</td><td><span class="badge b-warn" data-i18n="stMonitoring">Monitoring</span></td></tr>
+            <tr><td class="muted">INC-238</td><td><span class="badge b-warn" data-i18n="sevMedB">Medium</span></td><td data-i18n="inc3">Deploy pipeline failures — expired registry credentials</td><td>deployers</td><td>06 Jul 14:05</td><td class="num">52m</td><td><span class="badge b-good" data-i18n="stResolved">Resolved</span></td></tr>
+            <tr><td class="muted">INC-236</td><td><span class="badge b-bad" data-i18n="sevHighB">High</span></td><td data-i18n="inc4">OpenAI API outage — traffic failed over to Claude</td><td>gpt-5.2</td><td>28 Jun 03:22</td><td class="num">2h 18m</td><td><span class="badge b-good" data-i18n="stResolved">Resolved</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid g2 mt">
+        <div class="card"><h3><span data-i18n="uptimeByService">Uptime by service (30d)</span></h3>
+          <div class="hbar-row"><span class="hl">Orchestrator</span><div class="hbar-track"><div class="hbar-fill" style="width:99.98%;background:var(--good)"></div></div><span class="hv">99.98%</span></div>
+          <div class="hbar-row"><span class="hl">Task queue</span><div class="hbar-track"><div class="hbar-fill" style="width:99.99%;background:var(--good)"></div></div><span class="hv">99.99%</span></div>
+          <div class="hbar-row"><span class="hl">Vector store</span><div class="hbar-track"><div class="hbar-fill" style="width:99.71%;background:var(--warn)"></div></div><span class="hv">99.71%</span></div>
+          <div class="hbar-row"><span class="hl">Git service</span><div class="hbar-track"><div class="hbar-fill" style="width:99.95%;background:var(--good)"></div></div><span class="hv">99.95%</span></div>
+          <div class="hbar-row"><span class="hl">CI runners</span><div class="hbar-track"><div class="hbar-fill" style="width:99.90%;background:var(--good)"></div></div><span class="hv">99.90%</span></div>
+        </div>
+        <div class="card"><h3><span data-i18n="errBudget">Error budget remaining</span><span class="hint" data-i18n="thisMonth">This month</span></h3>
+          <div class="hbar-row"><span class="hl" data-i18n="ebUptime">Uptime SLO</span><div class="hbar-track"><div class="hbar-fill" style="width:61%;background:var(--good)"></div></div><span class="hv">61%</span></div>
+          <div class="hbar-row"><span class="hl" data-i18n="ebLatency">Latency SLO</span><div class="hbar-track"><div class="hbar-fill" style="width:74%;background:var(--good)"></div></div><span class="hv">74%</span></div>
+          <div class="hbar-row"><span class="hl" data-i18n="ebErrors">Error-rate SLO</span><div class="hbar-track"><div class="hbar-fill" style="width:33%;background:var(--warn)"></div></div><span class="hv">33%</span></div>
+          <div class="muted mt" style="font-size:12px" data-i18n="ebNote">Error-rate budget is burning 2.1× faster than plan — driven by Sonnet throttling.</div>
+        </div>
+      </div>
+    </section>
+    <!--VIEWS-->
+  </div>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-overlay" id="modal-up">
+  <div class="modal">
+    <div class="modal-head"><h2>⬆️ <span data-i18n="modalUpTitle">Upgrades — last 30 days</span></h2><button class="x" data-close>✕</button></div>
+    <div class="modal-body">
+      <table>
+        <thead><tr><th data-i18n="thCustomer">Customer</th><th data-i18n="thRegion">Region</th><th data-i18n="thFrom">From</th><th data-i18n="thTo">To</th><th class="num" data-i18n="thDate">Date</th><th class="num" data-i18n="thMrrDelta">MRR change</th><th data-i18n="thReason">Reason</th></tr></thead>
+        <tbody>
+          <tr><td><b>Acme Corp</b></td><td>NA · US</td><td>Scale</td><td>Enterprise</td><td class="num">08 Jul</td><td class="num up">+$5,500</td><td><span class="badge b-good" data-i18n="rLimits">Hit plan limits</span></td></tr>
+          <tr><td><b>Nortech</b></td><td>EMEA · UK</td><td>Growth</td><td>Scale</td><td class="num">05 Jul</td><td class="num up">+$2,000</td><td><span class="badge b-mut" data-i18n="rMoreProj">More projects</span></td></tr>
+          <tr><td><b>Grupo Andes</b></td><td>LATAM · MX</td><td>Growth</td><td>Scale</td><td class="num">29 Jun</td><td class="num up">+$2,000</td><td><span class="badge b-mut" data-i18n="rMoreProj">More projects</span></td></tr>
+          <tr><td><b>Zentrix</b></td><td>EMEA · ES</td><td>Starter</td><td>Growth</td><td class="num">24 Jun</td><td class="num up">+$1,800</td><td><span class="badge b-good" data-i18n="rLimits">Hit plan limits</span></td></tr>
+          <tr><td><b>Kite Logistics</b></td><td>LATAM · BR</td><td>Starter</td><td>Growth</td><td class="num">19 Jun</td><td class="num up">+$1,800</td><td><span class="badge b-good" data-i18n="rLimits">Hit plan limits</span></td></tr>
+          <tr><td><b>Nova Terra</b></td><td>EMEA · PT</td><td>Growth</td><td>Scale</td><td class="num">14 Jun</td><td class="num up">+$2,000</td><td><span class="badge b-mut" data-i18n="rMoreProj">More projects</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-foot" data-i18n="modalUpFoot">Showing 6 of 17 · Total impact: +$28,400 MRR · 4 of 6 upgraded after hitting plan limits.</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-active">
+  <div class="modal">
+    <div class="modal-head"><h2>✅ <span data-i18n="modalActiveTitle">Active customers — last 30 days</span></h2><button class="x" data-close>✕</button></div>
+    <div class="modal-body">
+      <table>
+        <thead><tr><th data-i18n="thCustomer">Customer</th><th data-i18n="thPlan">Plan</th><th data-i18n="thRegion">Region</th><th class="num" data-i18n="thProjects">Projects</th><th class="num" data-i18n="thTickets30">Tickets (30d)</th><th class="num" data-i18n="thLoc30">LOC (30d)</th></tr></thead>
+        <tbody>
+          <tr><td><b>Acme Corp</b></td><td>Enterprise</td><td>NA · US</td><td class="num">24</td><td class="num">312</td><td class="num">1.82M</td></tr>
+          <tr><td><b>Nortech</b></td><td>Scale</td><td>EMEA · UK</td><td class="num">20</td><td class="num">228</td><td class="num">1.31M</td></tr>
+          <tr><td><b>Grupo Andes</b></td><td>Scale</td><td>LATAM · MX</td><td class="num">14</td><td class="num">176</td><td class="num">988K</td></tr>
+          <tr><td><b>Helios Bank</b></td><td>Enterprise</td><td>EMEA · ES</td><td class="num">13</td><td class="num">154</td><td class="num">870K</td></tr>
+          <tr><td><b>Mira Foods</b></td><td>Growth</td><td>LATAM · BR</td><td class="num">9</td><td class="num">121</td><td class="num">515K</td></tr>
+          <tr><td><b>Cobalt Systems</b></td><td>Scale</td><td>NA · US</td><td class="num">11</td><td class="num">118</td><td class="num">640K</td></tr>
+          <tr><td><b>Zentrix</b></td><td>Starter</td><td>EMEA · ES</td><td class="num">7</td><td class="num">91</td><td class="num">402K</td></tr>
+          <tr><td><b>Drava Media</b></td><td>Growth</td><td>EMEA · PT</td><td class="num">6</td><td class="num">74</td><td class="num">280K</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-foot" data-i18n="modalActiveFoot">Showing top 8 of 119 by activity · 93% of customer base active.</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-trials">
+  <div class="modal">
+    <div class="modal-head"><h2>🧪 <span data-i18n="modalTrialsTitle">Trials in progress</span></h2><button class="x" data-close>✕</button></div>
+    <div class="modal-body">
+      <table>
+        <thead><tr><th data-i18n="thCustomer">Customer</th><th data-i18n="thRegion">Region</th><th class="num" data-i18n="thProjects">Projects</th><th class="num" data-i18n="thTickets30">Tickets (30d)</th><th class="num" data-i18n="thDaysLeft">Days left</th><th data-i18n="thStatus">Status</th></tr></thead>
+        <tbody>
+          <tr><td><b>Ferro Log</b></td><td>LATAM · BR</td><td class="num">10</td><td class="num">64</td><td class="num">9</td><td><span class="badge b-good" data-i18n="stLikely">Likely to convert</span></td></tr>
+          <tr><td><b>Vortex AI</b></td><td>NA · US</td><td class="num">5</td><td class="num">41</td><td class="num">12</td><td><span class="badge b-good" data-i18n="stLikely">Likely to convert</span></td></tr>
+          <tr><td><b>Andor Systems</b></td><td>EMEA · UK</td><td class="num">3</td><td class="num">22</td><td class="num">20</td><td><span class="badge b-good" data-i18n="stLikely">Likely to convert</span></td></tr>
+          <tr><td><b>Ohana Labs</b></td><td>NA · US</td><td class="num">2</td><td class="num">18</td><td class="num">3</td><td><span class="badge b-warn" data-i18n="stNeedsPush">Needs push</span></td></tr>
+          <tr><td><b>Pixel Foundry</b></td><td>LATAM · MX</td><td class="num">1</td><td class="num">4</td><td class="num">6</td><td><span class="badge b-warn" data-i18n="stNeedsPush">Needs push</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-foot" data-i18n="modalTrialsFoot">Showing 5 of 11 · 7 on track to convert · trial-to-paid rate last quarter: 64%.</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-alerts">
+  <div class="modal">
+    <div class="modal-head"><h2>⚠️ <span data-i18n="modalAlertsTitle">Customers with usage alerts</span></h2><button class="x" data-close>✕</button></div>
+    <div class="modal-body">
+      <table>
+        <thead><tr><th data-i18n="thCustomer">Customer</th><th data-i18n="thPlan">Plan</th><th data-i18n="thRegion">Region</th><th class="num" data-i18n="thLastTicket">Last ticket</th><th class="num" data-i18n="thDaysInactive">Days inactive</th><th class="num" data-i18n="thMrrRisk">MRR at risk</th></tr></thead>
+        <tbody>
+          <tr><td><b>Vela Bank</b></td><td>Enterprise</td><td>LATAM · MX</td><td class="num">24 Jun</td><td class="num">16</td><td class="num">$7,500</td></tr>
+          <tr><td><b>Lumio Health</b></td><td>Growth</td><td>NA · US</td><td class="num">23 Jun</td><td class="num">17</td><td class="num">$3,000</td></tr>
+          <tr><td><b>Kappa Retail</b></td><td>Growth</td><td>EMEA · UK</td><td class="num">08 Jun</td><td class="num">32</td><td class="num">$3,000</td></tr>
+          <tr><td><b>Baltic Soft</b></td><td>Starter</td><td>EMEA · PT</td><td class="num">25 Jun</td><td class="num">15</td><td class="num">$1,200</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-foot" data-i18n="modalAlertsFoot">Total MRR at risk: $14,700 · Suggested action: trigger customer-success outreach playbook.</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-churn">
+  <div class="modal">
+    <div class="modal-head"><h2>📉 <span data-i18n="modalChurnTitle">Lost customers — last 90 days</span></h2><button class="x" data-close>✕</button></div>
+    <div class="modal-body">
+      <table>
+        <thead><tr><th data-i18n="thCustomer">Customer</th><th data-i18n="thPlan">Plan</th><th data-i18n="thRegion">Region</th><th class="num" data-i18n="thChurnDate">Churn date</th><th class="num" data-i18n="thMrrLost">MRR lost</th><th data-i18n="thReason">Reason</th></tr></thead>
+        <tbody>
+          <tr><td><b>Quantum Freight</b></td><td>Scale</td><td>NA · US</td><td class="num">02 Jul</td><td class="num">$5,000</td><td><span class="badge b-bad" data-i18n="rInhouse">Moved in-house</span></td></tr>
+          <tr><td><b>Iberia Media</b></td><td>Growth</td><td>EMEA · ES</td><td class="num">18 Jun</td><td class="num">$3,000</td><td><span class="badge b-warn" data-i18n="rBudget">Budget cut</span></td></tr>
+          <tr><td><b>Sol Energia</b></td><td>Starter</td><td>LATAM · BR</td><td class="num">29 May</td><td class="num">$1,200</td><td><span class="badge b-mut" data-i18n="rLowUse">Low usage</span></td></tr>
+          <tr><td><b>Helix Studios</b></td><td>Starter</td><td>EMEA · UK</td><td class="num">12 May</td><td class="num">$1,200</td><td><span class="badge b-warn" data-i18n="rPrice">Price</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-foot" data-i18n="modalChurnFoot">Total MRR lost: $10,400 · 2 of 4 had a usage alert before churning.</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-down">
+  <div class="modal">
+    <div class="modal-head"><h2>⬇️ <span data-i18n="modalDownTitle">Downgrades — last 30 days</span></h2><button class="x" data-close>✕</button></div>
+    <div class="modal-body">
+      <table>
+        <thead><tr><th data-i18n="thCustomer">Customer</th><th data-i18n="thRegion">Region</th><th data-i18n="thFrom">From</th><th data-i18n="thTo">To</th><th class="num" data-i18n="thDate">Date</th><th class="num" data-i18n="thMrrDelta">MRR change</th><th data-i18n="thReason">Reason</th></tr></thead>
+        <tbody>
+          <tr><td><b>Ferro Log</b></td><td>LATAM · BR</td><td>Scale</td><td>Growth</td><td class="num">07 Jul</td><td class="num down">−$2,000</td><td><span class="badge b-warn" data-i18n="rBudget">Budget cut</span></td></tr>
+          <tr><td><b>Delta Insurance</b></td><td>NA · US</td><td>Enterprise</td><td>Scale</td><td class="num">01 Jul</td><td class="num down">−$2,500</td><td><span class="badge b-mut" data-i18n="rSeats">Fewer projects</span></td></tr>
+          <tr><td><b>Marea Travel</b></td><td>EMEA · ES</td><td>Growth</td><td>Starter</td><td class="num">26 Jun</td><td class="num down">−$1,800</td><td><span class="badge b-mut" data-i18n="rLowUse">Low usage</span></td></tr>
+          <tr><td><b>Prisma Legal</b></td><td>EMEA · PT</td><td>Growth</td><td>Starter</td><td class="num">20 Jun</td><td class="num down">−$1,800</td><td><span class="badge b-warn" data-i18n="rPrice">Price</span></td></tr>
+          <tr><td><b>Atlas Mining</b></td><td>LATAM · MX</td><td>Scale</td><td>Growth</td><td class="num">14 Jun</td><td class="num down">−$1,000</td><td><span class="badge b-mut" data-i18n="rSeats">Fewer projects</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-foot" data-i18n="modalDownFoot">Net impact: −$9,100 MRR · 3 of 5 cited cost — consider usage-based add-on tier.</div>
+  </div>
+</div>
+<script>
+const I18N = {
+en:{
+appTitle:"Kallicode",appSub:"Management Console",navBusiness:"Business",navOverview:"Overview",navCustomers:"Customers",navSubs:"Subscriptions & Revenue",navTokens:"Tokens & Costs",navOperations:"Operations",navAgents:"Agents",navModels:"Models & Services",navSla:"SLA & Incidents",wireframeNote:"Functional wireframe · mock data",lastUpdate:"Last updated",searchPh:"Search customers, projects, agents…",
+kCustomers:"Total customers",vsLastMonth:"vs last month",kMrr:"MRR",kArr:"ARR (run-rate)",kUsageAlerts:"Usage alerts",noTickets14d:"no tickets in 14 days",kProjects:"Projects running",kLoc:"LOC generated (30d)",kChurn:"Churn rate",kNrr:"Net revenue retention",mrrTrend:"MRR trend ($K)",m12:"12 months",projPerCust:"Projects per customer",kUpgrades:"Upgrades (30d)",kDowngrades:"Downgrades (30d)",kArpu:"ARPU",
+alertBanner:"customers have generated no tickets in the last 14 days — review engagement",kActive:"Active (30d)",kTrials:"Trials in progress",kAtRisk:"At risk",noActivity:"no activity",filterAll:"All",filterAlerts:"Usage alerts",filterTrials:"Trials",thCustomer:"Customer",thPlan:"Plan",thProjects:"Projects",thTickets30:"Tickets (30d)",thLoc30:"LOC (30d)",thTokens30:"Tokens (30d)",thCost30:"Token cost",thStatus:"Status",stActive:"Active",stNoTickets:"No tickets 14d",stTrial:"Trial · 9d left",stTrial2:"Trial · 3d left",stInactive:"Inactive 30d",
+kSubs:"Active subscriptions",kNetMove:"Net MRR movement",expansionLed:"expansion-led",subsByTier:"Subscriptions by tier",upDown:"Upgrades vs downgrades",m6:"6 months",marginByTier:"Revenue & gross margin by tier",last30:"Last 30 days",thTier:"Tier",thSubsN:"Subs",thTokenCost:"Token cost",thMargin:"Gross margin",thTrend:"Trend",
+kTokens30:"Tokens generated (30d)",kCost30:"Token cost (30d)",vsBudget:"vs budget",kBudget:"Monthly budget used",kCostKloc:"Cost per KLOC",tokensByModel:"Tokens & cost by model",thModel:"Model",thProvider:"Provider",thTokIn:"Tokens in",thTokOut:"Tokens out",thCostPerM:"$ / 1M out",thTotalCost:"Total cost",thShare:"Share",costTrend:"Daily cost vs budget",d14:"14 days",dailyBudgetLine:"daily budget ($5.6K)",lastDaysOver:"last 2 days over budget",topCostCust:"Top customers by token cost",
+kAgents:"Total agents",pools:"pools",kAgentsActive:"Active",kAgentsIdle:"Idle",kAgentsError:"Error / stalled",lastHour:"last hour",kSuccess:"Task success rate (24h)",kAvgTime:"Avg task completion",kRetry:"Retry rate",kQueue:"Queue depth (total)",tasks:"tasks",poolTable:"Agent pools",realtime:"Real-time",thPool:"Pool",thStage:"Stage",thAgentsN:"Agents",thRunning:"Running",thQueue:"Queue",thSuccess24:"Success (24h)",thAvgT:"Avg time",stgSpec:"Specification",stgCode:"Code generation",stgTest:"Testing",stgReview:"Code review",stgDeploy:"Deployment",stHealthy:"Healthy",stDegraded:"Degraded",stAttention:"Needs attention",throughput:"Pipeline throughput",h24:"24 hours · tasks/h",peak:"peak: 1,840 tasks/h",failReasons:"Failure reasons (24h)",frTimeout:"Timeout",frRateLimit:"Rate limit",frTestFail:"Tests failing",frCtx:"Context overflow",frOther:"Other",
+kModels:"Models in service",providers:"providers",kTokMin:"Tokens / min (now)",kErrRate:"Error rate (1h)",kQuotaMax:"Highest quota usage",modelHealth:"Model & service status",thErr1h:"Errors (1h)",thTokMinC:"Tok/min",thQuota:"Quota used",stOperational:"Operational",coreServices:"Core platform services",thService:"Service",thUptime30:"Uptime (30d)",thLatency:"Latency p95",thNote:"Note",lagNormal:"consumer lag normal",reindexing:"re-indexing in progress",capacity78:"78% capacity",
+kUptime:"Platform uptime (30d)",kOpenInc:"Open incidents",sevHigh:"high",sevLow:"low",kP95:"Platform p95 latency",incidents:"Recent incidents",d30:"Last 30 days",thSeverity:"Severity",thTitle:"Title",thAffected:"Affected",thStarted:"Started",thDuration:"Duration",sevHighB:"High",sevLowB:"Low",sevMedB:"Medium",inc1:"Sonnet quota exhaustion — code-gen-b throttled",inc2:"Vector store slow queries during re-index",inc3:"Deploy pipeline failures — expired registry credentials",inc4:"OpenAI API outage — traffic failed over to Claude",stInvestigating:"Investigating",stMonitoring:"Monitoring",stResolved:"Resolved",uptimeByService:"Uptime by service (30d)",errBudget:"Error budget remaining",thisMonth:"This month",ebUptime:"Uptime SLO",ebLatency:"Latency SLO",ebErrors:"Error-rate SLO",ebNote:"Error-rate budget is burning 2.1× faster than plan — driven by Sonnet throttling.",
+drillHint:"View affected customers",drillChurn:"View lost customers",drillDown:"View downgrades",modalAlertsTitle:"Customers with usage alerts",modalAlertsFoot:"Total MRR at risk: $14,700 · Suggested action: trigger customer-success outreach playbook.",modalChurnTitle:"Lost customers — last 90 days",modalChurnFoot:"Total MRR lost: $10,400 · 2 of 4 had a usage alert before churning.",modalDownTitle:"Downgrades — last 30 days",modalDownFoot:"Net impact: −$9,100 MRR · 3 of 5 cited cost — consider usage-based add-on tier.",
+thRegion:"Region",thLastTicket:"Last ticket",thDaysInactive:"Days inactive",thMrrRisk:"MRR at risk",thChurnDate:"Churn date",thMrrLost:"MRR lost",thReason:"Reason",thFrom:"From",thTo:"To",thDate:"Date",thMrrDelta:"MRR change",
+rInhouse:"Moved in-house",rBudget:"Budget cut",rLowUse:"Low usage",rPrice:"Price",rSeats:"Fewer projects",
+ogRegions:"Regions",ogCountries:"Countries",regionNA:"North America",regionEMEA:"EMEA",regionLATAM:"LATAM",regionAPAC:"APAC",cUS:"United States",cUK:"United Kingdom",cES:"Spain",cPT:"Portugal",cMX:"Mexico",cBR:"Brazil",scope:"Scope",
+drillUp:"View upgrades",drillActive:"View active customers",drillAtRisk:"View at-risk customers",drillTrials:"View trials",
+modalUpTitle:"Upgrades — last 30 days",modalUpFoot:"Showing 6 of 17 · Total impact: +$28,400 MRR · 4 of 6 upgraded after hitting plan limits.",
+modalActiveTitle:"Active customers — last 30 days",modalActiveFoot:"Showing top 8 of 119 by activity · 93% of customer base active.",
+modalTrialsTitle:"Trials in progress",modalTrialsFoot:"Showing 5 of 11 · 7 on track to convert · trial-to-paid rate last quarter: 64%.",
+thDaysLeft:"Days left",rMoreProj:"More projects",rLimits:"Hit plan limits",stLikely:"Likely to convert",stNeedsPush:"Needs push"
+},
+es:{
+appTitle:"Kallicode",appSub:"Consola de gestión",navBusiness:"Negocio",navOverview:"Resumen",navCustomers:"Clientes",navSubs:"Suscripciones e ingresos",navTokens:"Tokens y costes",navOperations:"Operaciones",navAgents:"Agentes",navModels:"Modelos y servicios",navSla:"SLA e incidencias",wireframeNote:"Wireframe funcional · datos simulados",lastUpdate:"Última actualización",searchPh:"Buscar clientes, proyectos, agentes…",
+kCustomers:"Clientes totales",vsLastMonth:"vs mes anterior",kMrr:"MRR",kArr:"ARR (anualizado)",kUsageAlerts:"Alertas de uso",noTickets14d:"sin tickets en 14 días",kProjects:"Proyectos en curso",kLoc:"LOC generadas (30d)",kChurn:"Tasa de churn",kNrr:"Retención neta de ingresos",mrrTrend:"Evolución del MRR ($K)",m12:"12 meses",projPerCust:"Proyectos por cliente",kUpgrades:"Upgrades (30d)",kDowngrades:"Downgrades (30d)",kArpu:"ARPU",
+alertBanner:"clientes no han generado tickets en los últimos 14 días — revisar engagement",kActive:"Activos (30d)",kTrials:"Pruebas en curso",kAtRisk:"En riesgo",noActivity:"sin actividad",filterAll:"Todos",filterAlerts:"Alertas de uso",filterTrials:"Pruebas",thCustomer:"Cliente",thPlan:"Plan",thProjects:"Proyectos",thTickets30:"Tickets (30d)",thLoc30:"LOC (30d)",thTokens30:"Tokens (30d)",thCost30:"Coste tokens",thStatus:"Estado",stActive:"Activo",stNoTickets:"Sin tickets 14d",stTrial:"Prueba · quedan 9d",stTrial2:"Prueba · quedan 3d",stInactive:"Inactivo 30d",
+kSubs:"Suscripciones activas",kNetMove:"Movimiento neto de MRR",expansionLed:"impulsado por expansión",subsByTier:"Suscripciones por nivel",upDown:"Upgrades vs downgrades",m6:"6 meses",marginByTier:"Ingresos y margen bruto por nivel",last30:"Últimos 30 días",thTier:"Nivel",thSubsN:"Subs",thTokenCost:"Coste tokens",thMargin:"Margen bruto",thTrend:"Tendencia",
+kTokens30:"Tokens generados (30d)",kCost30:"Coste de tokens (30d)",vsBudget:"vs presupuesto",kBudget:"Presupuesto mensual usado",kCostKloc:"Coste por KLOC",tokensByModel:"Tokens y coste por modelo",thModel:"Modelo",thProvider:"Proveedor",thTokIn:"Tokens entrada",thTokOut:"Tokens salida",thCostPerM:"$ / 1M salida",thTotalCost:"Coste total",thShare:"Cuota",costTrend:"Coste diario vs presupuesto",d14:"14 días",dailyBudgetLine:"presupuesto diario ($5,6K)",lastDaysOver:"últimos 2 días por encima",topCostCust:"Top clientes por coste de tokens",
+kAgents:"Agentes totales",pools:"pools",kAgentsActive:"Activos",kAgentsIdle:"Inactivos",kAgentsError:"Error / bloqueados",lastHour:"última hora",kSuccess:"Tasa de éxito (24h)",kAvgTime:"Tiempo medio por tarea",kRetry:"Tasa de reintentos",kQueue:"Profundidad de cola (total)",tasks:"tareas",poolTable:"Pools de agentes",realtime:"Tiempo real",thPool:"Pool",thStage:"Etapa",thAgentsN:"Agentes",thRunning:"En ejecución",thQueue:"Cola",thSuccess24:"Éxito (24h)",thAvgT:"T. medio",stgSpec:"Especificación",stgCode:"Generación de código",stgTest:"Pruebas",stgReview:"Revisión de código",stgDeploy:"Despliegue",stHealthy:"Saludable",stDegraded:"Degradado",stAttention:"Requiere atención",throughput:"Rendimiento del pipeline",h24:"24 horas · tareas/h",peak:"pico: 1.840 tareas/h",failReasons:"Causas de fallo (24h)",frTimeout:"Timeout",frRateLimit:"Límite de tasa",frTestFail:"Tests fallidos",frCtx:"Desbordamiento de contexto",frOther:"Otros",
+kModels:"Modelos en servicio",providers:"proveedores",kTokMin:"Tokens / min (ahora)",kErrRate:"Tasa de error (1h)",kQuotaMax:"Mayor uso de cuota",modelHealth:"Estado de modelos y servicios",thErr1h:"Errores (1h)",thTokMinC:"Tok/min",thQuota:"Cuota usada",stOperational:"Operativo",coreServices:"Servicios core de la plataforma",thService:"Servicio",thUptime30:"Uptime (30d)",thLatency:"Latencia p95",thNote:"Nota",lagNormal:"lag de consumidor normal",reindexing:"reindexado en curso",capacity78:"78% de capacidad",
+kUptime:"Uptime de plataforma (30d)",kOpenInc:"Incidencias abiertas",sevHigh:"alta",sevLow:"baja",kP95:"Latencia p95 plataforma",incidents:"Incidencias recientes",d30:"Últimos 30 días",thSeverity:"Severidad",thTitle:"Título",thAffected:"Afectado",thStarted:"Inicio",thDuration:"Duración",sevHighB:"Alta",sevLowB:"Baja",sevMedB:"Media",inc1:"Cuota de Sonnet agotada — code-gen-b limitado",inc2:"Consultas lentas del vector store durante reindexado",inc3:"Fallos en pipeline de despliegue — credenciales de registro caducadas",inc4:"Caída de la API de OpenAI — tráfico derivado a Claude",stInvestigating:"Investigando",stMonitoring:"En seguimiento",stResolved:"Resuelta",uptimeByService:"Uptime por servicio (30d)",errBudget:"Presupuesto de error restante",thisMonth:"Este mes",ebUptime:"SLO de uptime",ebLatency:"SLO de latencia",ebErrors:"SLO de tasa de error",ebNote:"El presupuesto de errores se consume 2,1× más rápido de lo previsto — por el throttling de Sonnet.",
+drillHint:"Ver clientes afectados",drillChurn:"Ver clientes perdidos",drillDown:"Ver downgrades",modalAlertsTitle:"Clientes con alertas de uso",modalAlertsFoot:"MRR total en riesgo: $14.700 · Acción sugerida: activar playbook de customer success.",modalChurnTitle:"Clientes perdidos — últimos 90 días",modalChurnFoot:"MRR total perdido: $10.400 · 2 de 4 tenían alerta de uso antes del churn.",modalDownTitle:"Downgrades — últimos 30 días",modalDownFoot:"Impacto neto: −$9.100 MRR · 3 de 5 citaron el coste — considerar un nivel adicional por uso.",
+thRegion:"Región",thLastTicket:"Último ticket",thDaysInactive:"Días inactivo",thMrrRisk:"MRR en riesgo",thChurnDate:"Fecha de baja",thMrrLost:"MRR perdido",thReason:"Motivo",thFrom:"De",thTo:"A",thDate:"Fecha",thMrrDelta:"Cambio MRR",
+rInhouse:"Desarrollo interno",rBudget:"Recorte de presupuesto",rLowUse:"Bajo uso",rPrice:"Precio",rSeats:"Menos proyectos",
+ogRegions:"Regiones",ogCountries:"Países",regionNA:"Norteamérica",regionEMEA:"EMEA",regionLATAM:"LATAM",regionAPAC:"APAC",cUS:"Estados Unidos",cUK:"Reino Unido",cES:"España",cPT:"Portugal",cMX:"México",cBR:"Brasil",scope:"Ámbito",
+drillUp:"Ver upgrades",drillActive:"Ver clientes activos",drillAtRisk:"Ver clientes en riesgo",drillTrials:"Ver pruebas",
+modalUpTitle:"Upgrades — últimos 30 días",modalUpFoot:"Mostrando 6 de 17 · Impacto total: +$28.400 MRR · 4 de 6 tras alcanzar los límites del plan.",
+modalActiveTitle:"Clientes activos — últimos 30 días",modalActiveFoot:"Top 8 de 119 por actividad · 93% de la base de clientes activa.",
+modalTrialsTitle:"Pruebas en curso",modalTrialsFoot:"Mostrando 5 de 11 · 7 con buena probabilidad de conversión · conversión del último trimestre: 64%.",
+thDaysLeft:"Días restantes",rMoreProj:"Más proyectos",rLimits:"Límites del plan",stLikely:"Probable conversión",stNeedsPush:"Necesita impulso"
+},
+pt:{
+appTitle:"Kallicode",appSub:"Console de gestão",navBusiness:"Negócio",navOverview:"Visão geral",navCustomers:"Clientes",navSubs:"Assinaturas e receita",navTokens:"Tokens e custos",navOperations:"Operações",navAgents:"Agentes",navModels:"Modelos e serviços",navSla:"SLA e incidentes",wireframeNote:"Wireframe funcional · dados simulados",lastUpdate:"Última atualização",searchPh:"Buscar clientes, projetos, agentes…",
+kCustomers:"Total de clientes",vsLastMonth:"vs mês anterior",kMrr:"MRR",kArr:"ARR (anualizado)",kUsageAlerts:"Alertas de uso",noTickets14d:"sem tickets em 14 dias",kProjects:"Projetos em execução",kLoc:"LOC geradas (30d)",kChurn:"Taxa de churn",kNrr:"Retenção líquida de receita",mrrTrend:"Evolução do MRR ($K)",m12:"12 meses",projPerCust:"Projetos por cliente",kUpgrades:"Upgrades (30d)",kDowngrades:"Downgrades (30d)",kArpu:"ARPU",
+alertBanner:"clientes não geraram tickets nos últimos 14 dias — revisar engajamento",kActive:"Ativos (30d)",kTrials:"Trials em andamento",kAtRisk:"Em risco",noActivity:"sem atividade",filterAll:"Todos",filterAlerts:"Alertas de uso",filterTrials:"Trials",thCustomer:"Cliente",thPlan:"Plano",thProjects:"Projetos",thTickets30:"Tickets (30d)",thLoc30:"LOC (30d)",thTokens30:"Tokens (30d)",thCost30:"Custo tokens",thStatus:"Status",stActive:"Ativo",stNoTickets:"Sem tickets 14d",stTrial:"Trial · restam 9d",stTrial2:"Trial · restam 3d",stInactive:"Inativo 30d",
+kSubs:"Assinaturas ativas",kNetMove:"Movimento líquido de MRR",expansionLed:"puxado por expansão",subsByTier:"Assinaturas por nível",upDown:"Upgrades vs downgrades",m6:"6 meses",marginByTier:"Receita e margem bruta por nível",last30:"Últimos 30 dias",thTier:"Nível",thSubsN:"Assin.",thTokenCost:"Custo tokens",thMargin:"Margem bruta",thTrend:"Tendência",
+kTokens30:"Tokens gerados (30d)",kCost30:"Custo de tokens (30d)",vsBudget:"vs orçamento",kBudget:"Orçamento mensal usado",kCostKloc:"Custo por KLOC",tokensByModel:"Tokens e custo por modelo",thModel:"Modelo",thProvider:"Provedor",thTokIn:"Tokens entrada",thTokOut:"Tokens saída",thCostPerM:"$ / 1M saída",thTotalCost:"Custo total",thShare:"Participação",costTrend:"Custo diário vs orçamento",d14:"14 dias",dailyBudgetLine:"orçamento diário ($5,6K)",lastDaysOver:"últimos 2 dias acima",topCostCust:"Top clientes por custo de tokens",
+kAgents:"Total de agentes",pools:"pools",kAgentsActive:"Ativos",kAgentsIdle:"Ociosos",kAgentsError:"Erro / travados",lastHour:"última hora",kSuccess:"Taxa de sucesso (24h)",kAvgTime:"Tempo médio por tarefa",kRetry:"Taxa de novas tentativas",kQueue:"Profundidade da fila (total)",tasks:"tarefas",poolTable:"Pools de agentes",realtime:"Tempo real",thPool:"Pool",thStage:"Etapa",thAgentsN:"Agentes",thRunning:"Executando",thQueue:"Fila",thSuccess24:"Sucesso (24h)",thAvgT:"T. médio",stgSpec:"Especificação",stgCode:"Geração de código",stgTest:"Testes",stgReview:"Revisão de código",stgDeploy:"Implantação",stHealthy:"Saudável",stDegraded:"Degradado",stAttention:"Requer atenção",throughput:"Vazão do pipeline",h24:"24 horas · tarefas/h",peak:"pico: 1.840 tarefas/h",failReasons:"Causas de falha (24h)",frTimeout:"Timeout",frRateLimit:"Limite de taxa",frTestFail:"Testes falhando",frCtx:"Estouro de contexto",frOther:"Outros",
+kModels:"Modelos em serviço",providers:"provedores",kTokMin:"Tokens / min (agora)",kErrRate:"Taxa de erro (1h)",kQuotaMax:"Maior uso de cota",modelHealth:"Status de modelos e serviços",thErr1h:"Erros (1h)",thTokMinC:"Tok/min",thQuota:"Cota usada",stOperational:"Operacional",coreServices:"Serviços core da plataforma",thService:"Serviço",thUptime30:"Uptime (30d)",thLatency:"Latência p95",thNote:"Nota",lagNormal:"lag de consumidor normal",reindexing:"reindexação em andamento",capacity78:"78% de capacidade",
+kUptime:"Uptime da plataforma (30d)",kOpenInc:"Incidentes abertos",sevHigh:"alto",sevLow:"baixo",kP95:"Latência p95 da plataforma",incidents:"Incidentes recentes",d30:"Últimos 30 dias",thSeverity:"Severidade",thTitle:"Título",thAffected:"Afetado",thStarted:"Início",thDuration:"Duração",sevHighB:"Alto",sevLowB:"Baixo",sevMedB:"Médio",inc1:"Cota do Sonnet esgotada — code-gen-b limitado",inc2:"Consultas lentas no vector store durante reindexação",inc3:"Falhas no pipeline de deploy — credenciais de registro expiradas",inc4:"Queda da API da OpenAI — tráfego redirecionado para Claude",stInvestigating:"Investigando",stMonitoring:"Monitorando",stResolved:"Resolvido",uptimeByService:"Uptime por serviço (30d)",errBudget:"Orçamento de erro restante",thisMonth:"Este mês",ebUptime:"SLO de uptime",ebLatency:"SLO de latência",ebErrors:"SLO de taxa de erro",ebNote:"O orçamento de erros está sendo consumido 2,1× mais rápido que o planejado — devido ao throttling do Sonnet.",
+drillHint:"Ver clientes afetados",drillChurn:"Ver clientes perdidos",drillDown:"Ver downgrades",modalAlertsTitle:"Clientes com alertas de uso",modalAlertsFoot:"MRR total em risco: $14.700 · Ação sugerida: acionar playbook de customer success.",modalChurnTitle:"Clientes perdidos — últimos 90 dias",modalChurnFoot:"MRR total perdido: $10.400 · 2 de 4 tinham alerta de uso antes do churn.",modalDownTitle:"Downgrades — últimos 30 dias",modalDownFoot:"Impacto líquido: −$9.100 MRR · 3 de 5 citaram custo — considerar nível adicional por uso.",
+thRegion:"Região",thLastTicket:"Último ticket",thDaysInactive:"Dias inativo",thMrrRisk:"MRR em risco",thChurnDate:"Data de saída",thMrrLost:"MRR perdido",thReason:"Motivo",thFrom:"De",thTo:"Para",thDate:"Data",thMrrDelta:"Variação MRR",
+rInhouse:"Desenvolvimento interno",rBudget:"Corte de orçamento",rLowUse:"Baixo uso",rPrice:"Preço",rSeats:"Menos projetos",
+ogRegions:"Regiões",ogCountries:"Países",regionNA:"América do Norte",regionEMEA:"EMEA",regionLATAM:"LATAM",regionAPAC:"APAC",cUS:"Estados Unidos",cUK:"Reino Unido",cES:"Espanha",cPT:"Portugal",cMX:"México",cBR:"Brasil",scope:"Escopo",
+drillUp:"Ver upgrades",drillActive:"Ver clientes ativos",drillAtRisk:"Ver clientes em risco",drillTrials:"Ver trials",
+modalUpTitle:"Upgrades — últimos 30 dias",modalUpFoot:"Mostrando 6 de 17 · Impacto total: +$28.400 MRR · 4 de 6 após atingir os limites do plano.",
+modalActiveTitle:"Clientes ativos — últimos 30 dias",modalActiveFoot:"Top 8 de 119 por atividade · 93% da base de clientes ativa.",
+modalTrialsTitle:"Trials em andamento",modalTrialsFoot:"Mostrando 5 de 11 · 7 com boa chance de conversão · conversão do último trimestre: 64%.",
+thDaysLeft:"Dias restantes",rMoreProj:"Mais projetos",rLimits:"Limites do plano",stLikely:"Conversão provável",stNeedsPush:"Precisa de impulso"
+}};
+
+let lang = 'en';
+function applyLang(l){
+  lang = l; document.documentElement.lang = l;
+  const dict = I18N[l];
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k = el.getAttribute('data-i18n');
+    if(dict[k] !== undefined) el.textContent = dict[k];
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-ph');
+    if(dict[k] !== undefined) el.placeholder = dict[k];
+  });
+  document.querySelectorAll('[data-i18n-opt]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-opt');
+    if(dict[k] !== undefined) el.textContent = dict[k];
+  });
+  document.querySelectorAll('[data-i18n-og]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-og');
+    if(dict[k] !== undefined) el.label = dict[k];
+  });
+  updateScope();
+}
+document.getElementById('langSel').addEventListener('change', e=>applyLang(e.target.value));
+
+// ---- navigation ----
+const titleKeys = {'biz-overview':'navOverview','biz-customers':'navCustomers','biz-subs':'navSubs','biz-tokens':'navTokens','ops-agents':'navAgents','ops-models':'navModels','ops-sla':'navSla'};
+document.querySelectorAll('.nav a').forEach(a=>{
+  a.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));
+    a.classList.add('active');
+    const id = a.getAttribute('data-view');
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id===id));
+    const t = document.getElementById('viewTitle');
+    t.setAttribute('data-i18n', titleKeys[id]);
+    t.textContent = I18N[lang][titleKeys[id]];
+    window.scrollTo({top:0});
+  });
+});
+
+// ---- modals ----
+document.querySelectorAll('[data-modal]').forEach(card=>{
+  card.addEventListener('click', ()=>{
+    document.getElementById(card.getAttribute('data-modal')).classList.add('show');
+  });
+});
+document.querySelectorAll('.modal-overlay').forEach(ov=>{
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.remove('show'); });
+  ov.querySelector('[data-close]').addEventListener('click', ()=>ov.classList.remove('show'));
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') document.querySelectorAll('.modal-overlay.show').forEach(m=>m.classList.remove('show'));
+});
+
+// ---- region / country selector ----
+const regionSel = document.getElementById('regionSel');
+function updateScope(){
+  const el = document.getElementById('scopeLbl');
+  if(el) el.textContent = regionSel.options[regionSel.selectedIndex].textContent.replace('🌍 ','');
+}
+regionSel.addEventListener('change', updateScope);
+
+// ---- theme toggle ----
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.addEventListener('click', ()=>{
+  const root = document.documentElement;
+  const dark = root.getAttribute('data-theme')==='dark';
+  root.setAttribute('data-theme', dark ? 'light' : 'dark');
+  themeBtn.textContent = dark ? '🌙' : '☀️';
+});
+
+// ---- customer table filter ----
+document.querySelectorAll('.pill').forEach(p=>{
+  p.addEventListener('click', ()=>{
+    document.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+    const f = p.getAttribute('data-filter');
+    document.querySelectorAll('#custTable tbody tr').forEach(tr=>{
+      tr.style.display = (f==='all' || tr.getAttribute('data-tag')===f) ? '' : 'none';
+    });
+  });
+});
+
+// ---- global search (filters customer table & jumps to it) ----
+document.querySelector('.search').addEventListener('input', e=>{
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#custTable tbody tr').forEach(tr=>{
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+applyLang('en');
+</script>
+</body>
+</html>
