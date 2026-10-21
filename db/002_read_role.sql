@@ -247,54 +247,79 @@ END $$;
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION admin.validate_read_role()
 RETURNS TABLE (check_id text, detail text) AS $$
+-- IMPORTANTE: esta funcion se invoca al arrancar la API con el rol kallicode_admin_app,
+-- que NO es el que concede los privilegios. Las vistas information_schema.*_privileges
+-- solo muestran privilegios concedidos A o POR un rol del que el invocador es miembro,
+-- asi que desde kallicode_admin_app no ven los privilegios de kallicode_admin_ro:
+-- V4 marcaba todo el inventario como "no concedido" y V2/V3/V5 devolvian siempre cero
+-- filas (falso negativo: la barrera no detectaba nada). Aqui se usan
+-- has_*_privilege() y aclexplode(), que consultan el catalogo y dan el mismo resultado
+-- para cualquier invocador, incluidos los privilegios heredados y los de PUBLIC.
 BEGIN
-    -- V1: ningún rol de la consola puede eludir la seguridad a nivel de fila
+    -- V1: ningun rol de la consola puede eludir la seguridad a nivel de fila
     RETURN QUERY
-    SELECT 'V1_sin_bypassrls', rolname::text FROM pg_roles
+    SELECT 'V1_sin_bypassrls'::text, rolname::text FROM pg_roles
     WHERE rolname IN ('kallicode_admin_app', 'kallicode_admin_ro')
       AND (rolbypassrls OR rolsuper);
 
-    -- V2: el rol de lectura no tiene ningún privilegio de escritura
+    -- V2: el rol de lectura no tiene ningun privilegio de escritura
     RETURN QUERY
-    SELECT 'V2_solo_lectura', table_schema || '.' || table_name || ':' || privilege_type
-    FROM information_schema.table_privileges
-    WHERE grantee = 'kallicode_admin_ro'
-      AND privilege_type IN ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE');
+    SELECT 'V2_solo_lectura'::text, n.nspname || '.' || c.relname || ':' || p.priv
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN (VALUES ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE')) AS p(priv)
+    WHERE c.relkind IN ('r', 'p')
+      AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg\_toast%'
+      AND CASE WHEN p.priv IN ('INSERT', 'UPDATE')
+               THEN has_any_column_privilege('kallicode_admin_ro', c.oid, p.priv)
+               ELSE has_table_privilege('kallicode_admin_ro', c.oid, p.priv) END;
 
     -- V3: no hay columna accesible fuera del inventario aprobado
     RETURN QUERY
-    SELECT 'V3_fuera_de_inventario',
-           cp.table_schema || '.' || cp.table_name || '.' || cp.column_name
-    FROM information_schema.column_privileges cp
-    WHERE cp.grantee = 'kallicode_admin_ro'
-      AND cp.table_schema = 'core'
+    SELECT 'V3_fuera_de_inventario'::text,
+           n.nspname || '.' || c.relname || '.' || a.attname
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'core'
+      AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND a.attnum > 0 AND NOT a.attisdropped
+      AND has_column_privilege('kallicode_admin_ro', c.oid, a.attnum, 'SELECT')
       AND NOT EXISTS (
             SELECT 1 FROM admin.access_inventory ai
-            WHERE ai.table_name = cp.table_schema || '.' || cp.table_name
-              AND ai.column_name = cp.column_name);
+            WHERE ai.table_name = n.nspname || '.' || c.relname
+              AND ai.column_name = a.attname);
 
-    -- V4: toda columna del inventario está efectivamente concedida
+    -- V4: toda columna del inventario esta efectivamente concedida
     RETURN QUERY
-    SELECT 'V4_inventario_no_concedido', ai.table_name || '.' || ai.column_name
+    SELECT 'V4_inventario_no_concedido'::text, ai.table_name || '.' || ai.column_name
     FROM admin.access_inventory ai
     WHERE ai.table_name LIKE 'core.%'
-      AND NOT EXISTS (
-            SELECT 1 FROM information_schema.column_privileges cp
-            WHERE cp.grantee = 'kallicode_admin_ro'
-              AND cp.table_schema || '.' || cp.table_name = ai.table_name
-              AND cp.column_name = ai.column_name);
+      AND NOT coalesce((
+            SELECT has_column_privilege('kallicode_admin_ro', c.oid, a.attnum, 'SELECT')
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_attribute a ON a.attrelid = c.oid
+            WHERE n.nspname || '.' || c.relname = ai.table_name
+              AND a.attname = ai.column_name AND NOT a.attisdropped), false);
 
-    -- V5: el registro de acciones del personal no admite mutación
+    -- V5: el registro de acciones del personal no admite mutacion
     RETURN QUERY
-    SELECT 'V5_auditoria_append_only',
-           grantee || ':' || privilege_type
-    FROM information_schema.table_privileges
-    WHERE table_schema = 'admin' AND table_name = 'staff_actions'
-      AND privilege_type IN ('UPDATE', 'DELETE', 'TRUNCATE');
+    SELECT 'V5_auditoria_append_only'::text,
+           (CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END)
+           || ':' || x.privilege_type
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN LATERAL aclexplode(c.relacl) AS x
+    WHERE n.nspname = 'admin' AND c.relname = 'staff_actions'
+      AND x.privilege_type IN ('UPDATE', 'DELETE', 'TRUNCATE')
+      AND (CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END)
+          NOT IN ('postgres', 'kallicode_admin');
 
-    -- V6: la cadena de acciones del personal es íntegra
+    -- V6: la cadena de acciones del personal es integra
     RETURN QUERY
-    SELECT 'V6_cadena_integra', motivo FROM admin.verify_staff_action_chain();
+    SELECT 'V6_cadena_integra'::text, motivo FROM admin.verify_staff_action_chain();
 END $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION admin.validate_read_role IS

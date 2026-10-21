@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS admin.sla_cases (
 CREATE INDEX IF NOT EXISTS slac_tenant_ix ON admin.sla_cases (tenant_id, iniciado_en DESC);
 CREATE INDEX IF NOT EXISTS slac_result_ix ON admin.sla_cases (resultado, iniciado_en DESC);
 CREATE INDEX IF NOT EXISTS slac_ciclo_ix
-    ON admin.sla_cases (to_char(iniciado_en, 'YYYY-MM'), tenant_id);
+    ON admin.sla_cases (iniciado_en, tenant_id);
 
 COMMENT ON COLUMN admin.sla_cases.tramos IS
   'Desglose del reloj: [{inicio, fin, etapa, computa, causa_pausa}]. Es lo que '

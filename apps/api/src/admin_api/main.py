@@ -21,6 +21,7 @@ Diferencias deliberadas respecto a la aplicación del portal:
 from __future__ import annotations
 
 import uuid
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -96,18 +97,16 @@ async def contexto_y_cabeceras(
             "CUERPO_DEMASIADO_GRANDE", "La petición es demasiado grande.",
             trace_id, {"maximo_bytes": MAX_BODY_BYTES}))
 
-    cron = Cronometro()
+    inicio = time.perf_counter()
     try:
         resp = await call_next(request)
     finally:
+        latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
         log.info("http", metodo=request.method, ruta=request.url.path,
-                 latencia_ms=cron.ms())
+                 latencia_ms=latencia_ms)
         limpiar_contexto()
 
     resp.headers["X-Trace-Id"] = trace_id
-    # Endurecimiento de la superficie. En esta consola una fuga de información
-    # en una respuesta es más grave que en el portal, porque quien la ve tiene
-    # acceso a varios clientes.
     resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"

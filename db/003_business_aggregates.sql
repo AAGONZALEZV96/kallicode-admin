@@ -385,7 +385,7 @@ BEGIN
     SELECT d.dia,
            coalesce(cr.n, 0), coalesce(en.n, 0), en.p50, en.p95,
            coalesce(es.n, 0), coalesce(jc.n, 0)
-    FROM generate_series(desde, current_date, '1 day')::date AS d(dia)
+    FROM generate_series(desde::timestamp, current_date::timestamp, interval '1 day') AS d(dia)
     LEFT JOIN LATERAL (
         SELECT count(*) AS n FROM core.tickets t
         WHERE t.creado_en::date = d.dia) cr ON true
