@@ -13,7 +13,44 @@ tiene acceso a varios clientes.
 
 from __future__ import annotations
 
-from kallicode_core.errors import AppError
+from kallicode_core.errors import CATALOGO_ERRORES, AppError
+
+_ERRORES_ADMIN = {
+    "MFA_REQUERIDO": {"http": 403, "descripcion": "Verificación de segundo factor requerida."},
+    "MFA_INVALIDO": {"http": 401, "descripcion": "El código de verificación no es correcto."},
+    "MFA_NO_INSCRITO": {
+        "http": 403,
+        "descripcion": "Debes inscribir tu segundo factor antes de continuar.",
+    },
+    "STAFF_DESACTIVADO": {"http": 403, "descripcion": "Tu cuenta está desactivada."},
+    "ROL_STAFF_INSUFICIENTE": {
+        "http": 403,
+        "descripcion": "Tu rol no permite esta operación.",
+    },
+    "ACCESO_NO_JUSTIFICADO": {"http": 403, "descripcion": "Acceso a datos no justificado."},
+    "CONCESION_CADUCADA": {
+        "http": 403,
+        "descripcion": "La concesión de acceso ha caducado.",
+    },
+    "CONCESION_DUPLICADA": {"http": 409, "descripcion": "Ya existe una concesión activa."},
+    "MOTIVO_INSUFICIENTE": {
+        "http": 422,
+        "descripcion": "El motivo proporcionado es insuficiente.",
+    },
+    "AGREGADO_NO_DISPONIBLE": {
+        "http": 503,
+        "descripcion": "Agregado analítico no disponible.",
+    },
+    "SLA_SIN_DEFINICION": {
+        "http": 409,
+        "descripcion": "No hay objetivos de nivel de servicio configurados.",
+    },
+    "TELEMETRIA_NO_DISPONIBLE": {
+        "http": 503,
+        "descripcion": "La telemetría del pipeline no está disponible.",
+    },
+}
+CATALOGO_ERRORES.update(_ERRORES_ADMIN)
 
 __all__ = [
     "acceso_no_justificado",
@@ -35,8 +72,8 @@ __all__ = [
 def mfa_requerido(
     msj: str = "Verificación de segundo factor requerida.",
 ) -> AppError:
-    """401 · el token no acredita segundo factor vigente en esta sesión."""
-    return AppError("MFA_REQUERIDO", 401, msj)
+    """403 · el token no acredita segundo factor vigente en esta sesión."""
+    return AppError("MFA_REQUERIDO", 403, msj)
 
 
 def mfa_invalido(

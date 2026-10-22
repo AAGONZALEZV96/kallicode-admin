@@ -20,6 +20,7 @@ comprobar el encadenamiento real. Es la corrección de origen del defecto DB-F04
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any, Literal
 
 from kallicode_core.logging import log
@@ -128,8 +129,8 @@ async def registrar_lectura(
 
 async def verificar_cadena(
     db: AsyncSession,
-    desde: str | None = None,
-    hasta: str | None = None,
+    desde: datetime | str | None = None,
+    hasta: datetime | str | None = None,
 ) -> list[dict[str, Any]]:
     """Verifica sello y encadenamiento del registro de acciones.
 

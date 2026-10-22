@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: kc_admin_isolated_postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: kallicode_test
+    ports:
+      - "5433:5432" # <-- Desplazado al 5433 en tu máquina host
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d kallicode_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: kc_admin_isolated_redis
+    ports:
+      - "6380:6379" # <-- Desplazado al 6380 en tu máquina host
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

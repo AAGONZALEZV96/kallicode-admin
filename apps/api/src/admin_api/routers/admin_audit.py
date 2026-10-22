@@ -16,7 +16,7 @@ alerta, no un detalle de la respuesta.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
@@ -75,11 +75,16 @@ async def acciones(
     if ambito not in ("propias", "todas"):
         raise validacion("Ámbito no válido.", {"ambito": ambito})
     if ambito == "todas" and st.role != "staff_admin":
-        from kallicode_core.errors import permiso_denegado
+        from admin_api.errors import rol_staff_insuficiente
 
-        raise permiso_denegado(
+        raise rol_staff_insuficiente(
             "Solo el rol de administración puede ver las acciones de todo el "
             "personal.")
+    if staff_id and staff_id != st.id and (ambito != "todas" or st.role != "staff_admin"):
+        from admin_api.errors import rol_staff_insuficiente
+
+        raise rol_staff_insuficiente(
+            "Filtrar por otro empleado exige ámbito 'todas' y rol de administración.")
     if accion is not None and accion not in _ACCIONES:
         raise validacion("Acción desconocida.",
                          {"accion": accion, "permitidas": list(_ACCIONES)})
@@ -92,12 +97,14 @@ async def acciones(
         raise validacion(f"El rango no puede superar {_MAX_DIAS} días.",
                          {"dias": (hasta - desde).days})
 
-    cond = ["(:ambito = 'todas' OR a.staff_id = :yo)",
-            "(:sid IS NULL OR a.staff_id = :sid)",
-            "(:tid IS NULL OR a.tenant_id = :tid)",
-            "(:acc IS NULL OR a.action = :acc)",
-            "a.occurred_at >= CAST(:d AS date)",
-            "a.occurred_at < CAST(:h AS date) + 1"]
+    cond = [
+        "(:ambito = 'todas' OR a.staff_id = :yo)",
+        "(CAST(:sid AS text) IS NULL OR a.staff_id = :sid)",
+        "(CAST(:tid AS text) IS NULL OR a.tenant_id = :tid)",
+        "(CAST(:acc AS text) IS NULL OR a.action = :acc)",
+        "a.occurred_at >= CAST(:d AS date)",
+        "a.occurred_at < CAST(:h AS date) + 1",
+    ]
     where = "WHERE " + " AND ".join(cond)
     params = {"ambito": ambito, "yo": st.id,
               "sid": staff_id if ambito == "todas" else None,
@@ -123,7 +130,9 @@ async def acciones(
 
         # La verificación se hace sobre el tramo consultado, no sobre toda la
         # cadena: el coste no debe crecer con la historia (lección de BE-F32).
-        rupturas = await verificar_cadena(db, str(desde), str(hasta + timedelta(days=1)))
+        d_dt = datetime.combine(desde, time.min, tzinfo=UTC)
+        h_dt = datetime.combine(hasta + timedelta(days=1), time.min, tzinfo=UTC)
+        rupturas = await verificar_cadena(db, d_dt, h_dt)
         integra = not rupturas
         for f in filas:
             f["verificado"] = integra
@@ -179,8 +188,8 @@ async def exportar(cuerpo: ExportIn,
             SELECT count(*) AS n FROM admin.staff_actions a
             WHERE a.occurred_at >= CAST(:d AS date)
               AND a.occurred_at < CAST(:h AS date) + 1
-              AND (:tid IS NULL OR a.tenant_id = :tid)
-              AND (:sid IS NULL OR a.staff_id = :sid)
+              AND (CAST(:tid AS text) IS NULL OR a.tenant_id = :tid)
+              AND (CAST(:sid AS text) IS NULL OR a.staff_id = :sid)
         """, {"d": cuerpo.desde, "h": cuerpo.hasta, "tid": cuerpo.tenant_id,
               "sid": cuerpo.staff_id})
 

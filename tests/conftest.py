@@ -80,7 +80,7 @@ def _psql_file(dsn_url: str, ruta: Path) -> None:
     r = subprocess.run(["psql", dsn_url, "-v", "ON_ERROR_STOP=1", "-q",
                         "-f", str(ruta)], capture_output=True, text=True)
     if r.returncode != 0:
-        pytest.fail(f"psql falló aplicando {ruta.name}: {r.stderr[:2000]}")
+        pytest.fail(f"psql falló aplicando {ruta.name}: {r.stderr[-2000:]}")
 
 
 @pytest.fixture(scope="session")
@@ -93,7 +93,25 @@ def esquema(dsn: str) -> str:
     if not BACKEND_DB.is_dir():
         pytest.skip(f"no se encuentra el esquema de la plataforma en {BACKEND_DB}")
 
-    _psql(dsn, "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+    _psql(
+        dsn,
+        """
+        DROP SCHEMA IF EXISTS admin CASCADE;
+        DROP SCHEMA IF EXISTS core CASCADE;
+        DROP SCHEMA IF EXISTS vec CASCADE;
+        DROP SCHEMA IF EXISTS audit CASCADE;
+        CREATE EXTENSION IF NOT EXISTS vector;
+        CREATE EXTENSION IF NOT EXISTS pg_trgm;
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kallicode_app') THEN
+                CREATE ROLE kallicode_app LOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kallicode_admin') THEN
+                CREATE ROLE kallicode_admin LOGIN BYPASSRLS;
+            END IF;
+        END $$;
+        """,
+    )
     # Contraseñas de prueba de los roles: las crea el propio script y aquí solo se
     # fijan para poder conectarse con cada uno.
     for f in sorted(BACKEND_DB.glob("0[1-5]_*.sql")):
@@ -103,6 +121,12 @@ def esquema(dsn: str) -> str:
     _psql(dsn, """
         ALTER ROLE kallicode_admin_app WITH PASSWORD 'test';
         ALTER ROLE kallicode_admin_ro  WITH PASSWORD 'test';
+        ALTER ROLE kallicode_app       WITH PASSWORD 'test';
+        INSERT INTO admin.staff (id, email, full_name, role, status,
+                                 password_hash, totp_secret, totp_enrolled_at)
+        VALUES ('st_prueba', 'st_prueba@kallicode.com', 'Empleado Prueba',
+                'staff_admin', 'active', 'hash', 'totp', now())
+        ON CONFLICT (id) DO NOTHING;
     """)
     return dsn
 
@@ -119,12 +143,13 @@ def entorno(esquema: str) -> Iterator[None]:
     previo = dict(os.environ)
     os.environ.update({
         "KC_ADMIN_ENV": "test",
+        "KC_ADMIN_ALLOWED_HOSTS": "localhost,127.0.0.1,admin.test,testserver",
         "KC_ADMIN_DATABASE_URL_APP": _dsn_como(esquema, "kallicode_admin_app"),
         "KC_ADMIN_DATABASE_URL_RO": _dsn_como(esquema, "kallicode_admin_ro"),
         "KC_ADMIN_STAFF_EMAIL_DOMAINS": "kallicode.com",
         "KC_ENV": "test",
-        "KC_DATABASE_URL": esquema.replace("postgresql://",
-                                           "postgresql+asyncpg://"),
+        "KC_DATABASE_URL": _dsn_como(esquema, "kallicode_app"),
+        "KC_DATABASE_URL_ADMIN": _dsn_como(esquema, "kallicode_admin"),
     })
     # La caché de configuración se limpia para que tome el entorno de prueba.
     from admin_api.settings import get_admin_settings
@@ -182,6 +207,7 @@ async def dos_clientes(db: Any) -> list[str]:
 @pytest_asyncio.fixture
 async def staff_factory(db: Any):
     """Crea empleados activos de cualquier rol, con segundo factor ya inscrito."""
+    from admin_api.db import admin_session
     from admin_api.security import hashear_password, nuevo_secreto_totp
     from kallicode_core.ids import nuevo
     from sqlalchemy import text
@@ -193,15 +219,16 @@ async def staff_factory(db: Any):
         sid = nuevo("st")
         email = f"{sid.lower()}@kallicode.com"
         secreto = nuevo_secreto_totp()
-        await db.execute(text("""
-            INSERT INTO admin.staff (id, email, full_name, role, status,
-                                     password_hash, totp_secret,
-                                     totp_enrolled_at)
-            VALUES (:i, :e, :n, :r, :s, :p, :t,
-                    CASE WHEN :s = 'active' THEN now() END)
-        """), {"i": sid, "e": email, "n": f"Empleado {rol}", "r": rol,
-               "s": estado, "p": hashear_password("Prueba-Segura-2026"),
-               "t": secreto})
+        async with admin_session() as s:
+            await s.execute(text("""
+                INSERT INTO admin.staff (id, email, full_name, role, status,
+                                         password_hash, totp_secret,
+                                         totp_enrolled_at)
+                VALUES (:i, :e, :n, :r, :s, :p, :t,
+                        CASE WHEN :s = 'active' THEN now() END)
+            """), {"i": sid, "e": email, "n": f"Empleado {rol}", "r": rol,
+                   "s": estado, "p": hashear_password("Prueba-Segura-2026"),
+                   "t": secreto})
         creados.append(sid)
         return {"id": sid, "email": email, "rol": rol, "secreto": secreto,
                 "password": "Prueba-Segura-2026"}

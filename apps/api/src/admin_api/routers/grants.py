@@ -191,18 +191,20 @@ async def listar(
     if ambito not in ("propias", "todas"):
         raise validacion("Ámbito no válido.", {"ambito": ambito})
     if ambito == "todas" and st.role != "staff_admin":
-        from kallicode_core.errors import permiso_denegado
+        from admin_api.errors import rol_staff_insuficiente
 
-        raise permiso_denegado(
+        raise rol_staff_insuficiente(
             "Solo el rol de administración puede ver las concesiones de todo el "
             "personal.")
     if estado is not None and estado not in ("vigente", "caducada", "revocada"):
         raise validacion("Estado no válido.", {"estado": estado})
 
-    cond = ["(:ambito = 'todas' OR g.staff_id = :yo)",
-            "(:t IS NULL OR g.tenant_id = :t)",
-            "(:d IS NULL OR g.granted_at >= CAST(:d AS date))",
-            "(:h IS NULL OR g.granted_at < CAST(:h AS date) + 1)"]
+    cond = [
+        "(:ambito = 'todas' OR g.staff_id = :yo)",
+        "(CAST(:t AS text) IS NULL OR g.tenant_id = :t)",
+        "(CAST(:d AS date) IS NULL OR g.granted_at >= CAST(:d AS date))",
+        "(CAST(:h AS date) IS NULL OR g.granted_at < CAST(:h AS date) + 1)",
+    ]
     if estado == "vigente":
         cond.append("g.revoked_at IS NULL AND g.expires_at > now()")
     elif estado == "caducada":
