@@ -19,7 +19,7 @@ Cuatro decisiones de diseño que corrigen defectos encontrados en el backend:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 import redis.asyncio as aioredis
@@ -40,9 +40,20 @@ _redis: aioredis.Redis | None = None
 
 def redis() -> aioredis.Redis:
     global _redis
-    if _redis is None:
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if _redis is None or (
+        loop is not None
+        and getattr(_redis, "_custom_loop", None) is not None
+        and getattr(_redis, "_custom_loop", None) != loop
+    ):
         _redis = aioredis.from_url(get_settings().redis_url,
                                    decode_responses=True)
+        _redis._custom_loop = loop  # type: ignore[attr-defined,union-attr]
     return _redis
 
 
@@ -154,6 +165,10 @@ def exigir(*roles: str):
 
     async def _guard(st: StaffDep) -> Staff:
         exigir_rol_staff(st.role, roles)
+        s = get_admin_settings()
+        if datetime.now(UTC) - st.mfa_at > timedelta(minutes=s.staff_idle_timeout_min):
+            from admin_api.errors import mfa_requerido
+            raise mfa_requerido("Verificación de segundo factor requerida.")
         return st
 
     return _guard

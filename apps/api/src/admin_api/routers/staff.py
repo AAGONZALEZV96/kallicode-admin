@@ -122,8 +122,10 @@ async def listar(
         {"ultimo_acceso": "st.last_login_at", "nombre": "st.full_name",
          "alta": "st.created_at"},
         "st.last_login_at DESC NULLS LAST")
-    filtros = "WHERE (:rol IS NULL OR st.role = :rol) " \
-              "AND (:est IS NULL OR st.status = :est)"
+    filtros = (
+        "WHERE (CAST(:rol AS text) IS NULL OR st.role = :rol) "
+        "AND (CAST(:est AS text) IS NULL OR st.status = :est)"
+    )
     params = {"rol": rol, "est": estado, "lim": p.page_size, "off": p.offset}
 
     async with admin_session() as db:

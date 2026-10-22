@@ -40,16 +40,27 @@ _maker_ro: async_sessionmaker[AsyncSession] | None = None
 
 
 def _crear(url: str, pool: int, timeout_ms: int) -> AsyncEngine:
+    s = get_admin_settings()
+    pool_kwargs: dict[str, Any] = {}
+    if s.env == "test":
+        from sqlalchemy.pool import NullPool
+
+        pool_kwargs["poolclass"] = NullPool
+    else:
+        pool_kwargs["pool_size"] = pool
+        pool_kwargs["max_overflow"] = pool
+        pool_kwargs["pool_pre_ping"] = True
+        pool_kwargs["pool_recycle"] = 1800
+
     return create_async_engine(
         url,
-        pool_size=pool,
-        max_overflow=pool,
-        pool_pre_ping=True,
-        pool_recycle=1800,
-        connect_args={"server_settings": {
-            "statement_timeout": str(timeout_ms),
-            "application_name": "kallicode-admin",
-        }},
+        **pool_kwargs,
+        connect_args={
+            "server_settings": {
+                "statement_timeout": str(timeout_ms),
+                "application_name": "kallicode-admin",
+            }
+        },
     )
 
 

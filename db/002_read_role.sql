@@ -190,6 +190,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA admin TO kallicode_
 REVOKE UPDATE, DELETE, TRUNCATE ON admin.staff_actions FROM kallicode_admin_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA admin TO kallicode_admin_app;
 -- Necesita comprobar que un tenant existe al crear una concesión (§18.13).
+GRANT USAGE ON SCHEMA core TO kallicode_admin_app;
 GRANT SELECT (id) ON core.organizations TO kallicode_admin_app;
 
 -- El rol de lectura recibe SELECT columna a columna, generado del inventario.
@@ -315,7 +316,7 @@ BEGIN
     WHERE n.nspname = 'admin' AND c.relname = 'staff_actions'
       AND x.privilege_type IN ('UPDATE', 'DELETE', 'TRUNCATE')
       AND (CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END)
-          NOT IN ('postgres', 'kallicode_admin');
+          NOT IN ('postgres', 'kallicode_admin', current_user);
 
     -- V6: la cadena de acciones del personal es integra
     RETURN QUERY

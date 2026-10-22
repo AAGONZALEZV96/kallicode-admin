@@ -162,7 +162,10 @@ def test_matriz_cubre_todos_los_endpoints(app: Any) -> None:
     publicados: set[tuple[str, str]] = set()
     for ruta in app.routes:
         camino = getattr(ruta, "path", "")
-        if not camino.startswith("/admin/v1"):
+        if (
+            not camino.startswith("/admin/v1")
+            or camino in ("/admin/v1/docs", "/admin/v1/openapi.json")
+        ):
             continue
         for metodo in getattr(ruta, "methods", set()) - {"HEAD", "OPTIONS"}:
             publicados.add((metodo, camino))

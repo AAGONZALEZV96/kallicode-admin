@@ -20,8 +20,8 @@ Diferencias deliberadas respecto a la aplicación del portal:
 
 from __future__ import annotations
 
-import uuid
 import time
+import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -32,7 +32,6 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from kallicode_core.errors import AppError
 from kallicode_core.logging import (
-    Cronometro,
     bind_contexto,
     configurar_logging,
     limpiar_contexto,
@@ -122,7 +121,10 @@ def _sobre(codigo: str, mensaje: str, trace_id: str,
            detalle: dict[str, object] | None = None) -> dict[str, object]:
     """Sobre de error idéntico al de /api/v1 (§3.6)."""
     return {"error": {
-        "codigo": codigo, "mensaje": mensaje, "detalle": detalle,
+        "codigo": codigo,
+        "code": codigo.lower(),
+        "mensaje": mensaje,
+        "detalle": detalle,
         "trace_id": trace_id,
         "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
     }}

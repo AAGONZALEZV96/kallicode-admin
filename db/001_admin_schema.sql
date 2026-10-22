@@ -20,12 +20,45 @@
 
 BEGIN;
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
 CREATE SCHEMA IF NOT EXISTS admin;
 
 COMMENT ON SCHEMA admin IS
   'Dominio propio de la consola de administración: personal de KalliCode, '
   'concesiones de acceso a datos de cliente y auditoría de sus acciones. '
   'Sin RLS por diseño: no contiene datos de cliente.';
+
+-- -----------------------------------------------------------------------------
+-- Roles y Permisos (RBAC administrativo)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin.staff_roles (
+    id          text PRIMARY KEY,
+    name        text        NOT NULL UNIQUE,
+    description text,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS admin.staff_permissions (
+    id          text PRIMARY KEY,
+    name        text        NOT NULL UNIQUE,
+    description text,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS admin.staff_role_permissions (
+    role_id       text        NOT NULL REFERENCES admin.staff_roles(id) ON DELETE CASCADE,
+    permission_id text        NOT NULL REFERENCES admin.staff_permissions(id) ON DELETE CASCADE,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (role_id, permission_id)
+);
+
+INSERT INTO admin.staff_roles (id, name, description) VALUES
+    ('staff_soporte', 'Soporte', 'Atención a incidencias y soporte técnico.'),
+    ('staff_operaciones', 'Operaciones', 'Operación y monitorización de infraestructura y servicios.'),
+    ('staff_negocio', 'Negocio', 'Acceso a métricas agregadas y datos de clientes.'),
+    ('staff_admin', 'Administrador', 'Control total y administración de personal.')
+ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- Personal de KalliCode
@@ -49,7 +82,7 @@ CREATE TABLE IF NOT EXISTS admin.staff (
     CONSTRAINT staff_email_uq     UNIQUE (email),
     CONSTRAINT staff_role_chk     CHECK (role IN ('staff_soporte', 'staff_operaciones',
                                                   'staff_negocio', 'staff_admin')),
-    CONSTRAINT staff_status_chk   CHECK (status IN ('invited', 'active', 'deactivated')),
+    CONSTRAINT staff_status_chk   CHECK (status IN ('invited', 'active', 'deactivated', 'suspended', 'disabled')),
     CONSTRAINT staff_email_len    CHECK (char_length(email) BETWEEN 6 AND 320),
     CONSTRAINT staff_name_len     CHECK (char_length(full_name) BETWEEN 2 AND 120),
     -- una cuenta activa exige contraseña y segundo factor inscrito (§18.2, §18.3)
@@ -59,6 +92,14 @@ CREATE TABLE IF NOT EXISTS admin.staff (
     CONSTRAINT staff_deact_chk    CHECK (
         status <> 'deactivated' OR (deactivated_at IS NOT NULL
                                     AND char_length(coalesce(deactivated_reason, '')) >= 10))
+);
+
+CREATE TABLE IF NOT EXISTS admin.staff_user_roles (
+    staff_id    text        NOT NULL REFERENCES admin.staff(id) ON DELETE CASCADE,
+    role_id     text        NOT NULL REFERENCES admin.staff_roles(id) ON DELETE CASCADE,
+    assigned_at timestamptz NOT NULL DEFAULT now(),
+    assigned_by text        REFERENCES admin.staff(id),
+    PRIMARY KEY (staff_id, role_id)
 );
 
 COMMENT ON TABLE admin.staff IS
