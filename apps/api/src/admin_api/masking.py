@@ -26,15 +26,33 @@ JERARQUIA: tuple[str, ...] = ("datos_negocio", "expediente", "contenido_codigo")
 
 # Campos identificables por bloque, tal como los declara el inventario de
 # acceso de 002_read_role.sql (columna `pii`).
-PII_NEGOCIO: frozenset[str] = frozenset({
-    "razon_social", "nombre", "dominio", "comentario", "conexion_nombre",
-})
-PII_EXPEDIENTE: frozenset[str] = frozenset({
-    "ticket_numero", "numero", "usuarios", "integraciones", "titulo",
-})
-PII_CODIGO: frozenset[str] = frozenset({
-    "diff", "contenido", "entrada", "salida", "fragmento",
-})
+PII_NEGOCIO: frozenset[str] = frozenset(
+    {
+        "razon_social",
+        "nombre",
+        "dominio",
+        "comentario",
+        "conexion_nombre",
+    }
+)
+PII_EXPEDIENTE: frozenset[str] = frozenset(
+    {
+        "ticket_numero",
+        "numero",
+        "usuarios",
+        "integraciones",
+        "titulo",
+    }
+)
+PII_CODIGO: frozenset[str] = frozenset(
+    {
+        "diff",
+        "contenido",
+        "entrada",
+        "salida",
+        "fragmento",
+    }
+)
 
 _MARCA = "•" * 4
 
@@ -131,8 +149,7 @@ def enmascarar_filas(
     alguna = False
     for fila in filas:
         tenant = str(fila.get(clave_tenant, ""))
-        nueva, enmascarados = enmascarar(
-            fila, concedidos_por_tenant.get(tenant, []))
+        nueva, enmascarados = enmascarar(fila, concedidos_por_tenant.get(tenant, []))
         nueva["enmascarado"] = bool(enmascarados)
         alguna = alguna or bool(enmascarados)
         salida.append(nueva)

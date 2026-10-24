@@ -57,8 +57,7 @@ def engine_app() -> AsyncEngine:
     global _engine_app, _maker_app
     if _engine_app is None:
         s = get_admin_settings()
-        _engine_app = _crear(s.database_url_app, s.pool_size_app,
-                             s.statement_timeout_ms_app)
+        _engine_app = _crear(s.database_url_app, s.pool_size_app, s.statement_timeout_ms_app)
         _maker_app = async_sessionmaker(_engine_app, expire_on_commit=False)
     return _engine_app
 
@@ -67,8 +66,7 @@ def engine_ro() -> AsyncEngine:
     global _engine_ro, _maker_ro
     if _engine_ro is None:
         s = get_admin_settings()
-        _engine_ro = _crear(s.database_url_ro, s.pool_size_ro,
-                            s.statement_timeout_ms_ro)
+        _engine_ro = _crear(s.database_url_ro, s.pool_size_ro, s.statement_timeout_ms_ro)
         _maker_ro = async_sessionmaker(_engine_ro, expire_on_commit=False)
     return _engine_ro
 
@@ -79,8 +77,14 @@ async def admin_session() -> AsyncIterator[AsyncSession]:
     engine_app()
     assert _maker_app is not None
     async with _maker_app() as db:
-        async with db.begin():
+        try:
             yield db
+            if db.in_transaction():
+                await db.commit()
+        except Exception:
+            if db.in_transaction():
+                await db.rollback()
+            raise
 
 
 @asynccontextmanager
@@ -102,19 +106,20 @@ async def read_session() -> AsyncIterator[AsyncSession]:
 
 
 # --------------------------------------------------------------- helpers
-async def uno(db: AsyncSession, sql: str,
-              params: dict[str, Any] | None = None) -> dict[str, Any] | None:
+async def uno(
+    db: AsyncSession, sql: str, params: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
     fila = (await db.execute(text(sql), params or {})).mappings().first()
     return dict(fila) if fila else None
 
 
-async def todos(db: AsyncSession, sql: str,
-                params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+async def todos(
+    db: AsyncSession, sql: str, params: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     return [dict(f) for f in (await db.execute(text(sql), params or {})).mappings()]
 
 
-async def valor(db: AsyncSession, sql: str,
-                params: dict[str, Any] | None = None) -> Any:
+async def valor(db: AsyncSession, sql: str, params: dict[str, Any] | None = None) -> Any:
     return (await db.execute(text(sql), params or {})).scalar()
 
 
@@ -138,37 +143,39 @@ async def verificar_arranque() -> None:
         fallos = await todos(db, "SELECT * FROM admin.validate_read_role()")
         if fallos:
             detalle = "; ".join(f"{f['check_id']} -> {f['detail']}" for f in fallos)
-            raise RuntimeError(
-                f"El modelo de acceso de la consola no es válido: {detalle}")
+            raise RuntimeError(f"El modelo de acceso de la consola no es válido: {detalle}")
 
     async with read_session() as db:
         # 4. la lectura cross-tenant funciona de verdad
-        n = await valor(db, "SELECT count(DISTINCT id) FROM core.organizations "
-                            "WHERE eliminado_en IS NULL")
+        n = await valor(
+            db, "SELECT count(DISTINCT id) FROM core.organizations WHERE eliminado_en IS NULL"
+        )
         if n is None:
             raise RuntimeError(
                 "El rol de lectura no puede consultar core.organizations: "
-                "faltan políticas o privilegios de columna")
+                "faltan políticas o privilegios de columna"
+            )
         # 5. y no puede escribir
         try:
             await db.execute(text("CREATE TEMP TABLE _probe_ro (x int)"))
         except Exception:
-            pass                                    # lo esperado
+            pass  # lo esperado
         else:
-            raise RuntimeError(
-                "El rol de lectura puede escribir: revisa 002_read_role.sql")
+            raise RuntimeError("El rol de lectura puede escribir: revisa 002_read_role.sql")
 
     async with admin_session() as db:
         # 5b. el rol de escritura no debe ver datos de cliente más allá del id
         try:
             await db.execute(text("SELECT nombre FROM core.organizations LIMIT 1"))
         except Exception:
-            log.info("admin.arranque.verificado",
-                     detalle="roles, políticas e inventario correctos")
+            log.info(
+                "admin.arranque.verificado", detalle="roles, políticas e inventario correctos"
+            )
             return
         raise RuntimeError(
             "El rol de escritura puede leer datos de cliente: revoca sus "
-            "privilegios sobre core (solo debe tener SELECT (id))")
+            "privilegios sobre core (solo debe tener SELECT (id))"
+        )
 
 
 async def cerrar() -> None:

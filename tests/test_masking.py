@@ -41,8 +41,8 @@ def test_la_jerarquia_es_transitiva_hacia_abajo() -> None:
         for j, requerido in enumerate(JERARQUIA):
             esperado = i >= j
             assert alcance_suficiente([concedido], requerido) is esperado, (
-                f"«{concedido}» {'debería' if esperado else 'no debería'} "
-                f"cubrir «{requerido}»")
+                f"«{concedido}» {'debería' if esperado else 'no debería'} cubrir «{requerido}»"
+            )
 
 
 def test_sin_concesiones_no_se_cubre_ningun_alcance() -> None:
@@ -82,13 +82,16 @@ def test_el_alcance_maximo_revela_todo() -> None:
     assert salida == datos
 
 
-@pytest.mark.parametrize(("alcance", "revelados", "ocultos"), [
-    ("datos_negocio", PII_NEGOCIO, PII_EXPEDIENTE | PII_CODIGO),
-    ("expediente", PII_NEGOCIO | PII_EXPEDIENTE, PII_CODIGO),
-])
+@pytest.mark.parametrize(
+    ("alcance", "revelados", "ocultos"),
+    [
+        ("datos_negocio", PII_NEGOCIO, PII_EXPEDIENTE | PII_CODIGO),
+        ("expediente", PII_NEGOCIO | PII_EXPEDIENTE, PII_CODIGO),
+    ],
+)
 def test_cada_alcance_revela_su_bloque_y_no_los_superiores(
-        alcance: str, revelados: frozenset[str],
-        ocultos: frozenset[str]) -> None:
+    alcance: str, revelados: frozenset[str], ocultos: frozenset[str]
+) -> None:
     """Una concesión de expediente no abre el código fuente del cliente.
 
     Es la distinción que hace útil la jerarquía: soporte necesita ver de qué caso
@@ -110,7 +113,8 @@ def test_las_listas_se_sustituyen_por_su_recuento() -> None:
     saber si el problema afecta a un usuario o a doscientos.
     """
     salida, bloques = enmascarar(
-        {"usuarios": ["ana@acme.es", "luis@acme.es", "sofia@acme.es"]}, [])
+        {"usuarios": ["ana@acme.es", "luis@acme.es", "sofia@acme.es"]}, []
+    )
     assert salida["usuarios"] is None
     assert salida["usuarios_total"] == 3
     assert bloques == ["usuarios"]
@@ -141,13 +145,16 @@ def test_enmascarar_no_muta_el_diccionario_de_entrada() -> None:
 
 
 # ============================================================== forma del texto
-@pytest.mark.parametrize(("entrada", "esperado"), [
-    ("Acme Logística S.L.", "A•••• S.L."),
-    ("Globex Industrial S.A.", "G•••• S.A."),
-    ("Nortec", "N••••"),
-    ("A", "A"),
-    ("", ""),
-])
+@pytest.mark.parametrize(
+    ("entrada", "esperado"),
+    [
+        ("Acme Logística S.L.", "A•••• S.L."),
+        ("Globex Industrial S.A.", "G•••• S.A."),
+        ("Nortec", "N••••"),
+        ("A", "A"),
+        ("", ""),
+    ],
+)
 def test_forma_del_texto_enmascarado(entrada: str, esperado: str) -> None:
     assert enmascarar_texto(entrada) == esperado
 
@@ -205,7 +212,8 @@ def test_una_fila_sin_tenant_se_enmascara_por_defecto() -> None:
     exactamente el caso en el que no se puede afirmar que haya concesión.
     """
     salida, alguna = enmascarar_filas(
-        [{"razon_social": "Sin dueño S.L."}], {"org_acme": ["contenido_codigo"]})
+        [{"razon_social": "Sin dueño S.L."}], {"org_acme": ["contenido_codigo"]}
+    )
     assert alguna is True
     assert salida[0]["razon_social"] != "Sin dueño S.L."
 
@@ -219,7 +227,8 @@ def test_la_concesion_de_otro_cliente_no_sirve() -> None:
     """
     salida, _ = enmascarar_filas(
         [{"tenant_id": "org_acme", "razon_social": "Acme Logística S.L."}],
-        {"org_globex": ["contenido_codigo"]})
+        {"org_globex": ["contenido_codigo"]},
+    )
     assert salida[0]["razon_social"] != "Acme Logística S.L."
     assert salida[0]["enmascarado"] is True
 

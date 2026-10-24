@@ -58,11 +58,11 @@ async def agents(
     devuelven ceros, que serían indistinguibles de «no hay trabajo».
     """
     if ventana not in _VENTANAS_AGENTES:
-        raise validacion("Ventana no válida.",
-                         {"ventana": ventana, "permitidas": list(_VENTANAS_AGENTES)})
+        raise validacion(
+            "Ventana no válida.", {"ventana": ventana, "permitidas": list(_VENTANAS_AGENTES)}
+        )
     if etapa is not None and etapa not in _ETAPAS:
-        raise validacion("Etapa no válida.",
-                         {"etapa": etapa, "permitidas": list(_ETAPAS)})
+        raise validacion("Etapa no válida.", {"etapa": etapa, "permitidas": list(_ETAPAS)})
 
     datos = await telemetry.agentes(ventana, etapa)
     sin_telemetria = bool(datos.get("_sin_telemetria"))
@@ -70,22 +70,24 @@ async def agents(
     # Las líneas salen del esquema, no de la telemetría: existen aunque ningún
     # agente esté reportando, y su estado es un dato de negocio.
     async with read_session() as db:
-        lineas = await uno(db, """
+        lineas = await uno(
+            db,
+            """
             SELECT count(*) FILTER (WHERE estado = 'ocupada')       AS activas,
                    count(*) FILTER (WHERE estado = 'mantenimiento') AS mantenimiento,
                    count(*) FILTER (WHERE estado = 'libre')         AS libres
             FROM core.production_lines
-        """)
+        """,
+        )
 
     etapas = datos.get("etapas") or []
     alertas = [
-        {"tipo": "agentes_caidos", "etapa": e.get("etapa"),
-         "valor": e.get("agentes_caidos")}
-        for e in etapas if (e.get("agentes_caidos") or 0) > 0
+        {"tipo": "agentes_caidos", "etapa": e.get("etapa"), "valor": e.get("agentes_caidos")}
+        for e in etapas
+        if (e.get("agentes_caidos") or 0) > 0
     ]
     if lineas and (lineas["mantenimiento"] or 0) > 0:
-        alertas.append({"tipo": "lineas_en_mantenimiento",
-                        "valor": lineas["mantenimiento"]})
+        alertas.append({"tipo": "lineas_en_mantenimiento", "valor": lineas["mantenimiento"]})
 
     return {
         "ventana": datos.get("ventana", ventana),
@@ -135,13 +137,15 @@ async def queues(
     if criticas:
         log.warning("admin.ops.cola_critica", colas=criticas)
 
-    return {"colas": colas,
-            "resumen": {
-                "criticas": len(criticas),
-                "atencion": sum(1 for c in colas if c["estado"] == "atencion"),
-                "pendientes_total": sum(c.get("pendientes") or 0 for c in colas),
-                "fallidos_total": sum(c.get("fallidos") or 0 for c in colas),
-            }}
+    return {
+        "colas": colas,
+        "resumen": {
+            "criticas": len(criticas),
+            "atencion": sum(1 for c in colas if c["estado"] == "atencion"),
+            "pendientes_total": sum(c.get("pendientes") or 0 for c in colas),
+            "fallidos_total": sum(c.get("fallidos") or 0 for c in colas),
+        },
+    }
 
 
 # ------------------------------------------------------------------ §18.26
@@ -161,31 +165,42 @@ async def models(
     invalidaría el cálculo.
     """
     if ventana not in _VENTANAS_MODELOS:
-        raise validacion("Ventana no válida.",
-                         {"ventana": ventana, "permitidas": list(_VENTANAS_MODELOS)})
+        raise validacion(
+            "Ventana no válida.", {"ventana": ventana, "permitidas": list(_VENTANAS_MODELOS)}
+        )
 
     datos = await telemetry.proveedores(ventana, proveedor)
-    degradados = [p for p in (datos.get("proveedores") or [])
-                  if (p.get("disponibilidad_pct") or 100) < 99.0]
+    degradados = [
+        p
+        for p in (datos.get("proveedores") or [])
+        if (p.get("disponibilidad_pct") or 100) < 99.0
+    ]
     if degradados and ventana == "1h":
-        log.warning("admin.ops.proveedor_degradado",
-                    proveedores=[p.get("proveedor") for p in degradados])
+        log.warning(
+            "admin.ops.proveedor_degradado",
+            proveedores=[p.get("proveedor") for p in degradados],
+        )
 
     # El coste se toma de los agregados propios, que aplican la tarifa vigente:
     # la telemetría del pipeline no conoce precios.
     dias = {"1h": 1, "24h": 1, "7d": 7, "30d": 30}[ventana]
     async with read_session() as db:
-        estado = await uno(db, "SELECT status FROM admin.aggregate_state "
-                               "WHERE agregado = 'tokens_daily'")
+        estado = await uno(
+            db, "SELECT status FROM admin.aggregate_state WHERE agregado = 'tokens_daily'"
+        )
         if estado is None or estado["status"] == "fallido":
             raise agregado_no_disponible("tokens_daily")
-        coste = await todos(db, """
+        coste = await todos(
+            db,
+            """
             SELECT d.tier, sum(d.tokens_in + d.tokens_out) AS tokens,
                    sum(d.coste) AS coste
             FROM admin.agg_tokens_daily d
             WHERE d.dia > current_date - :dias
             GROUP BY d.tier
-        """, {"dias": dias})
+        """,
+            {"dias": dias},
+        )
 
     salida: dict[str, Any] = {
         "ventana": datos.get("ventana", ventana),
@@ -224,9 +239,14 @@ async def sla(
     if ciclo is not None and len(ciclo) != 7:
         raise validacion("El ciclo debe tener el formato AAAA-MM.", {"ciclo": ciclo})
 
-    params: dict[str, Any] = {"ciclo": ciclo, "t": tenant_id,
-                             "min": s.sla_min_cases, "solo": solo_incumplidos,
-                             "lim": p.page_size, "off": p.offset}
+    params: dict[str, Any] = {
+        "ciclo": ciclo,
+        "t": tenant_id,
+        "min": s.sla_min_cases,
+        "solo": solo_incumplidos,
+        "lim": p.page_size,
+        "off": p.offset,
+    }
     where = """
         WHERE to_char(c.iniciado_en, 'YYYY-MM')
                   = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
@@ -234,13 +254,18 @@ async def sla(
     """
 
     async with read_session() as db:
-        estado = await uno(db, "SELECT status, refreshed_at "
-                               "FROM admin.aggregate_state "
-                               "WHERE agregado = 'sla_cases'")
+        estado = await uno(
+            db,
+            "SELECT status, refreshed_at "
+            "FROM admin.aggregate_state "
+            "WHERE agregado = 'sla_cases'",
+        )
         if estado is None or estado["status"] == "fallido":
             raise agregado_no_disponible("sla_cases")
 
-        resumen = await uno(db, f"""
+        resumen = await uno(
+            db,
+            f"""
             SELECT count(*) AS evaluados,
                    count(*) FILTER (WHERE c.resultado = 'incumplido') AS incumplidos,
                    count(*) FILTER (WHERE c.resultado = 'en_riesgo')  AS en_riesgo,
@@ -250,14 +275,22 @@ async def sla(
                              WHERE c.resultado IN ('dentro', 'incumplido')), 0), 2)
                        AS cumplimiento_pct
             FROM admin.sla_cases c {where}
-        """, params)
+        """,
+            params,
+        )
 
-        total = await uno(db, f"""
+        total = await uno(
+            db,
+            f"""
             SELECT count(DISTINCT c.tenant_id) AS n FROM admin.sla_cases c {where}
               AND (NOT :solo OR c.resultado = 'incumplido')
-        """, params)
+        """,
+            params,
+        )
 
-        filas = await todos(db, f"""
+        filas = await todos(
+            db,
+            f"""
             SELECT c.tenant_id, c.plan_codigo AS plan,
                    max(c.objetivo_h) AS objetivo_h,
                    count(*) AS evaluados,
@@ -278,21 +311,25 @@ async def sla(
             ORDER BY count(*) FILTER (WHERE c.resultado = 'incumplido') DESC,
                      c.tenant_id
             LIMIT :lim OFFSET :off
-        """, params)
+        """,
+            params,
+        )
 
-        sin_def = await todos(db, """
+        sin_def = await todos(
+            db,
+            """
             SELECT DISTINCT p.codigo AS plan FROM core.plans p
             WHERE NOT EXISTS (SELECT 1 FROM admin.sla_targets t
                                WHERE t.plan_codigo = p.codigo AND t.etapa = '*')
-        """)
+        """,
+        )
 
     if not filas and sin_def and tenant_id is None and not solo_incumplidos:
         # Ningún plan tiene objetivos: no hay nada que calcular y se declara.
         if len(sin_def) >= 1 and (resumen or {}).get("evaluados", 0) == 0:
             raise sla_sin_definicion(", ".join(f["plan"] for f in sin_def))
 
-    filas, _ = enmascarar_filas(
-        filas, _concesiones(st, [f["tenant_id"] for f in filas]))
+    filas, _ = enmascarar_filas(filas, _concesiones(st, [f["tenant_id"] for f in filas]))
 
     salida = sobre(filas, int(total["n"]) if total else 0, p)
     salida["ciclo"] = ciclo or "en_curso"
@@ -318,7 +355,9 @@ async def sla_case(
     tiempos y causas de pausa.
     """
     async with read_session() as db:
-        c = await uno(db, """
+        c = await uno(
+            db,
+            """
             SELECT c.job_id, c.tenant_id, c.ticket_numero, c.plan_codigo,
                    c.objetivo_h, c.transcurrido_h, c.bruto_h, c.resultado,
                    c.tramos, c.reglas, c.iniciado_en, c.terminado_en,
@@ -326,7 +365,9 @@ async def sla_case(
                    (SELECT s.razon_social FROM admin.agg_customer_state s
                      WHERE s.tenant_id = c.tenant_id) AS razon_social
             FROM admin.sla_cases c WHERE c.job_id = :j
-        """, {"j": job_id})
+        """,
+            {"j": job_id},
+        )
         if c is None:
             raise no_encontrado("El caso")
 
@@ -334,8 +375,10 @@ async def sla_case(
         raise sla_sin_definicion(c["plan_codigo"])
 
     salida: dict[str, Any] = {
-        "job_id": c["job_id"], "tenant_id": c["tenant_id"],
-        "razon_social": c["razon_social"], "ticket_numero": c["ticket_numero"],
+        "job_id": c["job_id"],
+        "tenant_id": c["tenant_id"],
+        "razon_social": c["razon_social"],
+        "ticket_numero": c["ticket_numero"],
         "plan": c["plan_codigo"],
         "objetivo_h": float(c["objetivo_h"]),
         "transcurrido_h": float(c["transcurrido_h"]),
@@ -343,7 +386,8 @@ async def sla_case(
         "resultado": c["resultado"],
         "tramos": c["tramos"],
         "reglas_aplicadas": list(c["reglas"] or []),
-        "iniciado_en": c["iniciado_en"], "terminado_en": c["terminado_en"],
+        "iniciado_en": c["iniciado_en"],
+        "terminado_en": c["terminado_en"],
         "calculado_en": c["calculado_en"],
     }
     salida, enmascarados = _enmascarar_caso(salida, st)
@@ -351,8 +395,7 @@ async def sla_case(
     return salida
 
 
-def _enmascarar_caso(caso: dict[str, Any],
-                     st: Staff) -> tuple[dict[str, Any], list[str]]:
+def _enmascarar_caso(caso: dict[str, Any], st: Staff) -> tuple[dict[str, Any], list[str]]:
     """El número de ticket y la razón social identifican al cliente."""
     from ..masking import enmascarar
 

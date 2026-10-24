@@ -70,11 +70,15 @@ async def _frescura(db: Any, *agregados: str) -> Any:
     viejo como si fuera actual es peor que no servirlo.
     """
     s = get_admin_settings()
-    filas = await todos(db, """
+    filas = await todos(
+        db,
+        """
         SELECT agregado, refreshed_at, status,
                extract(epoch FROM now() - refreshed_at)::int AS edad
         FROM admin.aggregate_state WHERE agregado = ANY(:ns)
-    """, {"ns": list(agregados)})
+    """,
+        {"ns": list(agregados)},
+    )
     if len(filas) < len(agregados):
         faltan = set(agregados) - {f["agregado"] for f in filas}
         raise agregado_no_disponible(", ".join(sorted(faltan)))
@@ -85,8 +89,9 @@ async def _frescura(db: Any, *agregados: str) -> Any:
             raise agregado_no_disponible(f["agregado"], f["edad"])
     edad = max(f["edad"] or 0 for f in filas)
     if edad > s.aggregate_max_age_s:
-        log.warning("admin.business.frescura_alta", antiguedad_s=edad,
-                    agregados=list(agregados))
+        log.warning(
+            "admin.business.frescura_alta", antiguedad_s=edad, agregados=list(agregados)
+        )
     return min(f["refreshed_at"] for f in filas)
 
 
@@ -94,8 +99,7 @@ def _concesiones(st: Staff, tenants: list[str]) -> dict[str, list[str]]:
     return {t: st.concedidos(t) for t in tenants}
 
 
-async def _registrar_lecturas(st: Staff, endpoint: str,
-                              tenants: set[str]) -> None:
+async def _registrar_lecturas(st: Staff, endpoint: str, tenants: set[str]) -> None:
     """Registra una lectura por cada cliente alcanzado con concesión vigente."""
     alcanzados = tenants & set(st.grant_detalle)
     if not alcanzados:
@@ -104,20 +108,30 @@ async def _registrar_lecturas(st: Staff, endpoint: str,
         for tenant in sorted(alcanzados):
             grant_id, alcance, motivo = st.grant_detalle[tenant]
             await registrar_lectura(
-                db, staff_id=st.id, staff_role=st.role, endpoint=endpoint,
-                tenant_id=tenant, grant_id=grant_id, scope=alcance,
-                reason=motivo, ip=st.ip, user_agent=st.user_agent,
-                request_id=st.request_id)
+                db,
+                staff_id=st.id,
+                staff_role=st.role,
+                endpoint=endpoint,
+                tenant_id=tenant,
+                grant_id=grant_id,
+                scope=alcance,
+                reason=motivo,
+                ip=st.ip,
+                user_agent=st.user_agent,
+                request_id=st.request_id,
+            )
 
 
 # ------------------------------------------------------------------ §18.16
 @router.get("/overview", summary="Panel general de negocio")
 async def overview(
     st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
-    periodo: Annotated[str, Query(
-        description="mes_actual | mes_anterior | trimestre | ano.")] = "mes_actual",
-    comparar_con: Annotated[str, Query(
-        description="periodo_anterior | mismo_periodo_ano_anterior.")] = "periodo_anterior",
+    periodo: Annotated[
+        str, Query(description="mes_actual | mes_anterior | trimestre | ano.")
+    ] = "mes_actual",
+    comparar_con: Annotated[
+        str, Query(description="periodo_anterior | mismo_periodo_ano_anterior.")
+    ] = "periodo_anterior",
 ) -> dict[str, Any]:
     """Indicadores agregados del negocio, con su frescura declarada.
 
@@ -126,14 +140,17 @@ async def overview(
     """
     rangos = {
         "mes_actual": ("date_trunc('month', current_date)", "current_date + 1"),
-        "mes_anterior": ("date_trunc('month', current_date) - interval '1 month'",
-                         "date_trunc('month', current_date)"),
+        "mes_anterior": (
+            "date_trunc('month', current_date) - interval '1 month'",
+            "date_trunc('month', current_date)",
+        ),
         "trimestre": ("date_trunc('quarter', current_date)", "current_date + 1"),
         "ano": ("date_trunc('year', current_date)", "current_date + 1"),
     }
     if periodo not in rangos:
-        raise validacion("Periodo no válido.",
-                         {"periodo": periodo, "permitidos": sorted(rangos)})
+        raise validacion(
+            "Periodo no válido.", {"periodo": periodo, "permitidos": sorted(rangos)}
+        )
     if comparar_con not in ("periodo_anterior", "mismo_periodo_ano_anterior"):
         raise validacion("Comparación no válida.", {"comparar_con": comparar_con})
 
@@ -148,9 +165,10 @@ async def overview(
         desplaz = "interval '1 year'"
 
     async with read_session() as db:
-        frescura = await _frescura(db, "customer_state", "usage_cycle",
-                                   "pipeline_daily")
-        datos = await uno(db, f"""
+        frescura = await _frescura(db, "customer_state", "usage_cycle", "pipeline_daily")
+        datos = await uno(
+            db,
+            f"""
             WITH rango AS (
                 SELECT ({ini_sql})::date AS ini, ({fin_sql})::date AS fin,
                        (({ini_sql}) - {desplaz})::date AS ini_prev,
@@ -215,7 +233,8 @@ async def overview(
                    pipe.entregados, pipe.e2e_p50, pipe.escalados, pipe.jobs,
                    pipe_prev.entregados AS entregados_prev
             FROM cli, por_plan, cons, cons_prev, pipe, pipe_prev
-        """)
+        """,
+        )
 
     assert datos is not None
 
@@ -225,26 +244,32 @@ async def overview(
             return None
         return round(100.0 * (float(actual) - float(previo)) / float(previo), 1)
 
-    escalado_pct = (round(100.0 * datos["escalados"] / datos["jobs"], 1)
-                    if datos["jobs"] else 0.0)
+    escalado_pct = (
+        round(100.0 * datos["escalados"] / datos["jobs"], 1) if datos["jobs"] else 0.0
+    )
     return {
         "periodo": {"inicio": datos["ini"], "fin": datos["fin"]},
         "frescura": frescura,
         "clientes": {
-            "activos": datos["activos"], "nuevos": datos["nuevos"],
-            "perdidos": datos["perdidos"], "por_plan": datos["por_plan"] or {},
+            "activos": datos["activos"],
+            "nuevos": datos["nuevos"],
+            "perdidos": datos["perdidos"],
+            "por_plan": datos["por_plan"] or {},
         },
         "ingreso_recurrente": {
-            "importe": float(datos["mrr"]), "moneda": datos["moneda"] or "EUR",
+            "importe": float(datos["mrr"]),
+            "moneda": datos["moneda"] or "EUR",
         },
         "consumo": {
-            "loc": int(datos["loc"]), "tokens": int(datos["tokens"]),
+            "loc": int(datos["loc"]),
+            "tokens": int(datos["tokens"]),
             "coste_estimado": float(datos["coste"]),
         },
         "pipeline": {
             "tickets_entregados": int(datos["entregados"]),
-            "tiempo_e2e_p50_h": (float(datos["e2e_p50"])
-                                 if datos["e2e_p50"] is not None else None),
+            "tiempo_e2e_p50_h": (
+                float(datos["e2e_p50"]) if datos["e2e_p50"] is not None else None
+            ),
             "escalado_humano_pct": escalado_pct,
         },
         "tendencia": {
@@ -260,10 +285,13 @@ async def customers(
     st: Annotated[Staff, Depends(exigir(*SOPORTE))],
     p: Annotated[Pagina, Depends(paginacion)],
     plan: Annotated[str | None, Query()] = None,
-    estado: Annotated[str | None, Query(
-        description="activa | periodo_gracia | suspendida | finalizada.")] = None,
-    q: Annotated[str | None, Query(
-        description="Búsqueda por identificador. Por razón social exige concesión.")] = None,
+    estado: Annotated[
+        str | None, Query(description="activa | periodo_gracia | suspendida | finalizada.")
+    ] = None,
+    q: Annotated[
+        str | None,
+        Query(description="Búsqueda por identificador. Por razón social exige concesión."),
+    ] = None,
 ) -> dict[str, Any]:
     """Listado de organizaciones con plan, estado, consumo y actividad.
 
@@ -272,17 +300,18 @@ async def customers(
     empleado.
     """
     if estado is not None and estado not in _ESTADOS_SUS:
-        raise validacion("Estado no válido.",
-                         {"estado": estado, "permitidos": list(_ESTADOS_SUS)})
+        raise validacion(
+            "Estado no válido.", {"estado": estado, "permitidos": list(_ESTADOS_SUS)}
+        )
 
     por_nombre = bool(q) and not (q or "").startswith("org_")
     if por_nombre and not st.grants:
         raise acceso_no_justificado(alcance="datos_negocio")
 
     orden = p.clausula_order(
-        {"consumo": "u.loc_consumidas", "alta": "c.alta_el",
-         "nombre": "c.razon_social"},
-        "u.loc_consumidas DESC NULLS LAST")
+        {"consumo": "u.loc_consumidas", "alta": "c.alta_el", "nombre": "c.razon_social"},
+        "u.loc_consumidas DESC NULLS LAST",
+    )
     where = """
         WHERE c.eliminado_en IS NULL
           AND (:plan IS NULL OR c.plan_codigo = :plan)
@@ -291,19 +320,31 @@ async def customers(
                OR c.tenant_id ILIKE '%' || :q || '%'
                OR (:por_nombre AND c.razon_social ILIKE '%' || :q || '%'))
     """
-    params = {"plan": plan, "est": estado, "q": q, "por_nombre": por_nombre,
-              "lim": p.page_size, "off": p.offset}
+    params = {
+        "plan": plan,
+        "est": estado,
+        "q": q,
+        "por_nombre": por_nombre,
+        "lim": p.page_size,
+        "off": p.offset,
+    }
 
     async with read_session() as db:
         await _frescura(db, "customer_state", "usage_cycle")
-        total = await uno(db, f"""
+        total = await uno(
+            db,
+            f"""
             SELECT count(*) AS n FROM admin.agg_customer_state c
             LEFT JOIN admin.agg_usage_cycle u
                    ON u.tenant_id = c.tenant_id
                   AND u.ciclo = to_char(current_date, 'YYYY-MM')
             {where}
-        """, params)
-        filas = await todos(db, f"""
+        """,
+            params,
+        )
+        filas = await todos(
+            db,
+            f"""
             SELECT c.tenant_id, c.razon_social, c.plan_codigo AS plan,
                    c.suscripcion_estado AS estado, c.lineas_contratadas,
                    c.ultima_actividad,
@@ -317,7 +358,9 @@ async def customers(
                   AND u.ciclo = to_char(current_date, 'YYYY-MM')
             {where}
             ORDER BY {orden} LIMIT :lim OFFSET :off
-        """, params)
+        """,
+            params,
+        )
 
     tenants = [f["tenant_id"] for f in filas]
     filas, alguna = enmascarar_filas(filas, _concesiones(st, tenants))
@@ -333,8 +376,9 @@ async def customers(
 async def customer(
     st: Annotated[Staff, Depends(exigir(*SOPORTE))],
     tenant_id: Annotated[str, Path(description="Organización a consultar.")],
-    incluir: Annotated[str | None, Query(
-        description="usuarios, integraciones, historico, grafo.")] = None,
+    incluir: Annotated[
+        str | None, Query(description="usuarios, integraciones, historico, grafo.")
+    ] = None,
 ) -> dict[str, Any]:
     """Reúne todo lo que hay que saber de un cliente en una sola respuesta.
 
@@ -344,16 +388,15 @@ async def customer(
     símbolo: eso pertenece al alcance `contenido_codigo` y no se sirve aquí.
     """
     permitidos = {"usuarios", "integraciones", "historico", "grafo"}
-    bloques = {b.strip() for b in (incluir or ",".join(permitidos)).split(",")
-               if b.strip()}
+    bloques = {b.strip() for b in (incluir or ",".join(permitidos)).split(",") if b.strip()}
     if bloques - permitidos:
-        raise validacion("Bloque desconocido.",
-                         {"bloques": sorted(bloques - permitidos)})
+        raise validacion("Bloque desconocido.", {"bloques": sorted(bloques - permitidos)})
 
     async with read_session() as db:
         await _frescura(db, "customer_state", "usage_cycle")
-        c = await uno(db, "SELECT * FROM admin.agg_customer_state "
-                          "WHERE tenant_id = :t", {"t": tenant_id})
+        c = await uno(
+            db, "SELECT * FROM admin.agg_customer_state WHERE tenant_id = :t", {"t": tenant_id}
+        )
         if c is None:
             raise no_encontrado("La organización")
 
@@ -364,51 +407,78 @@ async def customer(
             "idioma": c["idioma"],
             "alta_el": c["alta_el"],
             "suscripcion": {
-                "plan": c["plan_codigo"], "estado": c["suscripcion_estado"],
-                "inicia_el": c["inicia_el"], "renueva_el": c["renueva_el"],
+                "plan": c["plan_codigo"],
+                "estado": c["suscripcion_estado"],
+                "inicia_el": c["inicia_el"],
+                "renueva_el": c["renueva_el"],
                 "finaliza_el": c["finaliza_el"],
-                "importe_mes": (float(c["importe_mes"])
-                                if c["importe_mes"] is not None else None),
+                "importe_mes": (
+                    float(c["importe_mes"]) if c["importe_mes"] is not None else None
+                ),
             },
-            "lineas": {"contratadas": c["lineas_contratadas"],
-                       "activas": c["lineas_activas"]},
-            "actividad": {"tickets_abiertos": c["tickets_abiertos"],
-                          "ultima_actividad": c["ultima_actividad"],
-                          "fabrica_activa": c["fabrica_activa"]},
+            "lineas": {"contratadas": c["lineas_contratadas"], "activas": c["lineas_activas"]},
+            "actividad": {
+                "tickets_abiertos": c["tickets_abiertos"],
+                "ultima_actividad": c["ultima_actividad"],
+                "fabrica_activa": c["fabrica_activa"],
+            },
         }
 
-        consumo: dict[str, Any] = {"ciclo": await uno(db, """
+        consumo: dict[str, Any] = {
+            "ciclo": await uno(
+                db,
+                """
             SELECT loc_consumidas, tokens_in, tokens_out, cuota_pct, coste
             FROM admin.agg_usage_cycle
             WHERE tenant_id = :t AND ciclo = to_char(current_date, 'YYYY-MM')
-        """, {"t": tenant_id}) or {}}
+        """,
+                {"t": tenant_id},
+            )
+            or {}
+        }
         if "historico" in bloques:
-            consumo["historico"] = await todos(db, """
+            consumo["historico"] = await todos(
+                db,
+                """
                 SELECT ciclo, loc_consumidas, tokens_in + tokens_out AS tokens,
                        coste, cuota_pct
                 FROM admin.agg_usage_cycle WHERE tenant_id = :t
                 ORDER BY ciclo DESC LIMIT 6
-            """, {"t": tenant_id})
+            """,
+                {"t": tenant_id},
+            )
         ficha["consumo"] = consumo
 
         if "usuarios" in bloques:
-            ficha["usuarios"] = await todos(db, """
+            ficha["usuarios"] = await todos(
+                db,
+                """
                 SELECT nombre, rol, estado, ultimo_acceso
                 FROM core.users WHERE tenant_id = :t
                 ORDER BY ultimo_acceso DESC NULLS LAST LIMIT 50
-            """, {"t": tenant_id})
+            """,
+                {"t": tenant_id},
+            )
         if "integraciones" in bloques:
-            ficha["integraciones"] = await todos(db, """
+            ficha["integraciones"] = await todos(
+                db,
+                """
                 SELECT proveedor, categoria, estado, ultimo_test,
                        nombre AS conexion_nombre
                 FROM core.connections WHERE tenant_id = :t ORDER BY proveedor
-            """, {"t": tenant_id})
+            """,
+                {"t": tenant_id},
+            )
         if "grafo" in bloques:
-            docs = await uno(db, """
+            docs = await uno(
+                db,
+                """
                 SELECT count(*) AS n,
                        count(*) FILTER (WHERE estado = 'procesado') AS ok
                 FROM core.onboarding_documents WHERE tenant_id = :t
-            """, {"t": tenant_id})
+            """,
+                {"t": tenant_id},
+            )
             # Solo métricas agregadas: el contenido del grafo pertenece al
             # alcance contenido_codigo y no se sirve por este endpoint.
             ficha["grafo"] = {
@@ -424,12 +494,20 @@ async def customer(
         grant_id, alcance, motivo = st.grant_detalle[tenant_id]
         async with admin_session() as db:
             await registrar_lectura(
-                db, staff_id=st.id, staff_role=st.role,
+                db,
+                staff_id=st.id,
+                staff_role=st.role,
                 endpoint=f"GET /admin/v1/business/customers/{tenant_id}",
-                tenant_id=tenant_id, grant_id=grant_id, scope=alcance,
-                reason=motivo, resource=tenant_id, ip=st.ip,
-                user_agent=st.user_agent, request_id=st.request_id,
-                revelado=sorted(bloques - set(enmascarados)) or None)
+                tenant_id=tenant_id,
+                grant_id=grant_id,
+                scope=alcance,
+                reason=motivo,
+                resource=tenant_id,
+                ip=st.ip,
+                user_agent=st.user_agent,
+                request_id=st.request_id,
+                revelado=sorted(bloques - set(enmascarados)) or None,
+            )
     return ficha
 
 
@@ -448,8 +526,9 @@ async def subscriptions(
     suspender una suscripción se hace desde el flujo comercial de §15.
     """
     if estado is not None and estado not in _ESTADOS_SUS:
-        raise validacion("Estado no válido.",
-                         {"estado": estado, "permitidos": list(_ESTADOS_SUS)})
+        raise validacion(
+            "Estado no válido.", {"estado": estado, "permitidos": list(_ESTADOS_SUS)}
+        )
 
     where = """
         WHERE c.eliminado_en IS NULL
@@ -459,18 +538,26 @@ async def subscriptions(
                AND c.renueva_el <= current_date + :dias
                AND c.renueva_el >= current_date))
     """
-    params = {"est": estado, "plan": plan, "dias": renueva_en_dias,
-              "lim": p.page_size, "off": p.offset}
+    params = {
+        "est": estado,
+        "plan": plan,
+        "dias": renueva_en_dias,
+        "lim": p.page_size,
+        "off": p.offset,
+    }
     orden = p.clausula_order(
-        {"renovacion": "c.renueva_el", "nombre": "c.razon_social",
-         "importe": "c.importe_mes"},
-        "c.renueva_el ASC NULLS LAST")
+        {"renovacion": "c.renueva_el", "nombre": "c.razon_social", "importe": "c.importe_mes"},
+        "c.renueva_el ASC NULLS LAST",
+    )
 
     async with read_session() as db:
         await _frescura(db, "customer_state", "usage_cycle")
-        total = await uno(db, f"SELECT count(*) AS n "
-                              f"FROM admin.agg_customer_state c {where}", params)
-        filas = await todos(db, f"""
+        total = await uno(
+            db, f"SELECT count(*) AS n FROM admin.agg_customer_state c {where}", params
+        )
+        filas = await todos(
+            db,
+            f"""
             SELECT c.tenant_id, c.razon_social, c.plan_codigo AS plan,
                    c.suscripcion_estado AS estado, c.inicia_el, c.renueva_el,
                    c.finaliza_el,
@@ -483,10 +570,11 @@ async def subscriptions(
             FROM admin.agg_customer_state c
             {where}
             ORDER BY {orden} LIMIT :lim OFFSET :off
-        """, params)
+        """,
+            params,
+        )
 
-    filas, alguna = enmascarar_filas(
-        filas, _concesiones(st, [f["tenant_id"] for f in filas]))
+    filas, alguna = enmascarar_filas(filas, _concesiones(st, [f["tenant_id"] for f in filas]))
     salida = sobre(filas, int(total["n"]) if total else 0, p)
     salida["alguna_enmascarada"] = alguna
     return salida
@@ -505,19 +593,20 @@ async def upgrade_requests(
     El orden por defecto es la solicitud más antigua primero: una solicitud
     olvidada es la peor de las respuestas posibles.
     """
-    where = ("WHERE (:est IS NULL OR r.estado = :est) "
-             "AND (:pd IS NULL OR r.plan_deseado = :pd)")
-    params = {"est": estado, "pd": plan_deseado, "lim": p.page_size,
-              "off": p.offset}
-    orden = p.clausula_order({"antiguedad": "r.solicitado_el",
-                              "urgente": "r.urgente"},
-                             "r.solicitado_el ASC")
+    where = "WHERE (:est IS NULL OR r.estado = :est) AND (:pd IS NULL OR r.plan_deseado = :pd)"
+    params = {"est": estado, "pd": plan_deseado, "lim": p.page_size, "off": p.offset}
+    orden = p.clausula_order(
+        {"antiguedad": "r.solicitado_el", "urgente": "r.urgente"}, "r.solicitado_el ASC"
+    )
 
     async with read_session() as db:
         await _frescura(db, "upgrade_requests")
-        total = await uno(db, f"SELECT count(*) AS n "
-                              f"FROM admin.agg_upgrade_requests r {where}", params)
-        filas = await todos(db, f"""
+        total = await uno(
+            db, f"SELECT count(*) AS n FROM admin.agg_upgrade_requests r {where}", params
+        )
+        filas = await todos(
+            db,
+            f"""
             SELECT r.solicitud_id, r.tenant_id, r.razon_social, r.plan_actual,
                    r.plan_deseado, r.urgente, r.estado, r.comentario,
                    r.solicitado_el, r.cuota_uso_pct,
@@ -526,26 +615,24 @@ async def upgrade_requests(
             FROM admin.agg_upgrade_requests r
             {where}
             ORDER BY {orden} LIMIT :lim OFFSET :off
-        """, params)
+        """,
+            params,
+        )
 
-    filas, alguna = enmascarar_filas(
-        filas, _concesiones(st, [f["tenant_id"] for f in filas]))
+    filas, alguna = enmascarar_filas(filas, _concesiones(st, [f["tenant_id"] for f in filas]))
     salida = sobre(filas, int(total["n"]) if total else 0, p)
     salida["alguna_enmascarada"] = alguna
     return salida
 
 
 # ------------------------------------------------------------------ §18.21
-@router.get("/usage/tokens",
-            summary="Consumo de tokens por cliente, tier y periodo")
+@router.get("/usage/tokens", summary="Consumo de tokens por cliente, tier y periodo")
 async def usage_tokens(
     st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
     p: Annotated[Pagina, Depends(paginacion)],
-    ciclo: Annotated[str | None, Query(
-        description="AAAA-MM; defecto, ciclo en curso.")] = None,
+    ciclo: Annotated[str | None, Query(description="AAAA-MM; defecto, ciclo en curso.")] = None,
     tenant_id: Annotated[str | None, Query()] = None,
-    agrupar_por: Annotated[str, Query(
-        description="cliente | tier | dia.")] = "cliente",
+    agrupar_por: Annotated[str, Query(description="cliente | tier | dia.")] = "cliente",
 ) -> dict[str, Any]:
     """Consumo con su coste estimado y el cuadre contra la facturación.
 
@@ -557,16 +644,21 @@ async def usage_tokens(
     if agrupar_por not in ("cliente", "tier", "dia"):
         raise validacion("Agrupación no válida.", {"agrupar_por": agrupar_por})
     if ciclo is not None and len(ciclo) != 7:
-        raise validacion("El ciclo debe tener el formato AAAA-MM.",
-                         {"ciclo": ciclo})
+        raise validacion("El ciclo debe tener el formato AAAA-MM.", {"ciclo": ciclo})
 
-    params: dict[str, Any] = {"ciclo": ciclo, "t": tenant_id,
-                             "lim": p.page_size, "off": p.offset}
+    params: dict[str, Any] = {
+        "ciclo": ciclo,
+        "t": tenant_id,
+        "lim": p.page_size,
+        "off": p.offset,
+    }
     consultas = {
-        "cliente": ("""
+        "cliente": (
+            """
             SELECT count(*) AS n FROM admin.agg_usage_cycle u
             WHERE u.ciclo = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
-              AND (:t IS NULL OR u.tenant_id = :t)""", """
+              AND (:t IS NULL OR u.tenant_id = :t)""",
+            """
             SELECT u.tenant_id AS clave, u.tenant_id, u.tokens_in, u.tokens_out,
                    jsonb_build_object('flash', u.tokens_flash, 'pro', u.tokens_pro,
                                       'fable', u.tokens_fable) AS por_tier,
@@ -578,11 +670,14 @@ async def usage_tokens(
             FROM admin.agg_usage_cycle u
             WHERE u.ciclo = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
               AND (:t IS NULL OR u.tenant_id = :t)
-            ORDER BY u.coste DESC LIMIT :lim OFFSET :off"""),
-        "tier": ("""
+            ORDER BY u.coste DESC LIMIT :lim OFFSET :off""",
+        ),
+        "tier": (
+            """
             SELECT count(DISTINCT d.tier) AS n FROM admin.agg_tokens_daily d
             WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))""", """
+                      = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))""",
+            """
             SELECT d.tier AS clave, NULL::text AS tenant_id,
                    sum(d.tokens_in) AS tokens_in, sum(d.tokens_out) AS tokens_out,
                    jsonb_build_object(d.tier,
@@ -594,11 +689,14 @@ async def usage_tokens(
                       = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
               AND (:t IS NULL OR d.tenant_id = :t)
             GROUP BY d.tier ORDER BY sum(d.coste) DESC
-            LIMIT :lim OFFSET :off"""),
-        "dia": ("""
+            LIMIT :lim OFFSET :off""",
+        ),
+        "dia": (
+            """
             SELECT count(DISTINCT d.dia) AS n FROM admin.agg_tokens_daily d
             WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))""", """
+                      = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))""",
+            """
             SELECT d.dia::text AS clave, NULL::text AS tenant_id,
                    sum(d.tokens_in) AS tokens_in, sum(d.tokens_out) AS tokens_out,
                    jsonb_object_agg(d.tier, d.tokens_in + d.tokens_out) AS por_tier,
@@ -608,34 +706,37 @@ async def usage_tokens(
             WHERE to_char(d.dia, 'YYYY-MM')
                       = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
               AND (:t IS NULL OR d.tenant_id = :t)
-            GROUP BY d.dia ORDER BY d.dia DESC LIMIT :lim OFFSET :off"""),
+            GROUP BY d.dia ORDER BY d.dia DESC LIMIT :lim OFFSET :off""",
+        ),
     }
     sql_total, sql = consultas[agrupar_por]
 
     async with read_session() as db:
         frescura = await _frescura(db, "usage_cycle", "tokens_daily")
-        totales = await uno(db, """
+        totales = await uno(
+            db,
+            """
             SELECT coalesce(sum(tokens_in + tokens_out), 0) AS tokens,
                    coalesce(sum(coste), 0) AS coste, max(moneda) AS moneda
             FROM admin.agg_usage_cycle
             WHERE ciclo = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
               AND (:t IS NULL OR tenant_id = :t)
-        """, params)
+        """,
+            params,
+        )
         total = await uno(db, sql_total, params)
         filas = await todos(db, sql, params)
 
-    descuadres = [f["clave"] for f in filas
-                  if f.get("cuadra_con_facturacion") is False]
+    descuadres = [f["clave"] for f in filas if f.get("cuadra_con_facturacion") is False]
     if descuadres:
         # Una consola de negocio cuyo consumo no cuadra con la factura destruye
         # la confianza en todas sus demás cifras: es alerta, no aviso.
-        log.critical("admin.usage.descuadre", claves=descuadres[:10],
-                     ciclo=ciclo or "actual")
+        log.critical("admin.usage.descuadre", claves=descuadres[:10], ciclo=ciclo or "actual")
 
     if agrupar_por == "cliente":
         filas, _ = enmascarar_filas(
-            filas, _concesiones(st, [f["tenant_id"] for f in filas
-                                     if f["tenant_id"]]))
+            filas, _concesiones(st, [f["tenant_id"] for f in filas if f["tenant_id"]])
+        )
 
     salida = sobre(filas, int(total["n"]) if total else 0, p)
     salida["ciclo"] = ciclo or datetime.now().strftime("%Y-%m")
@@ -650,9 +751,12 @@ async def usage_tokens(
 
 
 # ------------------------------------------------------------------ §18.22
-@router.post("/reports", response_model=ReporteOut,
-             status_code=status.HTTP_202_ACCEPTED,
-             summary="Solicitar informe de negocio")
+@router.post(
+    "/reports",
+    response_model=ReporteOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Solicitar informe de negocio",
+)
 async def crear_informe(
     cuerpo: ReporteIn,
     st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
@@ -673,8 +777,10 @@ async def crear_informe(
         raise validacion("El rango de fechas no es válido.")
     meses = (cuerpo.hasta - cuerpo.desde).days / 30.0
     if meses > s.report_max_months:
-        raise validacion(f"El rango no puede superar {s.report_max_months} meses.",
-                         {"meses": round(meses, 1)})
+        raise validacion(
+            f"El rango no puede superar {s.report_max_months} meses.",
+            {"meses": round(meses, 1)},
+        )
 
     if cuerpo.incluir_identificables:
         if cuerpo.tenant_id:
@@ -684,30 +790,54 @@ async def crear_informe(
 
     report_id = nuevo("rp")
     async with admin_session() as db:
-        await uno(db, """
+        await uno(
+            db,
+            """
             INSERT INTO admin.reports
                 (id, kind, format, params, requested_by, includes_pii, status,
                  expires_at)
             VALUES (:id, :k, :f, CAST(:p AS jsonb), :by, :pii, 'en_cola',
                     now() + make_interval(days => :ret))
             RETURNING id
-        """, {"id": report_id, "k": cuerpo.tipo, "f": cuerpo.formato,
-              "p": cuerpo.model_dump_json(), "by": st.id,
-              "pii": cuerpo.incluir_identificables,
-              "ret": s.report_retention_days})
+        """,
+            {
+                "id": report_id,
+                "k": cuerpo.tipo,
+                "f": cuerpo.formato,
+                "p": cuerpo.model_dump_json(),
+                "by": st.id,
+                "pii": cuerpo.incluir_identificables,
+                "ret": s.report_retention_days,
+            },
+        )
         await registrar_accion(
-            db, staff_id=st.id, staff_role=st.role, action="report",
+            db,
+            staff_id=st.id,
+            staff_role=st.role,
+            action="report",
             endpoint="POST /admin/v1/business/reports",
-            tenant_id=cuerpo.tenant_id, ip=st.ip, user_agent=st.user_agent,
+            tenant_id=cuerpo.tenant_id,
+            ip=st.ip,
+            user_agent=st.user_agent,
             request_id=st.request_id,
-            payload={"report_id": report_id, "tipo": cuerpo.tipo,
-                     "rango": [str(cuerpo.desde), str(cuerpo.hasta)],
-                     "identificables": cuerpo.incluir_identificables})
+            payload={
+                "report_id": report_id,
+                "tipo": cuerpo.tipo,
+                "rango": [str(cuerpo.desde), str(cuerpo.hasta)],
+                "identificables": cuerpo.incluir_identificables,
+            },
+        )
 
-    log.info("admin.report.solicitado", report_id=report_id, tipo=cuerpo.tipo,
-             identificables=cuerpo.incluir_identificables, staff_id=st.id)
-    return ReporteOut(report_id=report_id, estado="en_cola",
-                      estimacion_s=max(10, int(meses * 3)))
+    log.info(
+        "admin.report.solicitado",
+        report_id=report_id,
+        tipo=cuerpo.tipo,
+        identificables=cuerpo.incluir_identificables,
+        staff_id=st.id,
+    )
+    return ReporteOut(
+        report_id=report_id, estado="en_cola", estimacion_s=max(10, int(meses * 3))
+    )
 
 
 # ------------------------------------------------------------------ §18.23
@@ -725,39 +855,53 @@ async def informe(
     from ..servicios.blob import url_descarga
 
     async with admin_session() as db:
-        r = await uno(db, """
+        r = await uno(
+            db,
+            """
             SELECT r.id, r.kind, r.format, r.status, r.blob_ref, r.sha256,
                    r.rows_total, r.error, r.expires_at, r.requested_by,
                    s.full_name AS solicitante
             FROM admin.reports r
             JOIN admin.staff s ON s.id = r.requested_by
             WHERE r.id = :i
-        """, {"i": report_id})
+        """,
+            {"i": report_id},
+        )
         if r is None or (r["requested_by"] != st.id and st.role != "staff_admin"):
             raise no_encontrado("El informe")
         if r["status"] in ("en_cola", "generando"):
-            raise conflicto("CONFLICTO_ESTADO",
-                            "El informe todavía se está generando.",
-                            {"estado": r["status"]})
+            raise conflicto(
+                "CONFLICTO_ESTADO",
+                "El informe todavía se está generando.",
+                {"estado": r["status"]},
+            )
 
         url = None
         if r["status"] == "listo" and r["blob_ref"]:
             url = url_descarga(r["blob_ref"])
             await registrar_accion(
-                db, staff_id=st.id, staff_role=st.role, action="report",
+                db,
+                staff_id=st.id,
+                staff_role=st.role,
+                action="report",
                 endpoint=f"GET /admin/v1/business/reports/{report_id}",
-                ip=st.ip, user_agent=st.user_agent, request_id=st.request_id,
-                payload={"report_id": report_id, "evento": "descargado",
-                         "sha256": r["sha256"]})
-            log.info("admin.report.descargado", report_id=report_id,
-                     staff_id=st.id)
+                ip=st.ip,
+                user_agent=st.user_agent,
+                request_id=st.request_id,
+                payload={"report_id": report_id, "evento": "descargado", "sha256": r["sha256"]},
+            )
+            log.info("admin.report.descargado", report_id=report_id, staff_id=st.id)
 
     return {
-        "report_id": r["id"], "tipo": r["kind"], "formato": r["format"],
+        "report_id": r["id"],
+        "tipo": r["kind"],
+        "formato": r["format"],
         "estado": r["status"],
         "solicitado_por": {"id": r["requested_by"], "nombre": r["solicitante"]},
-        "download_url": url, "hash_sha256": r["sha256"],
-        "filas": r["rows_total"], "caduca_el": r["expires_at"],
+        "download_url": url,
+        "hash_sha256": r["sha256"],
+        "filas": r["rows_total"],
+        "caduca_el": r["expires_at"],
         "error": r["error"],
     }
 

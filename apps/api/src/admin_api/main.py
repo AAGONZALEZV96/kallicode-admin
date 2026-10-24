@@ -43,7 +43,7 @@ from . import db as dbmod
 from .deps import cerrar_redis
 from .settings import get_admin_settings
 
-MAX_BODY_BYTES = 2 * 1024 * 1024      # 2 MB: la consola no recibe adjuntos
+MAX_BODY_BYTES = 2 * 1024 * 1024  # 2 MB: la consola no recibe adjuntos
 
 
 @asynccontextmanager
@@ -68,15 +68,15 @@ app = FastAPI(
     description=(
         "Superficie interna de la consola de negocio y operaciones. No la "
         "consume ningún cliente ni ningún agente del pipeline. Documentada en "
-        "el capítulo 18 del Diseño del backend."),
+        "el capítulo 18 del Diseño del backend."
+    ),
     openapi_url="/admin/v1/openapi.json",
     docs_url="/admin/v1/docs",
     redoc_url=None,
     lifespan=lifespan,
 )
 
-app.add_middleware(TrustedHostMiddleware,
-                   allowed_hosts=get_admin_settings().hosts_permitidos)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=get_admin_settings().hosts_permitidos)
 
 
 # ------------------------------------------------------------- middleware
@@ -93,17 +93,22 @@ async def contexto_y_cabeceras(
     largo = request.headers.get("content-length")
     if largo and int(largo) > MAX_BODY_BYTES:
         limpiar_contexto()
-        return JSONResponse(status_code=413, content=_sobre(
-            "CUERPO_DEMASIADO_GRANDE", "La petición es demasiado grande.",
-            trace_id, {"maximo_bytes": MAX_BODY_BYTES}))
+        return JSONResponse(
+            status_code=413,
+            content=_sobre(
+                "CUERPO_DEMASIADO_GRANDE",
+                "La petición es demasiado grande.",
+                trace_id,
+                {"maximo_bytes": MAX_BODY_BYTES},
+            ),
+        )
 
     inicio = time.perf_counter()
     try:
         resp = await call_next(request)
     finally:
         latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-        log.info("http", metodo=request.method, ruta=request.url.path,
-                 latencia_ms=latencia_ms)
+        log.info("http", metodo=request.method, ruta=request.url.path, latencia_ms=latencia_ms)
         limpiar_contexto()
 
     resp.headers["X-Trace-Id"] = trace_id
@@ -113,19 +118,34 @@ async def contexto_y_cabeceras(
     resp.headers["Referrer-Policy"] = "no-referrer"
     resp.headers["Content-Security-Policy"] = (
         "default-src 'self'; img-src 'self' data:; style-src 'self'; "
-        "script-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+        "script-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+    )
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
 
-def _sobre(codigo: str, mensaje: str, trace_id: str,
-           detalle: dict[str, object] | None = None) -> dict[str, object]:
+def _sobre(
+    codigo: str, mensaje: str, trace_id: str, detalle: dict[str, object] | None = None
+) -> dict[str, object]:
     """Sobre de error idéntico al de /api/v1 (§3.6)."""
+<<<<<<< Updated upstream
     return {"error": {
         "codigo": codigo, "mensaje": mensaje, "detalle": detalle,
         "trace_id": trace_id,
         "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
     }}
+=======
+    return {
+        "error": {
+            "codigo": codigo,
+            "code": codigo.lower(),
+            "mensaje": mensaje,
+            "detalle": detalle,
+            "trace_id": trace_id,
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        }
+    }
+>>>>>>> Stashed changes
 
 
 # ------------------------------------------------------- manejadores de error
@@ -133,34 +153,44 @@ def _sobre(codigo: str, mensaje: str, trace_id: str,
 async def _app_error(request: Request, exc: AppError) -> JSONResponse:
     trace_id = getattr(request.state, "trace_id", "")
     nivel = log.warning if exc.http < 500 else log.error
-    nivel("admin.error", codigo=exc.codigo, http=exc.http,
-          ruta=request.url.path)
-    return JSONResponse(status_code=exc.http,
-                        content=_sobre(exc.codigo, exc.mensaje, trace_id,
-                                       exc.detalle))
+    nivel("admin.error", codigo=exc.codigo, http=exc.http, ruta=request.url.path)
+    return JSONResponse(
+        status_code=exc.http, content=_sobre(exc.codigo, exc.mensaje, trace_id, exc.detalle)
+    )
 
 
 @app.exception_handler(RequestValidationError)
-async def _validacion(request: Request,
-                      exc: RequestValidationError) -> JSONResponse:
+async def _validacion(request: Request, exc: RequestValidationError) -> JSONResponse:
     trace_id = getattr(request.state, "trace_id", "")
-    campos = [{"campo": ".".join(str(p) for p in e["loc"][1:]),
-               "error": e["msg"]} for e in exc.errors()]
-    return JSONResponse(status_code=422, content=_sobre(
-        "VALIDACION_ENTRADA", "Los datos enviados no son válidos.",
-        trace_id, {"campos": campos}))
+    campos = [
+        {"campo": ".".join(str(p) for p in e["loc"][1:]), "error": e["msg"]}
+        for e in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content=_sobre(
+            "VALIDACION_ENTRADA",
+            "Los datos enviados no son válidos.",
+            trace_id,
+            {"campos": campos},
+        ),
+    )
 
 
 @app.exception_handler(Exception)
 async def _no_controlado(request: Request, exc: Exception) -> JSONResponse:
     """Los 5xx no exponen ni el nombre de la excepción (§3.6, defecto BE-F39)."""
     trace_id = getattr(request.state, "trace_id", "")
-    log.error("admin.error_no_controlado", ruta=request.url.path,
-              excepcion=type(exc).__name__)
-    return JSONResponse(status_code=500, content=_sobre(
-        "ERROR_INTERNO",
-        "Se ha producido un error interno. Contacta con la plataforma indicando "
-        "el identificador de traza.", trace_id))
+    log.error("admin.error_no_controlado", ruta=request.url.path, excepcion=type(exc).__name__)
+    return JSONResponse(
+        status_code=500,
+        content=_sobre(
+            "ERROR_INTERNO",
+            "Se ha producido un error interno. Contacta con la plataforma indicando "
+            "el identificador de traza.",
+            trace_id,
+        ),
+    )
 
 
 # ----------------------------------------------------------------- routers
@@ -172,13 +202,13 @@ def registrar_routers() -> None:
     """
     from .routers import admin_audit, auth, business, grants, health, ops, staff
 
-    app.include_router(health.router)          # §18.31
-    app.include_router(auth.router)            # §18.1 – §18.8
-    app.include_router(staff.router)           # §18.9 – §18.12
-    app.include_router(grants.router)          # §18.13 – §18.15
-    app.include_router(business.router)        # §18.16 – §18.23
-    app.include_router(ops.router)             # §18.24 – §18.28
-    app.include_router(admin_audit.router)     # §18.29 – §18.30
+    app.include_router(health.router)  # §18.31
+    app.include_router(auth.router)  # §18.1 – §18.8
+    app.include_router(staff.router)  # §18.9 – §18.12
+    app.include_router(grants.router)  # §18.13 – §18.15
+    app.include_router(business.router)  # §18.16 – §18.23
+    app.include_router(ops.router)  # §18.24 – §18.28
+    app.include_router(admin_audit.router)  # §18.29 – §18.30
 
 
 registrar_routers()

@@ -18,6 +18,7 @@ Cuatro decisiones de diseño que corrigen defectos encontrados en el backend:
 
 from __future__ import annotations
 
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Annotated, Any
@@ -40,9 +41,29 @@ _redis: aioredis.Redis | None = None
 
 def redis() -> aioredis.Redis:
     global _redis
+<<<<<<< Updated upstream
     if _redis is None:
         _redis = aioredis.from_url(get_settings().redis_url,
                                    decode_responses=True)
+=======
+    import asyncio
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if _redis is None or (
+        loop is not None
+        and getattr(_redis, "_custom_loop", None) is not None
+        and getattr(_redis, "_custom_loop", None) != loop
+    ):
+        _redis = aioredis.from_url(  # type: ignore[no-untyped-call]
+            get_settings().redis_url,
+            decode_responses=True,
+        )
+        _redis._custom_loop = loop  # type: ignore[union-attr]
+>>>>>>> Stashed changes
     return _redis
 
 
@@ -101,26 +122,39 @@ async def staff_actual(request: Request) -> Staff:
     if await redis().exists(clave_denylist(jti)):
         raise no_autenticado("La sesión ha sido cerrada.")
 
+    sub = str(claims["sub"])
+    revocado_en = await redis().get(f"admin:staff:{sub}:revoked_at")
+    if revocado_en is not None and int(str(claims.get("iat", 0))) <= int(revocado_en):
+        raise no_autenticado("La sesión ha sido cerrada.")
+
     mfa_at = exigir_mfa_vigente(claims)
 
     # El estado y el rol se resuelven en base de datos, nunca desde el token.
     async with admin_session() as db:
-        fila = await uno(db, """
+        fila = await uno(
+            db,
+            """
             SELECT id, email, full_name, role, status
             FROM admin.staff WHERE id = :id
-        """, {"id": str(claims["sub"])})
+        """,
+            {"id": str(claims["sub"])},
+        )
     if fila is None:
         raise no_autenticado()
     if fila["status"] != "active":
         raise staff_desactivado()
 
     st = Staff(
-        id=fila["id"], role=fila["role"], full_name=fila["full_name"],
-        email=fila["email"], mfa_at=mfa_at, jti=jti,
+        id=fila["id"],
+        role=fila["role"],
+        full_name=fila["full_name"],
+        email=fila["email"],
+        mfa_at=mfa_at,
+        jti=jti,
         ip=_ip_cliente(request),
         user_agent=request.headers.get("user-agent"),
-        request_id=request.headers.get("x-trace-id") or getattr(
-            request.state, "trace_id", None),
+        request_id=request.headers.get("x-trace-id")
+        or getattr(request.state, "trace_id", None),
     )
     await _cargar_concesiones(st)
     bind_contexto(staff_id=st.id, rol=st.role, request_id=st.request_id)
@@ -130,12 +164,16 @@ async def staff_actual(request: Request) -> Staff:
 async def _cargar_concesiones(st: Staff) -> None:
     """Carga las concesiones vigentes del empleado, una vez por petición."""
     async with admin_session() as db:
-        filas = await todos(db, """
+        filas = await todos(
+            db,
+            """
             SELECT id, tenant_id, scope, reason
             FROM admin.access_grants
             WHERE staff_id = :s AND revoked_at IS NULL AND expires_at > now()
             ORDER BY tenant_id, granted_at
-        """, {"s": st.id})
+        """,
+            {"s": st.id},
+        )
     for f in filas:
         st.grants.setdefault(f["tenant_id"], []).append(f["scope"])
         st.grant_detalle[f["tenant_id"]] = (f["id"], f["scope"], f["reason"])
@@ -145,7 +183,7 @@ StaffDep = Annotated[Staff, Depends(staff_actual)]
 
 
 # ------------------------------------------------------------------ roles
-def exigir(*roles: str):
+def exigir(*roles: str) -> Callable[[Staff], Coroutine[Any, Any, Staff]]:
     """Fábrica de dependencia que restringe el endpoint a ciertos roles.
 
     Se usa como `Depends(exigir("staff_admin"))`, y la matriz de permisos del
@@ -154,6 +192,14 @@ def exigir(*roles: str):
 
     async def _guard(st: StaffDep) -> Staff:
         exigir_rol_staff(st.role, roles)
+<<<<<<< Updated upstream
+=======
+        s = get_admin_settings()
+        if datetime.now(UTC) - st.mfa_at > timedelta(minutes=s.staff_idle_timeout_min):
+            from admin_api.errors import mfa_requerido
+
+            raise mfa_requerido("Verificación de segundo factor requerida.")
+>>>>>>> Stashed changes
         return st
 
     return _guard
@@ -178,12 +224,16 @@ async def exigir_concesion(st: Staff, tenant_id: str, alcance: str) -> str:
         return st.grant_detalle[tenant_id][0]
 
     async with admin_session() as db:
-        vencida = await uno(db, """
+        vencida = await uno(
+            db,
+            """
             SELECT id FROM admin.access_grants
             WHERE staff_id = :s AND tenant_id = :t AND scope = :sc
               AND (revoked_at IS NOT NULL OR expires_at <= now())
             ORDER BY granted_at DESC LIMIT 1
-        """, {"s": st.id, "t": tenant_id, "sc": alcance})
+        """,
+            {"s": st.id, "t": tenant_id, "sc": alcance},
+        )
     if vencida:
         raise concesion_caducada()
     raise acceso_no_justificado(tenant_id, alcance)
@@ -270,6 +320,14 @@ async def revocar_jti(jti: str, ttl_s: int) -> None:
     await redis().setex(clave_denylist(jti), max(ttl_s, 1), "1")
 
 
+async def revocar_todas_sesiones_redis(staff_id: str) -> None:
+    """Invalida inmediatamente en Redis todos los access tokens emitidos para el empleado."""
+    s = get_admin_settings()
+    ttl = s.staff_refresh_token_ttl_h * 3600
+    ahora_ts = int(datetime.now(UTC).timestamp())
+    await redis().set(f"admin:staff:{staff_id}:revoked_at", ahora_ts, ex=ttl)
+
+
 async def cerrar_redis() -> None:
     global _redis
     if _redis is not None:
@@ -298,5 +356,6 @@ __all__ = [
     "redis",
     "registrar_fallo_login",
     "revocar_jti",
+    "revocar_todas_sesiones_redis",
     "staff_actual",
 ]

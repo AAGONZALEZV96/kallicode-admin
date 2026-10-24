@@ -20,6 +20,7 @@ import hmac
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 import jwt
 import pyotp
@@ -55,7 +56,10 @@ __all__ = [
 ]
 
 STAFF_ROLES: tuple[str, ...] = (
-    "staff_soporte", "staff_operaciones", "staff_negocio", "staff_admin",
+    "staff_soporte",
+    "staff_operaciones",
+    "staff_negocio",
+    "staff_admin",
 )
 
 
@@ -69,7 +73,7 @@ def _claves() -> tuple[str, str]:
     """
     from kallicode_core.seguridad import _claves as _core_claves
 
-    return _core_claves()
+    return cast(tuple[str, str], _core_claves())
 
 
 # --------------------------------------------------------------------- tokens
@@ -86,18 +90,21 @@ def emitir_tokens_staff(staff_id: str, rol: str, mfa_at: datetime) -> str:
     s = get_admin_settings()
     priv, _ = _claves()
     ahora = datetime.now(UTC)
-    return jwt.encode({
-        "sub": staff_id,
-        "rol": rol,
-        "typ": "staff",
-        "mfa": int(mfa_at.timestamp()),
-        "iss": s.jwt_issuer,
-        "aud": s.jwt_audience,
-        "jti": uuid.uuid4().hex,
-        "iat": int(ahora.timestamp()),
-        "exp": int((ahora + timedelta(
-            minutes=s.staff_access_token_ttl_min)).timestamp()),
-    }, priv, algorithm="RS256")
+    return jwt.encode(
+        {
+            "sub": staff_id,
+            "rol": rol,
+            "typ": "staff",
+            "mfa": int(mfa_at.timestamp()),
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "jti": uuid.uuid4().hex,
+            "iat": int(ahora.timestamp()),
+            "exp": int((ahora + timedelta(minutes=s.staff_access_token_ttl_min)).timestamp()),
+        },
+        priv,
+        algorithm="RS256",
+    )
 
 
 def verificar_token_staff(token: str) -> dict[str, object]:
@@ -112,10 +119,14 @@ def verificar_token_staff(token: str) -> dict[str, object]:
     _, pub = _claves()
     try:
         claims = jwt.decode(
-            token, pub, algorithms=["RS256"],
-            issuer=s.jwt_issuer, audience=s.jwt_audience,
-            options={"require": ["sub", "rol", "typ", "mfa", "iss", "aud",
-                                 "exp", "iat", "jti"]},
+            token,
+            pub,
+            algorithms=["RS256"],
+            issuer=s.jwt_issuer,
+            audience=s.jwt_audience,
+            options={
+                "require": ["sub", "rol", "typ", "mfa", "iss", "aud", "exp", "iat", "jti"]
+            },
         )
     except jwt.ExpiredSignatureError as exc:
         raise no_autenticado("El token ha expirado.") from exc

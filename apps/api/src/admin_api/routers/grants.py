@@ -36,13 +36,14 @@ from ..masking import JERARQUIA
 from ..pagination import Pagina, paginacion, sobre
 from ..settings import get_admin_settings
 
-router = APIRouter(prefix="/admin/v1/access-grants",
-                  tags=["Concesiones de acceso"])
+router = APIRouter(prefix="/admin/v1/access-grants", tags=["Concesiones de acceso"])
 
 # Motivos que no justifican nada. Un motivo debe describir el caso concreto.
 _PATRONES_VACIOS = re.compile(
     r"^(revisi[oó]n|prueba|test|soporte|comprobaci[oó]n|an[aá]lisis|consulta|"
-    r"verificaci[oó]n|mirar|ver|debug|depuraci[oó]n)\W*$", re.IGNORECASE)
+    r"verificaci[oó]n|mirar|ver|debug|depuraci[oó]n)\W*$",
+    re.IGNORECASE,
+)
 # Al menos una referencia verificable: un código de caso o un identificador.
 _TIENE_REFERENCIA = re.compile(r"[A-Z]{2,}-\d+|#\d+|\bKC-\d+\b")
 
@@ -84,21 +85,24 @@ def _validar_motivo(motivo: str, alcance: str, referencia: str | None) -> None:
     if _PATRONES_VACIOS.match(limpio):
         raise motivo_insuficiente(
             "el motivo es genérico: describe el caso, la incidencia o la "
-            "solicitud que justifica el acceso")
+            "solicitud que justifica el acceso"
+        )
     if len(set(limpio.lower().split())) < 5:
         raise motivo_insuficiente("el motivo no describe un caso concreto")
-    if alcance == "contenido_codigo" and not (
-            referencia or _TIENE_REFERENCIA.search(limpio)):
+    if alcance == "contenido_codigo" and not (referencia or _TIENE_REFERENCIA.search(limpio)):
         raise motivo_insuficiente(
-            "el acceso a contenido de código exige referencia a un caso "
-            "verificable")
+            "el acceso a contenido de código exige referencia a un caso verificable"
+        )
 
 
 # ------------------------------------------------------------------ §18.13
-@router.post("", response_model=CrearOut, status_code=status.HTTP_201_CREATED,
-             summary="Solicitar acceso a los datos de un cliente")
-async def crear(cuerpo: CrearIn,
-                st: Annotated[Staff, Depends(exigir(*SOPORTE))]) -> CrearOut:
+@router.post(
+    "",
+    response_model=CrearOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Solicitar acceso a los datos de un cliente",
+)
+async def crear(cuerpo: CrearIn, st: Annotated[Staff, Depends(exigir(*SOPORTE))]) -> CrearOut:
     """Crea una concesión justificada y temporal.
 
     La concesión no amplía el rol: un empleado con rol de soporte no obtiene por
@@ -106,8 +110,9 @@ async def crear(cuerpo: CrearIn,
     """
     s = get_admin_settings()
     if cuerpo.alcance not in JERARQUIA:
-        raise validacion("Alcance desconocido.",
-                         {"alcance": cuerpo.alcance, "permitidos": list(JERARQUIA)})
+        raise validacion(
+            "Alcance desconocido.", {"alcance": cuerpo.alcance, "permitidos": list(JERARQUIA)}
+        )
     _validar_motivo(cuerpo.motivo, cuerpo.alcance, cuerpo.referencia)
 
     minutos = cuerpo.duracion_min or s.grant_default_minutes
@@ -115,60 +120,101 @@ async def crear(cuerpo: CrearIn,
         minutos = min(minutos, s.grant_code_max_minutes)
 
     async with admin_session() as db:
-        org = await uno(db, "SELECT id FROM core.organizations WHERE id = :t",
-                        {"t": cuerpo.tenant_id})
+        org = await uno(
+            db, "SELECT id FROM core.organizations WHERE id = :t", {"t": cuerpo.tenant_id}
+        )
         if org is None:
             raise no_encontrado("La organización")
 
-        vigente = await uno(db, """
+        vigente = await uno(
+            db,
+            """
             SELECT id FROM admin.access_grants
             WHERE staff_id = :s AND tenant_id = :t AND scope = :sc
               AND revoked_at IS NULL AND expires_at > now()
-        """, {"s": st.id, "t": cuerpo.tenant_id, "sc": cuerpo.alcance})
+        """,
+            {"s": st.id, "t": cuerpo.tenant_id, "sc": cuerpo.alcance},
+        )
         if vigente is not None:
             raise concesion_duplicada(vigente["id"])
 
-        activas = await uno(db, """
+        activas = await uno(
+            db,
+            """
             SELECT count(*) AS n FROM admin.access_grants
             WHERE staff_id = :s AND revoked_at IS NULL AND expires_at > now()
-        """, {"s": st.id})
+        """,
+            {"s": st.id},
+        )
         if activas and int(activas["n"]) >= s.grant_max_concurrent:
             raise rate_limit(60)
 
         grant_id = nuevo("gr")
-        fila = await uno(db, """
+        fila = await uno(
+            db,
+            """
             INSERT INTO admin.access_grants
                 (id, staff_id, tenant_id, scope, reason, reference,
                  granted_at, expires_at)
             VALUES (:id, :s, :t, :sc, :rz, :rf, now(),
                     now() + make_interval(mins => :m))
             RETURNING id, tenant_id, scope, reason, granted_at, expires_at
-        """, {"id": grant_id, "s": st.id, "t": cuerpo.tenant_id,
-              "sc": cuerpo.alcance, "rz": cuerpo.motivo,
-              "rf": cuerpo.referencia, "m": minutos})
+        """,
+            {
+                "id": grant_id,
+                "s": st.id,
+                "t": cuerpo.tenant_id,
+                "sc": cuerpo.alcance,
+                "rz": cuerpo.motivo,
+                "rf": cuerpo.referencia,
+                "m": minutos,
+            },
+        )
         assert fila is not None
 
         # El evento que el cliente verá en su portal (§11.6).
         await registrar_accion(
-            db, staff_id=st.id, staff_role=st.role, action="grant_created",
+            db,
+            staff_id=st.id,
+            staff_role=st.role,
+            action="grant_created",
             endpoint="POST /admin/v1/access-grants",
-            tenant_id=cuerpo.tenant_id, grant_id=grant_id,
-            scope=cuerpo.alcance, reason=cuerpo.motivo, ip=st.ip,
-            user_agent=st.user_agent, request_id=st.request_id,
-            payload={"duracion_min": minutos, "referencia": cuerpo.referencia})
+            tenant_id=cuerpo.tenant_id,
+            grant_id=grant_id,
+            scope=cuerpo.alcance,
+            reason=cuerpo.motivo,
+            ip=st.ip,
+            user_agent=st.user_agent,
+            request_id=st.request_id,
+            payload={"duracion_min": minutos, "referencia": cuerpo.referencia},
+        )
 
-    log.info("admin.grant.creado", grant_id=grant_id, tenant_id=cuerpo.tenant_id,
-             alcance=cuerpo.alcance, duracion_min=minutos, staff_id=st.id)
+    log.info(
+        "admin.grant.creado",
+        grant_id=grant_id,
+        tenant_id=cuerpo.tenant_id,
+        alcance=cuerpo.alcance,
+        duracion_min=minutos,
+        staff_id=st.id,
+    )
     if cuerpo.alcance == "contenido_codigo":
-        log.critical("admin.grant.contenido_codigo", grant_id=grant_id,
-                     tenant_id=cuerpo.tenant_id, staff_id=st.id,
-                     referencia=cuerpo.referencia)
+        log.critical(
+            "admin.grant.contenido_codigo",
+            grant_id=grant_id,
+            tenant_id=cuerpo.tenant_id,
+            staff_id=st.id,
+            referencia=cuerpo.referencia,
+        )
 
     return CrearOut(
-        grant_id=fila["id"], tenant_id=fila["tenant_id"], alcance=fila["scope"],
-        motivo=fila["reason"], concedido_en=fila["granted_at"],
+        grant_id=fila["id"],
+        tenant_id=fila["tenant_id"],
+        alcance=fila["scope"],
+        motivo=fila["reason"],
+        concedido_en=fila["granted_at"],
         caduca_en=fila["expires_at"],
-        visible_para_cliente_en=fila["granted_at"])
+        visible_para_cliente_en=fila["granted_at"],
+    )
 
 
 # ------------------------------------------------------------------ §18.14
@@ -178,8 +224,7 @@ async def listar(
     p: Annotated[Pagina, Depends(paginacion)],
     ambito: Annotated[str, Query(description="propias | todas.")] = "propias",
     tenant_id: Annotated[str | None, Query()] = None,
-    estado: Annotated[str | None, Query(
-        description="vigente | caducada | revocada.")] = None,
+    estado: Annotated[str | None, Query(description="vigente | caducada | revocada.")] = None,
     desde: Annotated[str | None, Query()] = None,
     hasta: Annotated[str | None, Query()] = None,
 ) -> dict[str, Any]:
@@ -193,9 +238,15 @@ async def listar(
     if ambito == "todas" and st.role != "staff_admin":
         from kallicode_core.errors import permiso_denegado
 
+<<<<<<< Updated upstream
         raise permiso_denegado(
             "Solo el rol de administración puede ver las concesiones de todo el "
             "personal.")
+=======
+        raise rol_staff_insuficiente(
+            "Solo el rol de administración puede ver las concesiones de todo el personal."
+        )
+>>>>>>> Stashed changes
     if estado is not None and estado not in ("vigente", "caducada", "revocada"):
         raise validacion("Estado no válido.", {"estado": estado})
 
@@ -210,16 +261,27 @@ async def listar(
     elif estado == "revocada":
         cond.append("g.revoked_at IS NOT NULL")
     where = "WHERE " + " AND ".join(cond)
-    params = {"ambito": ambito, "yo": st.id, "t": tenant_id, "d": desde,
-              "h": hasta, "lim": p.page_size, "off": p.offset}
+    params = {
+        "ambito": ambito,
+        "yo": st.id,
+        "t": tenant_id,
+        "d": desde,
+        "h": hasta,
+        "lim": p.page_size,
+        "off": p.offset,
+    }
     orden = p.clausula_order(
-        {"concedido": "g.granted_at", "caduca": "g.expires_at",
-         "lecturas": "g.reads"}, "g.granted_at DESC")
+        {"concedido": "g.granted_at", "caduca": "g.expires_at", "lecturas": "g.reads"},
+        "g.granted_at DESC",
+    )
 
     async with admin_session() as db:
-        total = await uno(db, f"SELECT count(*) AS n FROM admin.access_grants g "
-                              f"{where}", params)
-        filas = await todos(db, f"""
+        total = await uno(
+            db, f"SELECT count(*) AS n FROM admin.access_grants g {where}", params
+        )
+        filas = await todos(
+            db,
+            f"""
             SELECT g.id AS grant_id, g.tenant_id, g.scope AS alcance,
                    g.reason AS motivo, g.reference AS referencia,
                    g.granted_at AS concedido_en, g.expires_at AS caduca_en,
@@ -242,20 +304,29 @@ async def listar(
             LEFT JOIN admin.staff rv ON rv.id = g.revoked_by
             {where}
             ORDER BY {orden} LIMIT :lim OFFSET :off
-        """, params)
+        """,
+            params,
+        )
 
         if ambito == "todas":
             await registrar_accion(
-                db, staff_id=st.id, staff_role=st.role, action="admin_query",
-                endpoint="GET /admin/v1/access-grants", ip=st.ip,
-                user_agent=st.user_agent, request_id=st.request_id,
-                payload={"ambito": "todas", "resultados": len(filas)})
+                db,
+                staff_id=st.id,
+                staff_role=st.role,
+                action="admin_query",
+                endpoint="GET /admin/v1/access-grants",
+                ip=st.ip,
+                user_agent=st.user_agent,
+                request_id=st.request_id,
+                payload={"ambito": "todas", "resultados": len(filas)},
+            )
     return sobre(filas, int(total["n"]) if total else 0, p)
 
 
 # ------------------------------------------------------------------ §18.15
-@router.delete("/{grant_id}", response_model=RevocarOut,
-               summary="Revocar una concesión de acceso")
+@router.delete(
+    "/{grant_id}", response_model=RevocarOut, summary="Revocar una concesión de acceso"
+)
 async def revocar(
     st: StaffDep,
     grant_id: Annotated[str, Path(description="Concesión a revocar.")],
@@ -269,10 +340,14 @@ async def revocar(
     """
     motivo = cuerpo.motivo if cuerpo else None
     async with admin_session() as db:
-        g = await uno(db, """
+        g = await uno(
+            db,
+            """
             SELECT id, staff_id, tenant_id, scope, reason, revoked_at, expires_at
             FROM admin.access_grants WHERE id = :i FOR UPDATE
-        """, {"i": grant_id})
+        """,
+            {"i": grant_id},
+        )
         if g is None:
             raise no_encontrado("La concesión")
 
@@ -281,28 +356,38 @@ async def revocar(
             # No se revela la existencia de una concesión ajena.
             raise no_encontrado("La concesión")
         if ajena and not motivo:
-            raise motivo_insuficiente(
-                "revocar una concesión ajena exige motivo")
+            raise motivo_insuficiente("revocar una concesión ajena exige motivo")
 
         # Idempotente: revocar una ya revocada o caducada no es un error.
         if g["revoked_at"] is not None:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-        fila = await uno(db, """
+        fila = await uno(
+            db,
+            """
             UPDATE admin.access_grants
             SET revoked_at = now(), revoked_by = :by, revoked_reason = :m
             WHERE id = :i RETURNING id, revoked_at
-        """, {"i": grant_id, "by": st.id,
-              "m": motivo or "cerrada por el propio empleado"})
+        """,
+            {"i": grant_id, "by": st.id, "m": motivo or "cerrada por el propio empleado"},
+        )
         assert fila is not None
 
         await registrar_accion(
-            db, staff_id=st.id, staff_role=st.role, action="grant_revoked",
+            db,
+            staff_id=st.id,
+            staff_role=st.role,
+            action="grant_revoked",
             endpoint=f"DELETE /admin/v1/access-grants/{grant_id}",
-            tenant_id=g["tenant_id"], grant_id=grant_id, scope=g["scope"],
-            reason=motivo or "cerrada por el propio empleado", ip=st.ip,
-            user_agent=st.user_agent, request_id=st.request_id,
-            payload={"ajena": ajena, "titular": g["staff_id"]})
+            tenant_id=g["tenant_id"],
+            grant_id=grant_id,
+            scope=g["scope"],
+            reason=motivo or "cerrada por el propio empleado",
+            ip=st.ip,
+            user_agent=st.user_agent,
+            request_id=st.request_id,
+            payload={"ajena": ajena, "titular": g["staff_id"]},
+        )
 
     log.info("admin.grant.revocado", grant_id=grant_id, por=st.id, ajena=ajena)
     return RevocarOut(grant_id=fila["id"], revocada_en=fila["revoked_at"])

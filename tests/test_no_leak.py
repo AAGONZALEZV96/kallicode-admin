@@ -54,10 +54,14 @@ async def test_el_rol_de_lectura_no_puede_saltarse_rls(db: Any) -> None:
     dependería del código de la aplicación en lugar del motor.
     """
     for rol in ("kallicode_admin_ro", "kallicode_admin_app"):
-        f = await _filas(db, """
+        f = await _filas(
+            db,
+            """
             SELECT rolbypassrls, rolsuper, rolcreatedb, rolcreaterole, rolcanlogin
             FROM pg_roles WHERE rolname = :r
-        """, {"r": rol})
+        """,
+            {"r": rol},
+        )
         assert f, f"el rol {rol} no existe"
         bypass, superusuario, creardb, crearrol, login = f[0]
         assert bypass is False, f"{rol} tiene BYPASSRLS"
@@ -66,15 +70,16 @@ async def test_el_rol_de_lectura_no_puede_saltarse_rls(db: Any) -> None:
         assert login is True, f"{rol} no puede iniciar sesión"
 
 
-async def test_el_rol_de_lectura_no_hereda_privilegios_por_pertenencia(
-        db: Any) -> None:
+async def test_el_rol_de_lectura_no_hereda_privilegios_por_pertenencia(db: Any) -> None:
     """No pertenece a ningún rol que sí pueda saltarse RLS.
 
     Un rol sin `BYPASSRLS` que pertenece a otro que sí lo tiene, lo tiene de
     hecho. Este camino indirecto es el que hace que revisar solo `pg_roles` no
     baste.
     """
-    f = await _filas(db, """
+    f = await _filas(
+        db,
+        """
         WITH RECURSIVE m AS (
             SELECT roleid FROM pg_auth_members
              WHERE member = 'kallicode_admin_ro'::regrole
@@ -82,7 +87,8 @@ async def test_el_rol_de_lectura_no_hereda_privilegios_por_pertenencia(
             SELECT a.roleid FROM pg_auth_members a JOIN m ON a.member = m.roleid)
         SELECT r.rolname FROM m JOIN pg_roles r ON r.oid = m.roleid
          WHERE r.rolbypassrls OR r.rolsuper
-    """)
+    """,
+    )
     assert f == [], f"el rol de lectura hereda privilegios peligrosos de {f}"
 
 
@@ -95,10 +101,13 @@ async def test_la_aplicacion_no_se_conecta_como_superusuario(db: Any) -> None:
     inertes— y se corrigió con un validador en la configuración; aquí se verifica
     el resultado.
     """
-    f = await _filas(db, """
+    f = await _filas(
+        db,
+        """
         SELECT current_user, session_user,
                (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
-    """)
+    """,
+    )
     actual, sesion, es_super = f[0]
     assert es_super is False, f"la consola conecta como superusuario ({actual})"
     assert actual.startswith("kallicode_admin"), actual
@@ -113,24 +122,36 @@ async def test_privilegios_reales_coinciden_con_el_inventario(db: Any) -> None:
     la tabla entera. Falta una columna: pantalla rota en producción con un error
     de permisos que nadie sabe interpretar.
     """
-    inventario = set(await _filas(db, """
+    inventario = set(
+        await _filas(
+            db,
+            """
         SELECT table_name, column_name FROM admin.access_inventory
-    """))
-    concedidas = set(await _filas(db, """
+    """,
+        )
+    )
+    concedidas = set(
+        await _filas(
+            db,
+            """
         SELECT table_schema || '.' || table_name, column_name
         FROM information_schema.column_privileges
         WHERE grantee = 'kallicode_admin_ro' AND privilege_type = 'SELECT'
-    """))
+    """,
+        )
+    )
 
     sobrantes = concedidas - inventario
     assert not sobrantes, (
         "el rol de lectura puede leer columnas fuera del inventario aprobado; "
-        f"cada una es una fuga: {sorted(sobrantes)}")
+        f"cada una es una fuga: {sorted(sobrantes)}"
+    )
 
     faltantes = inventario - concedidas
     assert not faltantes, (
         "columnas del inventario sin conceder; las pantallas que las usan "
-        f"fallarán con error de permisos: {sorted(faltantes)}")
+        f"fallarán con error de permisos: {sorted(faltantes)}"
+    )
 
 
 async def test_ninguna_tabla_esta_concedida_completa(db: Any) -> None:
@@ -140,11 +161,14 @@ async def test_ninguna_tabla_esta_concedida_completa(db: Any) -> None:
     una migración añade una columna con datos identificables y la consola empieza
     a poder leerla sin que nadie lo decida.
     """
-    f = await _filas(db, """
+    f = await _filas(
+        db,
+        """
         SELECT table_schema || '.' || table_name
         FROM information_schema.table_privileges
         WHERE grantee = 'kallicode_admin_ro' AND privilege_type = 'SELECT'
-    """)
+    """,
+    )
     assert f == [], f"tablas concedidas completas al rol de lectura: {f}"
 
 
@@ -163,49 +187,60 @@ async def test_tablas_prohibidas_son_inaccesibles(db_ro: Any, tabla: str) -> Non
     assert "permission denied" in str(exc.value).lower(), str(exc.value)[:400]
 
 
-async def test_columnas_identificables_estan_marcadas_y_justificadas(
-        db: Any) -> None:
+async def test_columnas_identificables_estan_marcadas_y_justificadas(db: Any) -> None:
     """Toda columna con datos identificables lleva marca y motivo por escrito.
 
     El inventario es un documento de gobierno, no una lista técnica: es lo que se
     enseña cuando un cliente pregunta qué ve KalliCode de su organización.
     """
-    sin_motivo = await _filas(db, """
+    sin_motivo = await _filas(
+        db,
+        """
         SELECT table_name, column_name FROM admin.access_inventory
          WHERE rationale IS NULL OR length(trim(rationale)) < 20
-    """)
+    """,
+    )
     assert sin_motivo == [], f"columnas sin justificación suficiente: {sin_motivo}"
 
-    sin_pantalla = await _filas(db, """
+    sin_pantalla = await _filas(
+        db,
+        """
         SELECT table_name, column_name FROM admin.access_inventory
          WHERE screens IS NULL OR cardinality(screens) = 0
-    """)
+    """,
+    )
     assert sin_pantalla == [], (
         "columnas en el inventario que ninguna pantalla usa; si nadie las "
-        f"necesita, no deben estar concedidas: {sin_pantalla}")
+        f"necesita, no deben estar concedidas: {sin_pantalla}"
+    )
 
     # Las columnas identificables deben estar marcadas: el enmascarado se apoya en
     # esta marca para decidir qué oculta sin concesión.
-    marcadas = await _filas(db, """
+    marcadas = await _filas(
+        db,
+        """
         SELECT column_name FROM admin.access_inventory
          WHERE column_name IN ('nombre', 'razon_social', 'email', 'telefono',
                                'direccion', 'nif')
            AND pii IS NOT TRUE
-    """)
+    """,
+    )
     assert marcadas == [], f"columnas identificables sin marcar como pii: {marcadas}"
 
 
 # ============================================================== solo lectura
-@pytest.mark.parametrize("sentencia", [
-    "INSERT INTO core.organizations (id, nombre) VALUES ('x', 'y')",
-    "UPDATE core.organizations SET nombre = 'z'",
-    "DELETE FROM core.subscriptions",
-    "CREATE TABLE publico_prueba (i int)",
-    "ALTER TABLE core.organizations ADD COLUMN colado text",
-    "GRANT SELECT ON core.code_blobs TO kallicode_admin_ro",
-])
-async def test_el_rol_de_lectura_no_puede_escribir_nada(
-        db_ro: Any, sentencia: str) -> None:
+@pytest.mark.parametrize(
+    "sentencia",
+    [
+        "INSERT INTO core.organizations (id, nombre) VALUES ('x', 'y')",
+        "UPDATE core.organizations SET nombre = 'z'",
+        "DELETE FROM core.subscriptions",
+        "CREATE TABLE publico_prueba (i int)",
+        "ALTER TABLE core.organizations ADD COLUMN colado text",
+        "GRANT SELECT ON core.code_blobs TO kallicode_admin_ro",
+    ],
+)
+async def test_el_rol_de_lectura_no_puede_escribir_nada(db_ro: Any, sentencia: str) -> None:
     """Ni datos, ni esquema, ni privilegios.
 
     El último caso es el más importante: si el rol de lectura pudiera concederse
@@ -264,30 +299,39 @@ async def test_los_agregados_no_amplian_el_alcance(db: Any) -> None:
     ampliado existe solo durante el cálculo. Si alguna función fuera propiedad del
     rol de lectura, ese rol tendría de hecho el alcance de la función.
     """
-    f = await _filas(db, """
+    f = await _filas(
+        db,
+        """
         SELECT p.proname, r.rolname, p.prosecdef
         FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
         JOIN pg_roles r ON r.oid = p.proowner
         WHERE n.nspname = 'admin' AND p.proname LIKE 'refresh%'
-    """)
+    """,
+    )
     assert f, "no hay funciones de refresco de agregados"
     for nombre, dueno, secdef in f:
         assert secdef is True, f"{nombre} no es SECURITY DEFINER"
         assert dueno == "kallicode_admin_agg", (
-            f"{nombre} pertenece a {dueno}; debe pertenecer al rol de agregación")
+            f"{nombre} pertenece a {dueno}; debe pertenecer al rol de agregación"
+        )
 
-    login = await _filas(db, """
+    login = await _filas(
+        db,
+        """
         SELECT rolcanlogin FROM pg_roles WHERE rolname = 'kallicode_admin_agg'
-    """)
+    """,
+    )
     assert login[0][0] is False, "el rol de agregación puede iniciar sesión"
 
     # Y el rol de lectura no puede ejecutarlas: no le corresponde recalcular.
-    ejecutables = await _filas(db, """
+    ejecutables = await _filas(
+        db,
+        """
         SELECT p.proname FROM pg_proc p
         JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'admin' AND p.proname LIKE 'refresh%'
           AND has_function_privilege('kallicode_admin_ro', p.oid, 'EXECUTE')
-    """)
-    assert ejecutables == [], (
-        f"el rol de lectura puede ejecutar refrescos: {ejecutables}")
+    """,
+    )
+    assert ejecutables == [], f"el rol de lectura puede ejecutar refrescos: {ejecutables}"

@@ -74,15 +74,22 @@ async def perfil(st: Annotated[Staff, Depends(limite_rl4)]) -> dict[str, Any]:
     del rol y no se almacenan, para que no puedan divergir de la matriz.
     """
     async with admin_session() as db:
-        concesiones = await todos(db, """
+        concesiones = await todos(
+            db,
+            """
             SELECT id AS grant_id, tenant_id, scope AS alcance,
                    expires_at AS caduca_en, reads AS lecturas
             FROM admin.access_grants
             WHERE staff_id = :s AND revoked_at IS NULL AND expires_at > now()
             ORDER BY expires_at
-        """, {"s": st.id})
+        """,
+            {"s": st.id},
+        )
     return {
-        "id": st.id, "nombre": st.full_name, "email": st.email, "rol": st.role,
+        "id": st.id,
+        "nombre": st.full_name,
+        "email": st.email,
+        "rol": st.role,
         "mfa_verificado_en": st.mfa_at,
         "permisos": sorted(_PERMISOS.get(st.role, ())),
         "concesiones_vigentes": concesiones,
@@ -92,14 +99,25 @@ async def perfil(st: Annotated[Staff, Depends(limite_rl4)]) -> dict[str, Any]:
 # Matriz de permisos efectivos por rol. Es la traducción de la tabla de roles del
 # capítulo 18 y la única fuente: los routers declaran roles, no permisos.
 _PERMISOS: dict[str, tuple[str, ...]] = {
-    "staff_soporte": ("negocio.clientes.leer", "expediente.leer",
-                      "concesiones.propias"),
+    "staff_soporte": ("negocio.clientes.leer", "expediente.leer", "concesiones.propias"),
     "staff_operaciones": ("operaciones.leer", "sla.leer", "concesiones.propias"),
-    "staff_negocio": ("negocio.leer", "negocio.clientes.leer", "informes.crear",
-                      "sla.leer", "concesiones.propias"),
-    "staff_admin": ("negocio.leer", "negocio.clientes.leer", "operaciones.leer",
-                    "sla.leer", "informes.crear", "personal.gestionar",
-                    "concesiones.todas", "auditoria.todas"),
+    "staff_negocio": (
+        "negocio.leer",
+        "negocio.clientes.leer",
+        "informes.crear",
+        "sla.leer",
+        "concesiones.propias",
+    ),
+    "staff_admin": (
+        "negocio.leer",
+        "negocio.clientes.leer",
+        "operaciones.leer",
+        "sla.leer",
+        "informes.crear",
+        "personal.gestionar",
+        "concesiones.todas",
+        "auditoria.todas",
+    ),
 }
 
 
@@ -109,8 +127,7 @@ async def listar(
     st: Annotated[Staff, Depends(exigir(*ADMIN))],
     p: Annotated[Pagina, Depends(paginacion)],
     rol: Annotated[str | None, Query(description="Filtra por rol de staff.")] = None,
-    estado: Annotated[str | None, Query(
-        description="invited | active | deactivated.")] = None,
+    estado: Annotated[str | None, Query(description="invited | active | deactivated.")] = None,
 ) -> dict[str, Any]:
     """Listado con rol, estado, último acceso y segundo factor inscrito."""
     if rol is not None and rol not in STAFF_ROLES:
@@ -119,17 +136,32 @@ async def listar(
         raise validacion("Estado desconocido.", {"estado": estado})
 
     orden = p.clausula_order(
+<<<<<<< Updated upstream
         {"ultimo_acceso": "st.last_login_at", "nombre": "st.full_name",
          "alta": "st.created_at"},
         "st.last_login_at DESC NULLS LAST")
     filtros = "WHERE (:rol IS NULL OR st.role = :rol) " \
               "AND (:est IS NULL OR st.status = :est)"
+=======
+        {
+            "ultimo_acceso": "st.last_login_at",
+            "nombre": "st.full_name",
+            "alta": "st.created_at",
+        },
+        "st.last_login_at DESC NULLS LAST",
+    )
+    filtros = (
+        "WHERE (CAST(:rol AS text) IS NULL OR st.role = :rol) "
+        "AND (CAST(:est AS text) IS NULL OR st.status = :est)"
+    )
+>>>>>>> Stashed changes
     params = {"rol": rol, "est": estado, "lim": p.page_size, "off": p.offset}
 
     async with admin_session() as db:
-        total = await uno(db, f"SELECT count(*) AS n FROM admin.staff st {filtros}",
-                          params)
-        filas = await todos(db, f"""
+        total = await uno(db, f"SELECT count(*) AS n FROM admin.staff st {filtros}", params)
+        filas = await todos(
+            db,
+            f"""
             SELECT st.id, st.full_name AS nombre, st.email, st.role AS rol,
                    st.status AS estado,
                    st.totp_secret IS NOT NULL AS mfa_inscrito,
@@ -139,78 +171,127 @@ async def listar(
                        AND g.expires_at > now()) AS concesiones_vigentes
             FROM admin.staff st {filtros}
             ORDER BY {orden} LIMIT :lim OFFSET :off
-        """, params)
+        """,
+            params,
+        )
         await registrar_accion(
-            db, staff_id=st.id, staff_role=st.role, action="admin_query",
-            endpoint="GET /admin/v1/staff", ip=st.ip, user_agent=st.user_agent,
+            db,
+            staff_id=st.id,
+            staff_role=st.role,
+            action="admin_query",
+            endpoint="GET /admin/v1/staff",
+            ip=st.ip,
+            user_agent=st.user_agent,
             request_id=st.request_id,
-            payload={"filtros": {"rol": rol, "estado": estado}})
+            payload={"filtros": {"rol": rol, "estado": estado}},
+        )
     return sobre(filas, int(total["n"]) if total else 0, p)
 
 
 # ------------------------------------------------------------------ §18.11
-@router.post("/invitations", response_model=InvitarOut,
-             summary="Invitar a un empleado")
-async def invitar(cuerpo: InvitarIn,
-                  st: Annotated[Staff, Depends(exigir(*ADMIN))]) -> InvitarOut:
+@router.post("/invitations", response_model=InvitarOut, summary="Invitar a un empleado")
+async def invitar(
+    cuerpo: InvitarIn, st: Annotated[Staff, Depends(exigir(*ADMIN))]
+) -> InvitarOut:
     """Crea la invitación y envía el enlace al correo corporativo."""
     s = get_admin_settings()
     email = cuerpo.email.lower()
     if email.rsplit("@", 1)[-1] not in s.dominios_permitidos:
-        raise validacion("El correo debe pertenecer a un dominio corporativo "
-                         "autorizado.", {"dominios": list(s.dominios_permitidos)})
+        raise validacion(
+            "El correo debe pertenecer a un dominio corporativo autorizado.",
+            {"dominios": list(s.dominios_permitidos)},
+        )
     if cuerpo.rol not in STAFF_ROLES:
         raise validacion("Rol de staff desconocido.", {"rol": cuerpo.rol})
 
     async with admin_session() as db:
-        activo = await uno(db, "SELECT id FROM admin.staff "
-                               "WHERE lower(email) = :e AND status = 'active'",
-                           {"e": email})
+        activo = await uno(
+            db,
+            "SELECT id FROM admin.staff WHERE lower(email) = :e AND status = 'active'",
+            {"e": email},
+        )
         if activo is not None:
-            raise conflicto("CONFLICTO_ESTADO",
-                            "Ese correo ya tiene una cuenta activa.",
-                            {"sugerencia": "usa PATCH /admin/v1/staff/{id} "
-                                           "para cambiar el rol"})
+            raise conflicto(
+                "CONFLICTO_ESTADO",
+                "Ese correo ya tiene una cuenta activa.",
+                {"sugerencia": "usa PATCH /admin/v1/staff/{id} para cambiar el rol"},
+            )
 
         # Reemitir invalida cualquier invitación anterior no aceptada.
-        await todos(db, """
+        await todos(
+            db,
+            """
             UPDATE admin.staff_invitations SET revoked_at = now()
             WHERE lower(email) = :e AND accepted_at IS NULL AND revoked_at IS NULL
             RETURNING id
-        """, {"e": email})
+        """,
+            {"e": email},
+        )
 
         claro, hashed = generar_token_opaco("inv")
         inv_id = nuevo("inv")
-        fila = await uno(db, """
+        fila = await uno(
+            db,
+            """
             INSERT INTO admin.staff_invitations
                 (id, email, role, token_hash, note, invited_by, expires_at)
             VALUES (:id, :e, :r, :h, :n, :by,
                     now() + make_interval(days => :d))
             RETURNING id, email, role, expires_at
-        """, {"id": inv_id, "e": cuerpo.email, "r": cuerpo.rol, "h": hashed,
-              "n": cuerpo.nota, "by": st.id, "d": s.invitation_ttl_days})
+        """,
+            {
+                "id": inv_id,
+                "e": cuerpo.email,
+                "r": cuerpo.rol,
+                "h": hashed,
+                "n": cuerpo.nota,
+                "by": st.id,
+                "d": s.invitation_ttl_days,
+            },
+        )
         assert fila is not None
 
         await registrar_accion(
-            db, staff_id=st.id, staff_role=st.role, action="staff_managed",
-            endpoint="POST /admin/v1/staff/invitations", ip=st.ip,
-            user_agent=st.user_agent, request_id=st.request_id,
-            payload={"evento": "invitacion_creada", "rol": cuerpo.rol,
-                     "email_hash": hash_email(email), "nota": cuerpo.nota})
+            db,
+            staff_id=st.id,
+            staff_role=st.role,
+            action="staff_managed",
+            endpoint="POST /admin/v1/staff/invitations",
+            ip=st.ip,
+            user_agent=st.user_agent,
+            request_id=st.request_id,
+            payload={
+                "evento": "invitacion_creada",
+                "rol": cuerpo.rol,
+                "email_hash": hash_email(email),
+                "nota": cuerpo.nota,
+            },
+        )
 
     # Por el stream de notificación viaja el identificador, nunca el token.
-    log.info("staff.invitacion.creada", invitacion_id=inv_id, rol=cuerpo.rol,
-             email=hash_email(email), token_ref=hashed[:12])
+    log.info(
+        "staff.invitacion.creada",
+        invitacion_id=inv_id,
+        rol=cuerpo.rol,
+        email=hash_email(email),
+        token_ref=hashed[:12],
+    )
     if cuerpo.rol == "staff_admin":
-        log.warning("staff.invitacion.rol_admin", invitacion_id=inv_id,
-                    invitado_por=st.id)
-    return InvitarOut(invitacion_id=fila["id"], email=fila["email"],
-                      rol=fila["role"], caduca_el=fila["expires_at"])
+        log.warning("staff.invitacion.rol_admin", invitacion_id=inv_id, invitado_por=st.id)
+    return InvitarOut(
+        invitacion_id=fila["id"],
+        email=fila["email"],
+        rol=fila["role"],
+        caduca_el=fila["expires_at"],
+    )
 
 
 # ------------------------------------------------------------------ §18.12
-@router.patch("/{staff_id}", response_model=ActualizarOut,
-              summary="Actualizar rol o estado de un empleado")
+@router.patch(
+    "/{staff_id}",
+    response_model=ActualizarOut,
+    summary="Actualizar rol o estado de un empleado",
+)
 async def actualizar(
     cuerpo: ActualizarIn,
     st: Annotated[Staff, Depends(exigir(*ADMIN))],
@@ -228,33 +309,43 @@ async def actualizar(
     if staff_id == st.id:
         from kallicode_core.errors import permiso_denegado
 
-        raise permiso_denegado(
-            "No puedes modificar tu propia cuenta por esta vía.")
+        raise permiso_denegado("No puedes modificar tu propia cuenta por esta vía.")
     if cuerpo.estado == "deactivated" and not cuerpo.motivo:
         raise motivo_insuficiente("la desactivación exige motivo")
 
     async with admin_session() as db:
-        objetivo = await uno(db, """
+        objetivo = await uno(
+            db,
+            """
             SELECT id, role, status FROM admin.staff WHERE id = :i FOR UPDATE
-        """, {"i": staff_id})
+        """,
+            {"i": staff_id},
+        )
         if objetivo is None:
             raise no_encontrado("El empleado")
 
         # No se puede dejar la plataforma sin rol de administración.
-        if (objetivo["role"] == "staff_admin"
-                and (cuerpo.estado == "deactivated"
-                     or (cuerpo.rol and cuerpo.rol != "staff_admin"))):
-            restantes = await uno(db, """
+        if objetivo["role"] == "staff_admin" and (
+            cuerpo.estado == "deactivated" or (cuerpo.rol and cuerpo.rol != "staff_admin")
+        ):
+            restantes = await uno(
+                db,
+                """
                 SELECT count(*) AS n FROM admin.staff
                 WHERE role = 'staff_admin' AND status = 'active' AND id <> :i
-            """, {"i": staff_id})
+            """,
+                {"i": staff_id},
+            )
             if restantes and int(restantes["n"]) == 0:
-                raise conflicto("CONFLICTO_ESTADO",
-                                "No puedes desactivar al último administrador.")
+                raise conflicto(
+                    "CONFLICTO_ESTADO", "No puedes desactivar al último administrador."
+                )
 
         rol_final = cuerpo.rol or objetivo["role"]
         estado_final = cuerpo.estado or objetivo["status"]
-        await uno(db, """
+        await uno(
+            db,
+            """
             UPDATE admin.staff
             SET role = :r, status = :e, updated_at = now(),
                 deactivated_at = CASE WHEN :e = 'deactivated'
@@ -265,51 +356,89 @@ async def actualizar(
                 totp_secret = CASE WHEN :e = 'active' AND :prev = 'deactivated'
                     THEN NULL ELSE totp_secret END
             WHERE id = :i RETURNING id
-        """, {"r": rol_final, "e": estado_final, "m": cuerpo.motivo,
-              "i": staff_id, "prev": objetivo["status"]})
+        """,
+            {
+                "r": rol_final,
+                "e": estado_final,
+                "m": cuerpo.motivo,
+                "i": staff_id,
+                "prev": objetivo["status"],
+            },
+        )
 
         # Un cambio de rol revoca las sesiones para que el rol nuevo se resuelva
         # en el siguiente inicio y no quede el anterior en un token vigente.
-        motivo_rev = ("desactivado" if estado_final == "deactivated"
-                      else "cambio_de_rol")
-        sesiones = await todos(db, """
+        motivo_rev = "desactivado" if estado_final == "deactivated" else "cambio_de_rol"
+        sesiones = await todos(
+            db,
+            """
             UPDATE admin.staff_refresh_tokens
             SET revoked = true, revoked_reason = :m
             WHERE staff_id = :s AND NOT revoked AND expires_at > now()
             RETURNING id
-        """, {"s": staff_id, "m": motivo_rev})
+        """,
+            {"s": staff_id, "m": motivo_rev},
+        )
 
         # La desactivación revoca también las concesiones vigentes: el acceso a
         # datos de cliente cesa en el mismo momento, no al caducar.
         concesiones: list[dict[str, Any]] = []
         if estado_final == "deactivated":
-            concesiones = await todos(db, """
+            concesiones = await todos(
+                db,
+                """
                 UPDATE admin.access_grants
                 SET revoked_at = now(), revoked_by = :by,
                     revoked_reason = 'personal desactivado'
                 WHERE staff_id = :s AND revoked_at IS NULL AND expires_at > now()
                 RETURNING id, tenant_id
-            """, {"s": staff_id, "by": st.id})
+            """,
+                {"s": staff_id, "by": st.id},
+            )
 
         await registrar_accion(
-            db, staff_id=st.id, staff_role=st.role, action="staff_managed",
-            endpoint=f"PATCH /admin/v1/staff/{staff_id}", ip=st.ip,
-            user_agent=st.user_agent, request_id=st.request_id,
-            payload={"objetivo": staff_id, "rol": rol_final,
-                     "estado": estado_final, "motivo": cuerpo.motivo,
-                     "sesiones_revocadas": len(sesiones),
-                     "concesiones_revocadas": len(concesiones)})
+            db,
+            staff_id=st.id,
+            staff_role=st.role,
+            action="staff_managed",
+            endpoint=f"PATCH /admin/v1/staff/{staff_id}",
+            ip=st.ip,
+            user_agent=st.user_agent,
+            request_id=st.request_id,
+            payload={
+                "objetivo": staff_id,
+                "rol": rol_final,
+                "estado": estado_final,
+                "motivo": cuerpo.motivo,
+                "sesiones_revocadas": len(sesiones),
+                "concesiones_revocadas": len(concesiones),
+            },
+        )
 
     if estado_final == "deactivated":
-        log.critical("staff.desactivado", staff_id=staff_id, por=st.id,
-                     sesiones=len(sesiones), concesiones=len(concesiones))
+        log.critical(
+            "staff.desactivado",
+            staff_id=staff_id,
+            por=st.id,
+            sesiones=len(sesiones),
+            concesiones=len(concesiones),
+        )
     else:
-        log.info("staff.actualizado", staff_id=staff_id, rol=rol_final,
-                 estado=estado_final, por=st.id)
+        log.info(
+            "staff.actualizado",
+            staff_id=staff_id,
+            rol=rol_final,
+            estado=estado_final,
+            por=st.id,
+        )
 
-    return ActualizarOut(id=staff_id, rol=rol_final, estado=estado_final,
-                         sesiones_revocadas=len(sesiones),
-                         concesiones_revocadas=len(concesiones))
+    return ActualizarOut(
+        id=staff_id,
+        rol=rol_final,
+        estado=estado_final,
+        sesiones_revocadas=len(sesiones),
+        concesiones_revocadas=len(concesiones),
+    )
 
 
 __all__ = ["router"]

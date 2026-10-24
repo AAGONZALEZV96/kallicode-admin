@@ -43,8 +43,8 @@ ROLES = ("staff_soporte", "staff_operaciones", "staff_negocio", "staff_admin")
 
 def pytest_configure(config: Any) -> None:
     config.addinivalue_line(
-        "markers",
-        "integracion: exige un PostgreSQL real; se omite si no está disponible.")
+        "markers", "integracion: exige un PostgreSQL real; se omite si no está disponible."
+    )
 
 
 # ============================================================ base de datos
@@ -70,15 +70,21 @@ def dsn() -> Iterator[str]:
 
 def _psql(dsn_url: str, sql: str) -> None:
     """Ejecuta SQL con psql. Falla la prueba si el script no aplica limpio."""
-    r = subprocess.run(["psql", dsn_url, "-v", "ON_ERROR_STOP=1", "-q", "-c", sql],
-                       capture_output=True, text=True)
+    r = subprocess.run(
+        ["psql", dsn_url, "-v", "ON_ERROR_STOP=1", "-q", "-c", sql],
+        capture_output=True,
+        text=True,
+    )
     if r.returncode != 0:
         pytest.fail(f"psql falló: {r.stderr[:2000]}")
 
 
 def _psql_file(dsn_url: str, ruta: Path) -> None:
-    r = subprocess.run(["psql", dsn_url, "-v", "ON_ERROR_STOP=1", "-q",
-                        "-f", str(ruta)], capture_output=True, text=True)
+    r = subprocess.run(
+        ["psql", dsn_url, "-v", "ON_ERROR_STOP=1", "-q", "-f", str(ruta)],
+        capture_output=True,
+        text=True,
+    )
     if r.returncode != 0:
         pytest.fail(f"psql falló aplicando {ruta.name}: {r.stderr[:2000]}")
 
@@ -100,10 +106,23 @@ def esquema(dsn: str) -> str:
         _psql_file(dsn, f)
     for f in sorted(ADMIN_DB.glob("00*.sql")):
         _psql_file(dsn, f)
-    _psql(dsn, """
+    _psql(
+        dsn,
+        """
         ALTER ROLE kallicode_admin_app WITH PASSWORD 'test';
         ALTER ROLE kallicode_admin_ro  WITH PASSWORD 'test';
+<<<<<<< Updated upstream
     """)
+=======
+        ALTER ROLE kallicode_app       WITH PASSWORD 'test';
+        INSERT INTO admin.staff (id, email, full_name, role, status,
+                                 password_hash, totp_secret, totp_enrolled_at)
+        VALUES ('st_prueba', 'st_prueba@kallicode.com', 'Empleado Prueba',
+                'staff_admin', 'active', 'hash', 'totp', now())
+        ON CONFLICT (id) DO NOTHING;
+    """,
+    )
+>>>>>>> Stashed changes
     return dsn
 
 
@@ -117,6 +136,7 @@ def _dsn_como(dsn_url: str, usuario: str) -> str:
 def entorno(esquema: str) -> Iterator[None]:
     """Configura las variables de entorno de la aplicación para la sesión."""
     previo = dict(os.environ)
+<<<<<<< Updated upstream
     os.environ.update({
         "KC_ADMIN_ENV": "test",
         "KC_ADMIN_DATABASE_URL_APP": _dsn_como(esquema, "kallicode_admin_app"),
@@ -126,6 +146,27 @@ def entorno(esquema: str) -> Iterator[None]:
         "KC_DATABASE_URL": esquema.replace("postgresql://",
                                            "postgresql+asyncpg://"),
     })
+=======
+    redis_test = (
+        os.getenv("KC_ADMIN_REDIS_URL")
+        or os.getenv("KC_REDIS_URL")
+        or "redis://localhost:6380/1"
+    )
+    os.environ.update(
+        {
+            "KC_ADMIN_ENV": "test",
+            "KC_ADMIN_ALLOWED_HOSTS": "localhost,127.0.0.1,admin.test,testserver",
+            "KC_ADMIN_DATABASE_URL_APP": _dsn_como(esquema, "kallicode_admin_app"),
+            "KC_ADMIN_DATABASE_URL_RO": _dsn_como(esquema, "kallicode_admin_ro"),
+            "KC_ADMIN_STAFF_EMAIL_DOMAINS": "kallicode.com",
+            "KC_ADMIN_REDIS_URL": redis_test,
+            "KC_REDIS_URL": redis_test,
+            "KC_ENV": "test",
+            "KC_DATABASE_URL": _dsn_como(esquema, "kallicode_app"),
+            "KC_DATABASE_URL_ADMIN": _dsn_como(esquema, "kallicode_admin"),
+        }
+    )
+>>>>>>> Stashed changes
     # La caché de configuración se limpia para que tome el entorno de prueba.
     from admin_api.settings import get_admin_settings
 
@@ -161,21 +202,29 @@ async def dos_clientes(db: Any) -> list[str]:
     """Dos organizaciones con plan y consumo, para probar la no-fuga entre ellas."""
     from sqlalchemy import text
 
-    for tid, nombre in ((TENANT_A, "Acme Logística S.L."),
-                        (TENANT_B, "Globex Industrial S.A.")):
-        await db.execute(text("""
+    for tid, nombre in (
+        (TENANT_A, "Acme Logística S.L."),
+        (TENANT_B, "Globex Industrial S.A."),
+    ):
+        await db.execute(
+            text("""
             INSERT INTO core.organizations (id, nombre, idioma, timezone,
                                             despliegue, fabrica_activa)
             VALUES (:i, :n, 'es', 'Europe/Madrid', 'cloud', true)
             ON CONFLICT (id) DO NOTHING
-        """), {"i": tid, "n": nombre})
-        await db.execute(text("""
+        """),
+            {"i": tid, "n": nombre},
+        )
+        await db.execute(
+            text("""
             INSERT INTO core.subscriptions (id, tenant_id, plan_codigo, estado,
                                             inicia_el, renueva_el)
             VALUES (:s, :i, 'growth', 'activa', current_date - 90,
                     current_date + 30)
             ON CONFLICT DO NOTHING
-        """), {"s": f"sub_{tid}", "i": tid})
+        """),
+            {"s": f"sub_{tid}", "i": tid},
+        )
     return [TENANT_A, TENANT_B]
 
 
@@ -188,11 +237,11 @@ async def staff_factory(db: Any):
 
     creados: list[str] = []
 
-    async def _crear(rol: str = "staff_admin",
-                     estado: str = "active") -> dict[str, Any]:
+    async def _crear(rol: str = "staff_admin", estado: str = "active") -> dict[str, Any]:
         sid = nuevo("st")
         email = f"{sid.lower()}@kallicode.com"
         secreto = nuevo_secreto_totp()
+<<<<<<< Updated upstream
         await db.execute(text("""
             INSERT INTO admin.staff (id, email, full_name, role, status,
                                      password_hash, totp_secret,
@@ -202,9 +251,35 @@ async def staff_factory(db: Any):
         """), {"i": sid, "e": email, "n": f"Empleado {rol}", "r": rol,
                "s": estado, "p": hashear_password("Prueba-Segura-2026"),
                "t": secreto})
+=======
+        async with admin_session() as s:
+            await s.execute(
+                text("""
+                INSERT INTO admin.staff (id, email, full_name, role, status,
+                                         password_hash, totp_secret,
+                                         totp_enrolled_at)
+                VALUES (:i, :e, :n, :r, :s, :p, :t,
+                        CASE WHEN :s = 'active' THEN now() END)
+            """),
+                {
+                    "i": sid,
+                    "e": email,
+                    "n": f"Empleado {rol}",
+                    "r": rol,
+                    "s": estado,
+                    "p": hashear_password("Prueba-Segura-2026"),
+                    "t": secreto,
+                },
+            )
+>>>>>>> Stashed changes
         creados.append(sid)
-        return {"id": sid, "email": email, "rol": rol, "secreto": secreto,
-                "password": "Prueba-Segura-2026"}
+        return {
+            "id": sid,
+            "email": email,
+            "rol": rol,
+            "secreto": secreto,
+            "password": "Prueba-Segura-2026",
+        }
 
     return _crear
 
@@ -224,8 +299,7 @@ async def cliente(app: Any) -> AsyncIterator[Any]:
     import httpx
 
     transporte = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transporte,
-                                 base_url="http://admin.test") as c:
+    async with httpx.AsyncClient(transport=transporte, base_url="http://admin.test") as c:
         yield c
 
 
@@ -240,18 +314,25 @@ def como(app: Any):
     """
     from admin_api.deps import Staff, staff_actual
 
-    def _como(rol: str,
-              grants: dict[str, list[str]] | None = None,
-              staff_id: str = "st_prueba") -> Staff:
+    def _como(
+        rol: str, grants: dict[str, list[str]] | None = None, staff_id: str = "st_prueba"
+    ) -> Staff:
         st = Staff(
-            id=staff_id, role=rol, full_name=f"Empleado {rol}",
+            id=staff_id,
+            role=rol,
+            full_name=f"Empleado {rol}",
             email=f"{rol}@kallicode.com",
             mfa_at=datetime.now(UTC) - timedelta(minutes=1),
-            jti="jti_prueba", ip="10.0.0.7", user_agent="pytest",
+            jti="jti_prueba",
+            ip="10.0.0.7",
+            user_agent="pytest",
             request_id="tr_prueba",
             grants=dict(grants or {}),
-            grant_detalle={t: (f"gr_{t}", a[-1], "motivo de prueba con caso SUP-1")
-                           for t, a in (grants or {}).items() if a},
+            grant_detalle={
+                t: (f"gr_{t}", a[-1], "motivo de prueba con caso SUP-1")
+                for t, a in (grants or {}).items()
+                if a
+            },
         )
 
         async def _override() -> Staff:

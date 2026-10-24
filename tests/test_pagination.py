@@ -23,13 +23,17 @@ def test_sin_orden_se_usa_el_por_defecto() -> None:
     assert _pagina().clausula_order(PERMITIDOS, "c.alta_el DESC") == "c.alta_el DESC"
 
 
-@pytest.mark.parametrize(("campo", "desc", "esperado"), [
-    ("alta", False, "c.alta_el ASC"),
-    ("alta", True, "c.alta_el DESC"),
-    ("consumo", True, "a.loc_consumidas DESC"),
-])
+@pytest.mark.parametrize(
+    ("campo", "desc", "esperado"),
+    [
+        ("alta", False, "c.alta_el ASC"),
+        ("alta", True, "c.alta_el DESC"),
+        ("consumo", True, "a.loc_consumidas DESC"),
+    ],
+)
 def test_un_campo_permitido_se_traduce_a_su_expresion(
-        campo: str, desc: bool, esperado: str) -> None:
+    campo: str, desc: bool, esperado: str
+) -> None:
     """El nombre público nunca llega al SQL: se traduce a la expresión declarada.
 
     Esta indirección es la que hace imposible la inyección, no la validación del
@@ -38,10 +42,18 @@ def test_un_campo_permitido_se_traduce_a_su_expresion(
     assert _pagina(campo, desc).clausula_order(PERMITIDOS, "x") == esperado
 
 
-@pytest.mark.parametrize("campo", [
-    "razon_social", "1", "c.alta_el", "alta;DROP TABLE core.organizations",
-    "alta,consumo", "alta) --", "ALTA",
-])
+@pytest.mark.parametrize(
+    "campo",
+    [
+        "razon_social",
+        "1",
+        "c.alta_el",
+        "alta;DROP TABLE core.organizations",
+        "alta,consumo",
+        "alta) --",
+        "ALTA",
+    ],
+)
 def test_cualquier_campo_no_declarado_se_rechaza(campo: str) -> None:
     """Incluido el nombre real de la columna y la variante en mayúsculas.
 

@@ -55,14 +55,16 @@ class Pagina:
         if expr is None:
             raise validacion(
                 "El campo de orden no es válido.",
-                {"campo": self.order_by, "permitidos": sorted(permitidos)})
+                {"campo": self.order_by, "permitidos": sorted(permitidos)},
+            )
         return f"{expr} {'DESC' if self.descending else 'ASC'}"
 
 
 def paginacion(
     page: int = Query(1, ge=1, description="Página, empezando en 1."),
-    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE,
-                           description="Tamaño de página, 1–100."),
+    page_size: int = Query(
+        DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Tamaño de página, 1–100."
+    ),
     sort: str | None = Query(None, description="Orden: campo-asc o campo-desc."),
 ) -> Pagina:
     """Dependencia de paginación común a todos los listados del capítulo 18."""
@@ -75,8 +77,8 @@ def paginacion(
             campo, desc = sort[:-5], True
         else:
             raise validacion(
-                "El parámetro de orden debe terminar en -asc o -desc.",
-                {"sort": sort})
+                "El parámetro de orden debe terminar en -asc o -desc.", {"sort": sort}
+            )
         if not campo:
             raise validacion("Falta el campo de orden.", {"sort": sort})
     return Pagina(page=page, page_size=page_size, order_by=campo, descending=desc)
@@ -98,5 +100,4 @@ def sobre(items: list[Any], total: int, p: Pagina) -> dict[str, Any]:
     resultados en silencio, que es el defecto que la vista de Consumo del portal
     cliente tiene hoy.
     """
-    return {"items": items, "total": total, "page": p.page,
-            "page_size": p.page_size}
+    return {"items": items, "total": total, "page": p.page, "page_size": p.page_size}
