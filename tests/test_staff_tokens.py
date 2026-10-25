@@ -22,6 +22,9 @@ from admin_api.security import (
     verificar_token_staff,
     verificar_totp,
 )
+from admin_api.security import (
+    validar_token_staff as validar_token_sec,
+)
 from admin_api.settings import get_admin_settings
 from kallicode_core.errors import AppError
 
@@ -198,3 +201,179 @@ def test_generar_codigos_recuperacion_unicidad() -> None:
         assert len(claro) == 9
         assert "-" in claro
         assert len(hashed) == 64
+
+
+# ========================================================= KC-ADM-B1-10 tests
+def test_verificar_token_staff_iss_invalido() -> None:
+    """Token con emisor del portal de clientes u otro es rechazado con 401."""
+    s = get_admin_settings()
+    priv, _ = _claves()
+    ahora = int(time.time())
+
+    token_iss_malo = jwt.encode(
+        {
+            "sub": "st_test_01",
+            "rol": "staff_soporte",
+            "typ": "staff",
+            "mfa": ahora,
+            "iss": "kallicode-portal",
+            "aud": s.jwt_audience,
+            "jti": uuid.uuid4().hex,
+            "iat": ahora,
+            "exp": ahora + 900,
+        },
+        priv,
+        algorithm="RS256",
+    )
+
+    with pytest.raises(AppError) as exc:
+        verificar_token_staff(token_iss_malo)
+    assert exc.value.http == 401
+
+
+def test_verificar_token_staff_aud_invalido() -> None:
+    """Token con audiencia del portal de clientes u otra es rechazado con 401."""
+    s = get_admin_settings()
+    priv, _ = _claves()
+    ahora = int(time.time())
+
+    token_aud_malo = jwt.encode(
+        {
+            "sub": "st_test_01",
+            "rol": "staff_soporte",
+            "typ": "staff",
+            "mfa": ahora,
+            "iss": s.jwt_issuer,
+            "aud": "portal-v1",
+            "jti": uuid.uuid4().hex,
+            "iat": ahora,
+            "exp": ahora + 900,
+        },
+        priv,
+        algorithm="RS256",
+    )
+
+    with pytest.raises(AppError) as exc:
+        verificar_token_staff(token_aud_malo)
+    assert exc.value.http == 401
+
+
+def test_verificar_token_staff_claim_mfa_faltante() -> None:
+    """Token sin el claim mfa obligatorio es rechazado con 401."""
+    s = get_admin_settings()
+    priv, _ = _claves()
+    ahora = int(time.time())
+
+    token_sin_mfa = jwt.encode(
+        {
+            "sub": "st_test_01",
+            "rol": "staff_soporte",
+            "typ": "staff",
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "jti": uuid.uuid4().hex,
+            "iat": ahora,
+            "exp": ahora + 900,
+        },
+        priv,
+        algorithm="RS256",
+    )
+
+    with pytest.raises(AppError) as exc:
+        verificar_token_staff(token_sin_mfa)
+    assert exc.value.http == 401
+
+
+def test_verificar_token_staff_claim_jti_faltante() -> None:
+    """Token sin el claim jti para control de revocación es rechazado con 401."""
+    s = get_admin_settings()
+    priv, _ = _claves()
+    ahora = int(time.time())
+
+    token_sin_jti = jwt.encode(
+        {
+            "sub": "st_test_01",
+            "rol": "staff_soporte",
+            "typ": "staff",
+            "mfa": ahora,
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "iat": ahora,
+            "exp": ahora + 900,
+        },
+        priv,
+        algorithm="RS256",
+    )
+
+    with pytest.raises(AppError) as exc:
+        verificar_token_staff(token_sin_jti)
+    assert exc.value.http == 401
+
+
+def test_verificar_token_staff_sub_sin_prefijo_st() -> None:
+    """Token de usuario cuyo sub no empiece con 'st_' es rechazado con 401."""
+    s = get_admin_settings()
+    priv, _ = _claves()
+    ahora = int(time.time())
+
+    token_sub_malo = jwt.encode(
+        {
+            "sub": "usr_cliente_externo",
+            "rol": "staff_soporte",
+            "typ": "staff",
+            "mfa": ahora,
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "jti": uuid.uuid4().hex,
+            "iat": ahora,
+            "exp": ahora + 900,
+        },
+        priv,
+        algorithm="RS256",
+    )
+
+    with pytest.raises(AppError) as exc:
+        verificar_token_staff(token_sub_malo)
+    assert exc.value.http == 401
+
+
+def test_token_cliente_portal_con_misma_clave_rechazado() -> None:
+    """Token emitido por el backend para un cliente es rechazado por la consola."""
+    from kallicode_core.seguridad import emitir_access_token
+
+    token_cliente = emitir_access_token("usr_123", "org_acme", "admin")
+    with pytest.raises(AppError) as exc:
+        verificar_token_staff(token_cliente)
+    assert exc.value.http == 401
+
+
+def test_dependencias_deps_validar_token_staff_y_obtener_staff_actual() -> None:
+    """Comprueba existencia y funcionamiento de validar_token_staff y obtener_staff_actual."""
+    from unittest.mock import MagicMock
+
+    from admin_api.deps import obtener_staff_actual, staff_actual, validar_token_staff
+
+    # obtener_staff_actual es un alias de staff_actual
+    assert obtener_staff_actual is staff_actual
+
+    # validar_token_staff en security
+    assert validar_token_sec is verificar_token_staff
+
+    # validar_token_staff en deps con token válido
+    mfa_momento = datetime.now(UTC)
+    token = emitir_tokens_staff("st_dep_test", "staff_admin", mfa_momento)
+
+    req = MagicMock()
+    req.headers = {"authorization": f"Bearer {token}"}
+    claims = validar_token_staff(req)
+    assert claims["sub"] == "st_dep_test"
+    assert claims["typ"] == "staff"
+    assert claims["aud"] == "admin-v1"
+    assert claims["iss"] == "kallicode-admin"
+
+    # validar_token_staff en deps sin cabecera lanza 401
+    req_vacio = MagicMock()
+    req_vacio.headers = {}
+    with pytest.raises(AppError) as exc:
+        validar_token_staff(req_vacio)
+    assert exc.value.http == 401

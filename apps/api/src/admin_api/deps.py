@@ -115,12 +115,21 @@ def _ip_cliente(request: Request) -> str | None:
 
 
 # ------------------------------------------------------- identidad del personal
-async def staff_actual(request: Request) -> Staff:
-    """Resuelve el empleado autenticado. Es la dependencia base del capítulo 18."""
+def validar_token_staff(request: Request) -> dict[str, Any]:
+    """Extrae y valida el JWT de la cabecera Authorization (Bearer).
+
+    Comprueba firma, emisor ('kallicode-admin'), audiencia ('admin-v1'),
+    tipo ('staff') y claims obligatorios sin consultar base de datos.
+    """
     cabecera = request.headers.get("authorization", "")
     if not cabecera.lower().startswith("bearer "):
         raise no_autenticado()
-    claims = verificar_token_staff(cabecera[7:].strip())
+    return verificar_token_staff(cabecera[7:].strip())
+
+
+async def staff_actual(request: Request) -> Staff:
+    """Resuelve el empleado autenticado. Es la dependencia base del capítulo 18."""
+    claims = validar_token_staff(request)
 
     jti = str(claims["jti"])
     if await redis().exists(clave_denylist(jti)):
@@ -184,6 +193,7 @@ async def _cargar_concesiones(st: Staff) -> None:
 
 
 StaffDep = Annotated[Staff, Depends(staff_actual)]
+obtener_staff_actual = staff_actual
 
 
 # ------------------------------------------------------------------ roles
@@ -378,9 +388,11 @@ __all__ = [
     "limite_rl4",
     "limite_vivo",
     "limpiar_fallos_login",
+    "obtener_staff_actual",
     "redis",
     "registrar_fallo_login",
     "revocar_jti",
     "revocar_todas_sesiones_redis",
     "staff_actual",
+    "validar_token_staff",
 ]

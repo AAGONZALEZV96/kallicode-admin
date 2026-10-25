@@ -51,6 +51,7 @@ __all__ = [
     "nuevo_secreto_totp",
     "url_otpauth",
     "validar_politica_password",
+    "validar_token_staff",
     "verificar_password",
     "verificar_token_staff",
     "verificar_totp",
@@ -194,7 +195,23 @@ def verificar_token_staff(token: str) -> dict[str, object]:
         raise no_autenticado("Tipo de token incorrecto para esta API.")
     if claims.get("rol") not in STAFF_ROLES:
         raise no_autenticado("Rol de personal no reconocido.")
+
+    sub = claims.get("sub")
+    if not isinstance(sub, str) or not sub.startswith("st_"):
+        raise no_autenticado("Identificador de personal no reconocido.")
+
+    mfa_marca = claims.get("mfa")
+    if not isinstance(mfa_marca, int):
+        raise no_autenticado("Marca de segundo factor no válida.")
+
+    jti = claims.get("jti")
+    if not isinstance(jti, str) or not jti:
+        raise no_autenticado("Identificador de token no válido.")
+
     return claims
+
+
+validar_token_staff = verificar_token_staff
 
 
 def exigir_rol_staff(rol_actual: str, permitidos: tuple[str, ...]) -> None:
