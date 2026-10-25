@@ -31,9 +31,19 @@ from kallicode_core.logging import bind_contexto
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import admin_session, read_session, todos, uno
-from .errors import acceso_no_justificado, concesion_caducada, staff_desactivado
+from .errors import (
+    acceso_no_justificado,
+    concesion_caducada,
+    rol_staff_insuficiente,
+    staff_desactivado,
+)
 from .masking import alcance_suficiente
-from .security import exigir_mfa_vigente, exigir_rol_staff, verificar_token_staff
+from .security import (
+    PERMISOS_ROL,
+    exigir_mfa_vigente,
+    exigir_rol_staff,
+    verificar_token_staff,
+)
 from .settings import get_admin_settings
 
 _redis: aioredis.Redis | None = None
@@ -59,7 +69,6 @@ def redis() -> aioredis.Redis:
         )
         _redis._custom_loop = loop  # type: ignore[union-attr]
     return _redis
-    
 
 
 def clave_denylist(jti: str) -> str:
@@ -187,6 +196,28 @@ def exigir(*roles: str) -> Callable[[Staff], Coroutine[Any, Any, Staff]]:
 
     async def _guard(st: StaffDep) -> Staff:
         exigir_rol_staff(st.role, roles)
+        s = get_admin_settings()
+        if datetime.now(UTC) - st.mfa_at > timedelta(minutes=s.staff_idle_timeout_min):
+            from .errors import mfa_requerido
+
+            raise mfa_requerido("Verificación de segundo factor requerida.")
+        return st
+
+    return _guard
+
+
+exigir_rol = exigir
+
+
+def exigir_permiso(*permisos: str) -> Callable[[Staff], Coroutine[Any, Any, Staff]]:
+    """Fábrica de dependencia que restringe el endpoint a empleados cuyo rol
+    posee todos los permisos canónicos especificados.
+    """
+
+    async def _guard(st: StaffDep) -> Staff:
+        rol_perms = set(PERMISOS_ROL.get(st.role, ()))
+        if not set(permisos).issubset(rol_perms):
+            raise rol_staff_insuficiente()
         s = get_admin_settings()
         if datetime.now(UTC) - st.mfa_at > timedelta(minutes=s.staff_idle_timeout_min):
             from .errors import mfa_requerido
@@ -341,6 +372,8 @@ __all__ = [
     "cerrar_redis",
     "exigir",
     "exigir_concesion",
+    "exigir_permiso",
+    "exigir_rol",
     "limite_login",
     "limite_rl4",
     "limite_vivo",

@@ -38,6 +38,7 @@ from .settings import get_admin_settings
 # Se reexportan para que los routers no importen del núcleo directamente y la
 # frontera quede en un solo módulo.
 __all__ = [
+    "PERMISOS_ROL",
     "STAFF_ROLES",
     "comparar_hash",
     "emitir_tokens_staff",
@@ -61,6 +62,62 @@ STAFF_ROLES: tuple[str, ...] = (
     "staff_negocio",
     "staff_admin",
 )
+
+PERMISOS_ROL: dict[str, tuple[str, ...]] = {
+    "staff_soporte": (
+        "auditoria.propias",
+        "concesiones.propias",
+        "concesiones.solicitar",
+        "expediente.leer",
+        "informes.descargar",
+        "negocio.clientes.leer",
+    ),
+    "staff_operaciones": (
+        "auditoria.propias",
+        "concesiones.propias",
+        "concesiones.solicitar",
+        "informes.descargar",
+        "ops.colas.leer",
+        "ops.modelos.leer",
+        "ops.sla.leer",
+        "ops.telemetria.leer",
+    ),
+    "staff_negocio": (
+        "auditoria.propias",
+        "concesiones.propias",
+        "concesiones.solicitar",
+        "informes.crear",
+        "informes.descargar",
+        "negocio.clientes.leer",
+        "negocio.overview.leer",
+        "negocio.suscripciones.leer",
+        "negocio.tokens.leer",
+        "ops.modelos.leer",
+        "ops.sla.leer",
+    ),
+    "staff_admin": (
+        "auditoria.exportar",
+        "auditoria.propias",
+        "auditoria.total.leer",
+        "concesiones.propias",
+        "concesiones.revocar_ajenas",
+        "concesiones.solicitar",
+        "concesiones.todas",
+        "expediente.leer",
+        "informes.crear",
+        "informes.descargar",
+        "negocio.clientes.leer",
+        "negocio.overview.leer",
+        "negocio.suscripciones.leer",
+        "negocio.tokens.leer",
+        "ops.colas.leer",
+        "ops.modelos.leer",
+        "ops.sla.leer",
+        "ops.telemetria.leer",
+        "personal.gestionar",
+        "personal.leer",
+    ),
+}
 
 
 def _claves() -> tuple[str, str]:

@@ -127,7 +127,6 @@ async def crear(cuerpo: CrearIn, st: Annotated[Staff, Depends(exigir(*SOPORTE))]
             raise no_encontrado("La organización")
 
     async with admin_session() as db:
-
         vigente = await uno(
             db,
             """

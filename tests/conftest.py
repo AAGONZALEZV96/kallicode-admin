@@ -236,7 +236,6 @@ async def dos_clientes(db: Any) -> list[str]:
 @pytest_asyncio.fixture
 async def staff_factory(db: Any):
     """Crea empleados activos de cualquier rol, con segundo factor ya inscrito."""
-    from admin_api.db import admin_session
     from admin_api.security import hashear_password, nuevo_secreto_totp
     from kallicode_core.ids import nuevo
     from sqlalchemy import text

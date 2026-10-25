@@ -27,7 +27,7 @@ from ..audit import registrar_accion
 from ..db import admin_session, todos, uno
 from ..deps import ADMIN, Staff, exigir, limite_rl4
 from ..pagination import Pagina, paginacion, sobre
-from ..security import STAFF_ROLES, generar_token_opaco
+from ..security import PERMISOS_ROL, STAFF_ROLES, generar_token_opaco
 from ..settings import get_admin_settings
 
 router = APIRouter(prefix="/admin/v1/staff", tags=["Gestión del personal"])
@@ -98,27 +98,7 @@ async def perfil(st: Annotated[Staff, Depends(limite_rl4)]) -> dict[str, Any]:
 
 # Matriz de permisos efectivos por rol. Es la traducción de la tabla de roles del
 # capítulo 18 y la única fuente: los routers declaran roles, no permisos.
-_PERMISOS: dict[str, tuple[str, ...]] = {
-    "staff_soporte": ("negocio.clientes.leer", "expediente.leer", "concesiones.propias"),
-    "staff_operaciones": ("operaciones.leer", "sla.leer", "concesiones.propias"),
-    "staff_negocio": (
-        "negocio.leer",
-        "negocio.clientes.leer",
-        "informes.crear",
-        "sla.leer",
-        "concesiones.propias",
-    ),
-    "staff_admin": (
-        "negocio.leer",
-        "negocio.clientes.leer",
-        "operaciones.leer",
-        "sla.leer",
-        "informes.crear",
-        "personal.gestionar",
-        "concesiones.todas",
-        "auditoria.todas",
-    ),
-}
+_PERMISOS: dict[str, tuple[str, ...]] = PERMISOS_ROL
 
 
 # ------------------------------------------------------------------ §18.10

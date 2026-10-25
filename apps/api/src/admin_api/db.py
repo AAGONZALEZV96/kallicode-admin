@@ -48,10 +48,12 @@ def _crear(url: str, pool: int, timeout_ms: int) -> AsyncEngine:
         max_overflow=pool,
         pool_pre_ping=True,
         pool_recycle=1800,
-        connect_args={"server_settings": {
-            "statement_timeout": str(timeout_ms),
-            "application_name": "kallicode-admin",
-        }},
+        connect_args={
+            "server_settings": {
+                "statement_timeout": str(timeout_ms),
+                "application_name": "kallicode-admin",
+            }
+        },
     )
 
 

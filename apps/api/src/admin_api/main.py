@@ -20,8 +20,8 @@ Diferencias deliberadas respecto a la aplicación del portal:
 
 from __future__ import annotations
 
-import uuid
 import time
+import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -32,7 +32,6 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from kallicode_core.errors import AppError
 from kallicode_core.logging import (
-    Cronometro,
     bind_contexto,
     configurar_logging,
     limpiar_contexto,
