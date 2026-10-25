@@ -174,7 +174,7 @@ async def verificar_cadena(
         """
         SELECT broken_at, broken_id, motivo
         FROM admin.verify_staff_action_chain(
-            CAST(:d AS timestamptz), CAST(:h AS timestamptz))
+            CAST(CAST(:d AS text) AS timestamptz), CAST(CAST(:h AS text) AS timestamptz))
     """,
         {"d": desde, "h": hasta},
     )

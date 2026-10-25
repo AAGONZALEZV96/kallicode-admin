@@ -37,6 +37,8 @@ _engine_app: AsyncEngine | None = None
 _engine_ro: AsyncEngine | None = None
 _maker_app: async_sessionmaker[AsyncSession] | None = None
 _maker_ro: async_sessionmaker[AsyncSession] | None = None
+_loop_app: Any = None
+_loop_ro: Any = None
 
 
 def _crear(url: str, pool: int, timeout_ms: int) -> AsyncEngine:
@@ -54,19 +56,35 @@ def _crear(url: str, pool: int, timeout_ms: int) -> AsyncEngine:
 
 
 def engine_app() -> AsyncEngine:
-    global _engine_app, _maker_app
-    if _engine_app is None:
+    global _engine_app, _maker_app, _loop_app
+    import asyncio
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if _engine_app is None or (loop is not None and _loop_app != loop):
         s = get_admin_settings()
         _engine_app = _crear(s.database_url_app, s.pool_size_app, s.statement_timeout_ms_app)
+        _loop_app = loop
         _maker_app = async_sessionmaker(_engine_app, expire_on_commit=False)
     return _engine_app
 
 
 def engine_ro() -> AsyncEngine:
-    global _engine_ro, _maker_ro
-    if _engine_ro is None:
+    global _engine_ro, _maker_ro, _loop_ro
+    import asyncio
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if _engine_ro is None or (loop is not None and _loop_ro != loop):
         s = get_admin_settings()
         _engine_ro = _crear(s.database_url_ro, s.pool_size_ro, s.statement_timeout_ms_ro)
+        _loop_ro = loop
         _maker_ro = async_sessionmaker(_engine_ro, expire_on_commit=False)
     return _engine_ro
 

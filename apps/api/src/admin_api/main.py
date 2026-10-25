@@ -128,13 +128,6 @@ def _sobre(
     codigo: str, mensaje: str, trace_id: str, detalle: dict[str, object] | None = None
 ) -> dict[str, object]:
     """Sobre de error idéntico al de /api/v1 (§3.6)."""
-<<<<<<< Updated upstream
-    return {"error": {
-        "codigo": codigo, "mensaje": mensaje, "detalle": detalle,
-        "trace_id": trace_id,
-        "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-    }}
-=======
     return {
         "error": {
             "codigo": codigo,
@@ -145,7 +138,6 @@ def _sobre(
             "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         }
     }
->>>>>>> Stashed changes
 
 
 # ------------------------------------------------------- manejadores de error

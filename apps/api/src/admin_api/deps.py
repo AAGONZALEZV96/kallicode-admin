@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 import redis.asyncio as aioredis
@@ -41,11 +41,6 @@ _redis: aioredis.Redis | None = None
 
 def redis() -> aioredis.Redis:
     global _redis
-<<<<<<< Updated upstream
-    if _redis is None:
-        _redis = aioredis.from_url(get_settings().redis_url,
-                                   decode_responses=True)
-=======
     import asyncio
 
     try:
@@ -63,8 +58,8 @@ def redis() -> aioredis.Redis:
             decode_responses=True,
         )
         _redis._custom_loop = loop  # type: ignore[union-attr]
->>>>>>> Stashed changes
     return _redis
+    
 
 
 def clave_denylist(jti: str) -> str:
@@ -192,14 +187,11 @@ def exigir(*roles: str) -> Callable[[Staff], Coroutine[Any, Any, Staff]]:
 
     async def _guard(st: StaffDep) -> Staff:
         exigir_rol_staff(st.role, roles)
-<<<<<<< Updated upstream
-=======
         s = get_admin_settings()
         if datetime.now(UTC) - st.mfa_at > timedelta(minutes=s.staff_idle_timeout_min):
-            from admin_api.errors import mfa_requerido
+            from .errors import mfa_requerido
 
             raise mfa_requerido("Verificación de segundo factor requerida.")
->>>>>>> Stashed changes
         return st
 
     return _guard

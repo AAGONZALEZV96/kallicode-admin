@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS admin.staff (
     CONSTRAINT staff_email_uq     UNIQUE (email),
     CONSTRAINT staff_role_chk     CHECK (role IN ('staff_soporte', 'staff_operaciones',
                                                   'staff_negocio', 'staff_admin')),
-    CONSTRAINT staff_status_chk   CHECK (status IN ('invited', 'active', 'deactivated')),
+    CONSTRAINT staff_status_chk   CHECK (status IN ('invited', 'active', 'deactivated', 'suspended', 'disabled')),
     CONSTRAINT staff_email_len    CHECK (char_length(email) BETWEEN 6 AND 320),
     CONSTRAINT staff_name_len     CHECK (char_length(full_name) BETWEEN 2 AND 120),
     -- una cuenta activa exige contraseña y segundo factor inscrito (§18.2, §18.3)

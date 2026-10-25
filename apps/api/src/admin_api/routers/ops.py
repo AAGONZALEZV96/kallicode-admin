@@ -249,8 +249,8 @@ async def sla(
     }
     where = """
         WHERE to_char(c.iniciado_en, 'YYYY-MM')
-                  = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
-          AND (:t IS NULL OR c.tenant_id = :t)
+                  = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
+          AND (CAST(:t AS text) IS NULL OR c.tenant_id = :t)
     """
 
     async with read_session() as db:

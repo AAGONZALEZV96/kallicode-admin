@@ -151,12 +151,13 @@ async def test_schema_and_partitions_structure(dsn: str) -> None:
         # Verificar tablas requeridas del esquema admin
         tablas_esperadas = {
             "staff",
-            "staff_roles",
-            "staff_permissions",
-            "staff_role_permissions",
-            "staff_user_roles",
             "staff_actions",
             "staff_action_head",
+            "staff_mfa_challenges",
+            "staff_refresh_tokens",
+            "staff_password_resets",
+            "staff_invitations",
+            "access_grants",
             "reports",
         }
         res = await session.execute(

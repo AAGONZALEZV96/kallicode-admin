@@ -83,23 +83,17 @@ async def acciones(
     if ambito not in ("propias", "todas"):
         raise validacion("Ámbito no válido.", {"ambito": ambito})
     if ambito == "todas" and st.role != "staff_admin":
-        from kallicode_core.errors import permiso_denegado
+        from ..errors import rol_staff_insuficiente
 
-<<<<<<< Updated upstream
-        raise permiso_denegado(
-            "Solo el rol de administración puede ver las acciones de todo el "
-            "personal.")
-=======
         raise rol_staff_insuficiente(
             "Solo el rol de administración puede ver las acciones de todo el personal."
         )
     if staff_id and staff_id != st.id and (ambito != "todas" or st.role != "staff_admin"):
-        from admin_api.errors import rol_staff_insuficiente
+        from ..errors import rol_staff_insuficiente
 
         raise rol_staff_insuficiente(
             "Filtrar por otro empleado exige ámbito 'todas' y rol de administración."
         )
->>>>>>> Stashed changes
     if accion is not None and accion not in _ACCIONES:
         raise validacion(
             "Acción desconocida.", {"accion": accion, "permitidas": list(_ACCIONES)}
@@ -114,12 +108,14 @@ async def acciones(
             f"El rango no puede superar {_MAX_DIAS} días.", {"dias": (hasta - desde).days}
         )
 
-    cond = ["(:ambito = 'todas' OR a.staff_id = :yo)",
-            "(:sid IS NULL OR a.staff_id = :sid)",
-            "(:tid IS NULL OR a.tenant_id = :tid)",
-            "(:acc IS NULL OR a.action = :acc)",
-            "a.occurred_at >= CAST(:d AS date)",
-            "a.occurred_at < CAST(:h AS date) + 1"]
+    cond = [
+        "(:ambito = 'todas' OR a.staff_id = :yo)",
+        "(CAST(:sid AS text) IS NULL OR a.staff_id = :sid)",
+        "(CAST(:tid AS text) IS NULL OR a.tenant_id = :tid)",
+        "(CAST(:acc AS text) IS NULL OR a.action = :acc)",
+        "a.occurred_at >= CAST(:d AS date)",
+        "a.occurred_at < CAST(:h AS date) + 1",
+    ]
     where = "WHERE " + " AND ".join(cond)
     params = {
         "ambito": ambito,
@@ -233,12 +229,6 @@ async def exportar(
             SELECT count(*) AS n FROM admin.staff_actions a
             WHERE a.occurred_at >= CAST(:d AS date)
               AND a.occurred_at < CAST(:h AS date) + 1
-<<<<<<< Updated upstream
-              AND (:tid IS NULL OR a.tenant_id = :tid)
-              AND (:sid IS NULL OR a.staff_id = :sid)
-        """, {"d": cuerpo.desde, "h": cuerpo.hasta, "tid": cuerpo.tenant_id,
-              "sid": cuerpo.staff_id})
-=======
               AND (CAST(:tid AS text) IS NULL OR a.tenant_id = :tid)
               AND (CAST(:sid AS text) IS NULL OR a.staff_id = :sid)
         """,
@@ -249,7 +239,6 @@ async def exportar(
                 "sid": cuerpo.staff_id,
             },
         )
->>>>>>> Stashed changes
 
         await uno(
             db,

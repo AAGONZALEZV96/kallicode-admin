@@ -13,9 +13,6 @@ tiene acceso a varios clientes.
 
 from __future__ import annotations
 
-<<<<<<< Updated upstream
-from kallicode_core.errors import AppError
-=======
 from kallicode_core.errors import CATALOGO_ERRORES, AppError
 
 _ERRORES_ADMIN = {
@@ -58,7 +55,6 @@ _ERRORES_ADMIN = {
     },
 }
 CATALOGO_ERRORES.update(_ERRORES_ADMIN)
->>>>>>> Stashed changes
 
 __all__ = [
     "acceso_no_justificado",
@@ -88,8 +84,8 @@ def credenciales_invalidas(
 def mfa_requerido(
     msj: str = "Verificación de segundo factor requerida.",
 ) -> AppError:
-    """401 · el token no acredita segundo factor vigente en esta sesión."""
-    return AppError("MFA_REQUERIDO", 401, msj)
+    """403 · el token no acredita segundo factor vigente en esta sesión."""
+    return AppError("MFA_REQUERIDO", 403, msj)
 
 
 def mfa_invalido(

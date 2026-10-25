@@ -1,0 +1,2133 @@
+openapi: 3.0.3
+info:
+  title: KalliCode · API de Administración
+  description: Superficie interna de la consola de negocio y operaciones. No la consume ningún cliente ni ningún agente del
+    pipeline. Documentada en el capítulo 18 del Diseño del backend.
+  version: 1.0.0
+paths:
+  /admin/v1/health:
+    get:
+      tags:
+      - Salud
+      summary: Salud del servicio de administración
+      description: Sonda de disponibilidad. 503 si una dependencia crítica no responde.
+      operationId: health_admin_v1_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Health Admin V1 Health Get
+  /admin/v1/auth/login:
+    post:
+      tags:
+      - Identidad y sesión
+      summary: Iniciar sesión (primer factor)
+      description: 'Verifica correo y contraseña y devuelve un desafío de segundo factor.
+
+
+        No emite tokens: sin segundo factor verificado no hay sesión, y no existe
+
+        forma de omitirlo para ningún rol.'
+      operationId: login_admin_v1_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/auth/mfa/verify:
+    post:
+      tags:
+      - Identidad y sesión
+      summary: Verificar segundo factor y emitir tokens
+      description: Verifica el código TOTP o un código de recuperación y abre la sesión.
+      operationId: mfa_verify_admin_v1_auth_mfa_verify_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaVerifyIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokensOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/auth/mfa/enroll:
+    post:
+      tags:
+      - Identidad y sesión
+      summary: Inscribir segundo factor (TOTP)
+      description: 'Inscribe o reinscribe el segundo factor.
+
+
+        Dos caminos: en el primer acceso, con el desafío de §18.1; y para reinscribir
+
+        tras la pérdida del dispositivo, con la contraseña vigente. En ambos casos el
+
+        secreto y los códigos de recuperación se muestran una única vez y no existe
+
+        endpoint para volver a consultarlos.'
+      operationId: mfa_enroll_admin_v1_auth_mfa_enroll_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaEnrollIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaEnrollOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/auth/refresh:
+    post:
+      tags:
+      - Identidad y sesión
+      summary: Renovar tokens
+      description: 'Rotación de un solo uso, con comprobación de la caducidad por inactividad.
+
+
+        Reutilizar un token ya consumido revoca todas las sesiones del empleado, igual
+
+        que en el portal, y el rol se resuelve en base de datos: un cambio de rol o
+
+        una desactivación invalidan la renovación de inmediato.'
+      operationId: refresh_admin_v1_auth_refresh_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/auth/logout:
+    post:
+      tags:
+      - Identidad y sesión
+      summary: Cerrar sesión
+      description: 'Revoca el refresh y añade el token de acceso a la lista de denegación.
+
+
+        El cierre de sesión no revoca las concesiones de acceso vigentes: caducan por
+
+        su propio vencimiento o se revocan expresamente (§18.15).'
+      operationId: logout_admin_v1_auth_logout_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/auth/forgot-password:
+    post:
+      tags:
+      - Identidad y sesión
+      summary: Solicitar restablecimiento de contraseña
+      description: 'Envía el enlace de restablecimiento. Siempre 204, exista o no la cuenta.
+
+
+        Restablecer la contraseña no reinscribe el segundo factor: el empleado sigue
+
+        necesitando su autenticador.'
+      operationId: forgot_password_admin_v1_auth_forgot_password_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotIn'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/auth/reset-password:
+    post:
+      tags:
+      - Identidad y sesión
+      summary: Restablecer contraseña
+      description: Fija la contraseña nueva y revoca todas las sesiones del empleado.
+      operationId: reset_password_admin_v1_auth_reset_password_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/auth/invitations/accept:
+    post:
+      tags:
+      - Identidad y sesión
+      summary: Aceptar invitación (alta de personal)
+      description: 'Completa el alta a partir de la invitación de §18.11.
+
+
+        El rol y el correo se toman de la invitación y no del cuerpo de la petición:
+
+        un invitado no puede elevarse el rol ni cambiar su correo al aceptar. Tras
+
+        fijar la contraseña, el flujo continúa obligatoriamente por §18.3 y hasta
+
+        completarlo no se emiten tokens.'
+      operationId: accept_invitation_admin_v1_auth_invitations_accept_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/staff/me:
+    get:
+      tags:
+      - Gestión del personal
+      summary: Perfil del empleado autenticado
+      description: 'Devuelve rol, permisos efectivos y concesiones vigentes.
+
+
+        La consola lo consulta al arrancar para decidir qué pantallas muestra y qué
+
+        datos puede pedir sin solicitar una concesión nueva. Los permisos se derivan
+
+        del rol y no se almacenan, para que no puedan divergir de la matriz.'
+      operationId: perfil_admin_v1_staff_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Perfil Admin V1 Staff Me Get
+  /admin/v1/staff:
+    get:
+      tags:
+      - Gestión del personal
+      summary: Listar personal de KalliCode
+      description: Listado con rol, estado, último acceso y segundo factor inscrito.
+      operationId: listar_admin_v1_staff_get
+      parameters:
+      - name: rol
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filtra por rol de staff.
+          title: Rol
+        description: Filtra por rol de staff.
+      - name: estado
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: invited | active | deactivated.
+          title: Estado
+        description: invited | active | deactivated.
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Página, empezando en 1.
+          default: 1
+          title: Page
+        description: Página, empezando en 1.
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Tamaño de página, 1–100.
+          default: 25
+          title: Page Size
+        description: Tamaño de página, 1–100.
+      - name: sort
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Orden: campo-asc o campo-desc.'
+          title: Sort
+        description: 'Orden: campo-asc o campo-desc.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Listar Admin V1 Staff Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/staff/invitations:
+    post:
+      tags:
+      - Gestión del personal
+      summary: Invitar a un empleado
+      description: Crea la invitación y envía el enlace al correo corporativo.
+      operationId: invitar_admin_v1_staff_invitations_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitarIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitarOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/staff/{staff_id}:
+    patch:
+      tags:
+      - Gestión del personal
+      summary: Actualizar rol o estado de un empleado
+      description: Cambia el rol o desactiva. La desactivación corta el acceso de inmediato.
+      operationId: actualizar_admin_v1_staff__staff_id__patch
+      parameters:
+      - name: staff_id
+        in: path
+        required: true
+        schema:
+          type: string
+          description: Empleado a modificar.
+          title: Staff Id
+        description: Empleado a modificar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActualizarOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/access-grants:
+    post:
+      tags:
+      - Concesiones de acceso
+      summary: Solicitar acceso a los datos de un cliente
+      description: 'Crea una concesión justificada y temporal.
+
+
+        La concesión no amplía el rol: un empleado con rol de soporte no obtiene por
+
+        esta vía acceso a los agregados globales de negocio.'
+      operationId: crear_admin_v1_access_grants_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrearOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - Concesiones de acceso
+      summary: Listar concesiones de acceso
+      description: 'Lista las concesiones. El ámbito `todas` exige rol de administración.
+
+
+        Con otro rol se devuelve 403 y no un listado recortado, para que el
+
+        comportamiento sea inequívoco.'
+      operationId: listar_admin_v1_access_grants_get
+      parameters:
+      - name: ambito
+        in: query
+        required: false
+        schema:
+          type: string
+          description: propias | todas.
+          default: propias
+          title: Ambito
+        description: propias | todas.
+      - name: tenant_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tenant Id
+      - name: estado
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: vigente | caducada | revocada.
+          title: Estado
+        description: vigente | caducada | revocada.
+      - name: desde
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Desde
+      - name: hasta
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Hasta
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Página, empezando en 1.
+          default: 1
+          title: Page
+        description: Página, empezando en 1.
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Tamaño de página, 1–100.
+          default: 25
+          title: Page Size
+        description: Tamaño de página, 1–100.
+      - name: sort
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Orden: campo-asc o campo-desc.'
+          title: Sort
+        description: 'Orden: campo-asc o campo-desc.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Listar Admin V1 Access Grants Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/access-grants/{grant_id}:
+    delete:
+      tags:
+      - Concesiones de acceso
+      summary: Revocar una concesión de acceso
+      description: 'Revoca una concesión antes de su vencimiento.
+
+
+        Cerrar la propia concesión al terminar la investigación es la práctica
+
+        esperada, no una excepción. Revocar una ajena exige rol de administración y
+
+        motivo, y notifica al empleado afectado.'
+      operationId: revocar_admin_v1_access_grants__grant_id__delete
+      parameters:
+      - name: grant_id
+        in: path
+        required: true
+        schema:
+          type: string
+          description: Concesión a revocar.
+          title: Grant Id
+        description: Concesión a revocar.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/RevocarIn'
+              - type: 'null'
+              title: Cuerpo
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevocarOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/business/overview:
+    get:
+      tags:
+      - Consola de negocio
+      summary: Panel general de negocio
+      description: 'Indicadores agregados del negocio, con su frescura declarada.
+
+
+        Ningún indicador de este endpoint identifica a un cliente concreto, así que no
+
+        requiere concesión de acceso.'
+      operationId: overview_admin_v1_business_overview_get
+      parameters:
+      - name: periodo
+        in: query
+        required: false
+        schema:
+          type: string
+          description: mes_actual | mes_anterior | trimestre | ano.
+          default: mes_actual
+          title: Periodo
+        description: mes_actual | mes_anterior | trimestre | ano.
+      - name: comparar_con
+        in: query
+        required: false
+        schema:
+          type: string
+          description: periodo_anterior | mismo_periodo_ano_anterior.
+          default: periodo_anterior
+          title: Comparar Con
+        description: periodo_anterior | mismo_periodo_ano_anterior.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Overview Admin V1 Business Overview Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/business/customers:
+    get:
+      tags:
+      - Consola de negocio
+      summary: Listar clientes
+      description: 'Listado de organizaciones con plan, estado, consumo y actividad.
+
+
+        La búsqueda por razón social exige concesión vigente: permitirla sin ella
+
+        convertiría el listado en un directorio de clientes consultable por cualquier
+
+        empleado.'
+      operationId: customers_admin_v1_business_customers_get
+      parameters:
+      - name: plan
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Plan
+      - name: estado
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: activa | periodo_gracia | suspendida | finalizada.
+          title: Estado
+        description: activa | periodo_gracia | suspendida | finalizada.
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Búsqueda por identificador. Por razón social exige concesión.
+          title: Q
+        description: Búsqueda por identificador. Por razón social exige concesión.
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Página, empezando en 1.
+          default: 1
+          title: Page
+        description: Página, empezando en 1.
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Tamaño de página, 1–100.
+          default: 25
+          title: Page Size
+        description: Tamaño de página, 1–100.
+      - name: sort
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Orden: campo-asc o campo-desc.'
+          title: Sort
+        description: 'Orden: campo-asc o campo-desc.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Customers Admin V1 Business Customers Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/business/customers/{tenant_id}:
+    get:
+      tags:
+      - Consola de negocio
+      summary: Ficha de cliente
+      description: 'Reúne todo lo que hay que saber de un cliente en una sola respuesta.
+
+
+        Los bloques de identificación, usuarios e integraciones exigen concesión de
+
+        alcance `datos_negocio` o superior; sin ella se devuelven enmascarados y la
+
+        petición no falla. El bloque de grafo no incluye rutas de fichero ni nombres de
+
+        símbolo: eso pertenece al alcance `contenido_codigo` y no se sirve aquí.'
+      operationId: customer_admin_v1_business_customers__tenant_id__get
+      parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema:
+          type: string
+          description: Organización a consultar.
+          title: Tenant Id
+        description: Organización a consultar.
+      - name: incluir
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: usuarios, integraciones, historico, grafo.
+          title: Incluir
+        description: usuarios, integraciones, historico, grafo.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Customer Admin V1 Business Customers  Tenant Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/business/subscriptions:
+    get:
+      tags:
+      - Consola de negocio
+      summary: Suscripciones y renovaciones
+      description: 'Suscripciones con su próxima renovación por aniversario de contratación.
+
+
+        La consola es de solo lectura sobre este dominio: aprobar un cambio de plan o
+
+        suspender una suscripción se hace desde el flujo comercial de §15.'
+      operationId: subscriptions_admin_v1_business_subscriptions_get
+      parameters:
+      - name: estado
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Estado
+      - name: renueva_en_dias
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+            maximum: 90
+            minimum: 1
+          - type: 'null'
+          title: Renueva En Dias
+      - name: plan
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Plan
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Página, empezando en 1.
+          default: 1
+          title: Page
+        description: Página, empezando en 1.
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Tamaño de página, 1–100.
+          default: 25
+          title: Page Size
+        description: Tamaño de página, 1–100.
+      - name: sort
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Orden: campo-asc o campo-desc.'
+          title: Sort
+        description: 'Orden: campo-asc o campo-desc.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Subscriptions Admin V1 Business Subscriptions Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/business/upgrade-requests:
+    get:
+      tags:
+      - Consola de negocio
+      summary: Solicitudes de cambio de plan
+      description: 'Cola de solicitudes de cambio de plan, ordenada por antigüedad.
+
+
+        El orden por defecto es la solicitud más antigua primero: una solicitud
+
+        olvidada es la peor de las respuestas posibles.'
+      operationId: upgrade_requests_admin_v1_business_upgrade_requests_get
+      parameters:
+      - name: estado
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: pendiente
+          title: Estado
+      - name: plan_deseado
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Plan Deseado
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Página, empezando en 1.
+          default: 1
+          title: Page
+        description: Página, empezando en 1.
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Tamaño de página, 1–100.
+          default: 25
+          title: Page Size
+        description: Tamaño de página, 1–100.
+      - name: sort
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Orden: campo-asc o campo-desc.'
+          title: Sort
+        description: 'Orden: campo-asc o campo-desc.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Upgrade Requests Admin V1 Business Upgrade Requests Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/business/usage/tokens:
+    get:
+      tags:
+      - Consola de negocio
+      summary: Consumo de tokens por cliente, tier y periodo
+      description: 'Consumo con su coste estimado y el cuadre contra la facturación.
+
+
+        El tier fable se reporta por separado y no agregado con pro: su coste no es
+
+        comparable y agregarlos invalidaría el cálculo. Y el campo
+
+        `cuadra_con_facturacion` no es decorativo: si es falso, la interfaz debe
+
+        advertirlo de forma visible en lugar de mostrar la cifra como buena.'
+      operationId: usage_tokens_admin_v1_business_usage_tokens_get
+      parameters:
+      - name: ciclo
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: AAAA-MM; defecto, ciclo en curso.
+          title: Ciclo
+        description: AAAA-MM; defecto, ciclo en curso.
+      - name: tenant_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tenant Id
+      - name: agrupar_por
+        in: query
+        required: false
+        schema:
+          type: string
+          description: cliente | tier | dia.
+          default: cliente
+          title: Agrupar Por
+        description: cliente | tier | dia.
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Página, empezando en 1.
+          default: 1
+          title: Page
+        description: Página, empezando en 1.
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Tamaño de página, 1–100.
+          default: 25
+          title: Page Size
+        description: Tamaño de página, 1–100.
+      - name: sort
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Orden: campo-asc o campo-desc.'
+          title: Sort
+        description: 'Orden: campo-asc o campo-desc.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Usage Tokens Admin V1 Business Usage Tokens Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/business/reports:
+    post:
+      tags:
+      - Consola de negocio
+      summary: Solicitar informe de negocio
+      description: 'Encola un informe exportable.
+
+
+        El informe hereda el enmascarado del solicitante: sin concesión vigente,
+
+        `incluir_identificables` se rechaza con 403 en lugar de generar en silencio un
+
+        fichero recortado. Ningún informe puede exportar más de lo que el empleado ve
+
+        en pantalla.'
+      operationId: crear_informe_admin_v1_business_reports_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReporteIn'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReporteOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/business/reports/{report_id}:
+    get:
+      tags:
+      - Consola de negocio
+      summary: Estado y descarga de un informe
+      description: 'Estado del informe y, si está listo, URL firmada de vencimiento corto.
+
+
+        No se sirve como descarga directa sin registro: toda salida de datos queda
+
+        trazada. Un empleado solo accede a los informes que ha solicitado; el rol de
+
+        administración accede a todos.'
+      operationId: informe_admin_v1_business_reports__report_id__get
+      parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Report Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Informe Admin V1 Business Reports  Report Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/ops/agents:
+    get:
+      tags:
+      - Consola de operaciones
+      summary: Agentes y líneas de producción
+      description: 'Estado de los agentes, rendimiento por etapa y ocupación de las líneas.
+
+
+        Consume el agregado de §17.14. Si la telemetría no está disponible, los
+
+        contadores se devuelven nulos y el campo `telemetria` lo declara: no se
+
+        devuelven ceros, que serían indistinguibles de «no hay trabajo».'
+      operationId: agents_admin_v1_ops_agents_get
+      parameters:
+      - name: ventana
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 5m | 1h | 24h.
+          default: 1h
+          title: Ventana
+        description: 5m | 1h | 24h.
+      - name: etapa
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Etapa
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Agents Admin V1 Ops Agents Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/ops/queues:
+    get:
+      tags:
+      - Consola de operaciones
+      summary: Colas del pipeline
+      description: 'Profundidad, antigüedad y cola de fallidos de cada cola del pipeline.
+
+
+        Complementa §18.24: una etapa sin agentes caídos y con la cola creciendo indica
+
+        un problema distinto que una etapa con agentes caídos. El endpoint no consume
+
+        mensajes ni altera ninguna cola: reprocesar o purgar es una operación de
+
+        plataforma y no de la consola en esta versión.'
+      operationId: queues_admin_v1_ops_queues_get
+      parameters:
+      - name: incluir_dlq
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Incluir Dlq
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Queues Admin V1 Ops Queues Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/ops/models:
+    get:
+      tags:
+      - Consola de operaciones
+      summary: Modelos y proveedores
+      description: 'Disponibilidad, latencia, tasa de error y escalados por proveedor y modelo.
+
+
+        Responde la pregunta operativa —si un proveedor está degradado— y la económica,
+
+        porque un escalado por encima de lo previsto encarece cada ticket. El tier fable
+
+        se reporta por separado: su coste no es comparable con el de pro y agregarlos
+
+        invalidaría el cálculo.'
+      operationId: models_admin_v1_ops_models_get
+      parameters:
+      - name: ventana
+        in: query
+        required: false
+        schema:
+          type: string
+          description: 1h | 24h | 7d | 30d.
+          default: 24h
+          title: Ventana
+        description: 1h | 24h | 7d | 30d.
+      - name: proveedor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Proveedor
+      - name: comparar
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Comparar
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Models Admin V1 Ops Models Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/ops/sla:
+    get:
+      tags:
+      - Consola de operaciones
+      summary: Cumplimiento de niveles de servicio
+      description: 'Cumplimiento por cliente, con su tendencia y los casos incumplidos.
+
+
+        Un cliente con menos casos que el mínimo configurado no recibe porcentaje de
+
+        cumplimiento: publicar una cifra sin significado estadístico es peor que no
+
+        publicarla. Y si un plan no tiene objetivos configurados, se declara en
+
+        `sin_definicion` en lugar de calcular sobre un supuesto.'
+      operationId: sla_admin_v1_ops_sla_get
+      parameters:
+      - name: ciclo
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: AAAA-MM; defecto, en curso.
+          title: Ciclo
+        description: AAAA-MM; defecto, en curso.
+      - name: tenant_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tenant Id
+      - name: solo_incumplidos
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Solo Incumplidos
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Página, empezando en 1.
+          default: 1
+          title: Page
+        description: Página, empezando en 1.
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Tamaño de página, 1–100.
+          default: 25
+          title: Page Size
+        description: Tamaño de página, 1–100.
+      - name: sort
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Orden: campo-asc o campo-desc.'
+          title: Sort
+        description: 'Orden: campo-asc o campo-desc.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Sla Admin V1 Ops Sla Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/ops/sla/cases/{job_id}:
+    get:
+      tags:
+      - Consola de operaciones
+      summary: Desglose del reloj de un caso
+      description: 'Desglose completo del reloj: tramos que computan, pausas y su causa.
+
+
+        Es el requisito menos obvio de la pantalla de niveles de servicio y el más
+
+        importante: quien vea un incumplimiento tiene que poder explicar por qué el
+
+        reloj contó lo que contó, porque será la primera pregunta que haga el cliente.
+
+
+        El desglose no revela el contenido del ticket ni de su código: solo etapas,
+
+        tiempos y causas de pausa.'
+      operationId: sla_case_admin_v1_ops_sla_cases__job_id__get
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          description: Caso cuyo reloj se desglosa.
+          title: Job Id
+        description: Caso cuyo reloj se desglosa.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Sla Case Admin V1 Ops Sla Cases  Job Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/audit/staff-actions:
+    get:
+      tags:
+      - Auditoría del personal
+      summary: Acciones del personal sobre datos de cliente
+      description: Registro de acciones, propias o de todo el personal.
+      operationId: acciones_admin_v1_audit_staff_actions_get
+      parameters:
+      - name: ambito
+        in: query
+        required: false
+        schema:
+          type: string
+          description: propias | todas.
+          default: propias
+          title: Ambito
+        description: propias | todas.
+      - name: staff_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filtra por empleado; solo en ámbito todas.
+          title: Staff Id
+        description: Filtra por empleado; solo en ámbito todas.
+      - name: tenant_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Filtra por cliente afectado.
+          title: Tenant Id
+        description: Filtra por cliente afectado.
+      - name: accion
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: grant_created | grant_revoked | read | reveal | report.
+          title: Accion
+        description: grant_created | grant_revoked | read | reveal | report.
+      - name: desde
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Desde
+      - name: hasta
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Hasta
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          description: Página, empezando en 1.
+          default: 1
+          title: Page
+        description: Página, empezando en 1.
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Tamaño de página, 1–100.
+          default: 25
+          title: Page Size
+        description: Tamaño de página, 1–100.
+      - name: sort
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Orden: campo-asc o campo-desc.'
+          title: Sort
+        description: 'Orden: campo-asc o campo-desc.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Acciones Admin V1 Audit Staff Actions Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/v1/audit/staff-actions/exports:
+    post:
+      tags:
+      - Auditoría del personal
+      summary: Exportar el registro de acciones del personal
+      description: 'Encola la exportación del registro para una auditoría externa.
+
+
+        El fichero incluye el sello de cada evento y el resultado de la verificación
+
+        de cadena: es el artefacto que se entrega a un cliente que pide constancia
+
+        formal de quién ha accedido a sus datos.'
+      operationId: exportar_admin_v1_audit_staff_actions_exports_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportIn'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    AcceptIn:
+      properties:
+        token:
+          type: string
+          maxLength: 128
+          minLength: 8
+          title: Token
+        nombre:
+          type: string
+          maxLength: 120
+          minLength: 2
+          title: Nombre
+        password:
+          type: string
+          maxLength: 128
+          minLength: 12
+          title: Password
+      additionalProperties: false
+      type: object
+      required:
+      - token
+      - nombre
+      - password
+      title: AcceptIn
+    AcceptOut:
+      properties:
+        staff:
+          additionalProperties: true
+          type: object
+          title: Staff
+        mfa_token:
+          type: string
+          title: Mfa Token
+      additionalProperties: false
+      type: object
+      required:
+      - staff
+      - mfa_token
+      title: AcceptOut
+    ActualizarIn:
+      properties:
+        rol:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Rol
+        estado:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Estado
+        motivo:
+          anyOf:
+          - type: string
+            maxLength: 280
+            minLength: 10
+          - type: 'null'
+          title: Motivo
+      additionalProperties: false
+      type: object
+      title: ActualizarIn
+    ActualizarOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        rol:
+          type: string
+          title: Rol
+        estado:
+          type: string
+          title: Estado
+        sesiones_revocadas:
+          type: integer
+          title: Sesiones Revocadas
+        concesiones_revocadas:
+          type: integer
+          title: Concesiones Revocadas
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - rol
+      - estado
+      - sesiones_revocadas
+      - concesiones_revocadas
+      title: ActualizarOut
+    CrearIn:
+      properties:
+        tenant_id:
+          type: string
+          maxLength: 64
+          minLength: 3
+          title: Tenant Id
+        alcance:
+          type: string
+          title: Alcance
+        motivo:
+          type: string
+          maxLength: 500
+          minLength: 20
+          title: Motivo
+        duracion_min:
+          anyOf:
+          - type: integer
+            maximum: 480.0
+            minimum: 15.0
+          - type: 'null'
+          title: Duracion Min
+        referencia:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Referencia
+      additionalProperties: false
+      type: object
+      required:
+      - tenant_id
+      - alcance
+      - motivo
+      title: CrearIn
+    CrearOut:
+      properties:
+        grant_id:
+          type: string
+          title: Grant Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        alcance:
+          type: string
+          title: Alcance
+        motivo:
+          type: string
+          title: Motivo
+        concedido_en:
+          title: Concedido En
+        caduca_en:
+          title: Caduca En
+        visible_para_cliente_en:
+          title: Visible Para Cliente En
+      additionalProperties: false
+      type: object
+      required:
+      - grant_id
+      - tenant_id
+      - alcance
+      - motivo
+      - concedido_en
+      - caduca_en
+      - visible_para_cliente_en
+      title: CrearOut
+    ExportIn:
+      properties:
+        desde:
+          type: string
+          format: date
+          title: Desde
+        hasta:
+          type: string
+          format: date
+          title: Hasta
+        tenant_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Tenant Id
+        staff_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Staff Id
+        formato:
+          type: string
+          title: Formato
+          default: csv
+      additionalProperties: false
+      type: object
+      required:
+      - desde
+      - hasta
+      title: ExportIn
+    ExportOut:
+      properties:
+        export_id:
+          type: string
+          title: Export Id
+        estado:
+          type: string
+          title: Estado
+        eventos_estimados:
+          type: integer
+          title: Eventos Estimados
+      additionalProperties: false
+      type: object
+      required:
+      - export_id
+      - estado
+      - eventos_estimados
+      title: ExportOut
+    ForgotIn:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      title: ForgotIn
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    InvitarIn:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+        rol:
+          type: string
+          title: Rol
+        nota:
+          anyOf:
+          - type: string
+            maxLength: 280
+          - type: 'null'
+          title: Nota
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - rol
+      title: InvitarIn
+    InvitarOut:
+      properties:
+        invitacion_id:
+          type: string
+          title: Invitacion Id
+        email:
+          type: string
+          title: Email
+        rol:
+          type: string
+          title: Rol
+        caduca_el:
+          title: Caduca El
+      additionalProperties: false
+      type: object
+      required:
+      - invitacion_id
+      - email
+      - rol
+      - caduca_el
+      title: InvitarOut
+    LoginIn:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+        password:
+          type: string
+          maxLength: 128
+          minLength: 12
+          title: Password
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - password
+      title: LoginIn
+    LoginOut:
+      properties:
+        mfa_token:
+          type: string
+          title: Mfa Token
+        mfa_inscrito:
+          type: boolean
+          title: Mfa Inscrito
+        expira_en:
+          type: integer
+          title: Expira En
+      additionalProperties: false
+      type: object
+      required:
+      - mfa_token
+      - mfa_inscrito
+      - expira_en
+      title: LoginOut
+    LogoutIn:
+      properties:
+        refresh_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Refresh Token
+        todas:
+          type: boolean
+          title: Todas
+          default: false
+      additionalProperties: false
+      type: object
+      title: LogoutIn
+    LogoutOut:
+      properties:
+        sesiones_revocadas:
+          type: integer
+          title: Sesiones Revocadas
+      additionalProperties: false
+      type: object
+      required:
+      - sesiones_revocadas
+      title: LogoutOut
+    MfaEnrollIn:
+      properties:
+        mfa_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mfa Token
+        password:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 12
+          - type: 'null'
+          title: Password
+        codigo:
+          anyOf:
+          - type: string
+            maxLength: 6
+            minLength: 6
+          - type: 'null'
+          title: Codigo
+      additionalProperties: false
+      type: object
+      title: MfaEnrollIn
+    MfaEnrollOut:
+      properties:
+        secreto:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Secreto
+        otpauth_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Otpauth Url
+        codigos_recuperacion:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Codigos Recuperacion
+        inscrito:
+          type: boolean
+          title: Inscrito
+      additionalProperties: false
+      type: object
+      required:
+      - inscrito
+      title: MfaEnrollOut
+    MfaVerifyIn:
+      properties:
+        mfa_token:
+          type: string
+          maxLength: 128
+          minLength: 8
+          title: Mfa Token
+        codigo:
+          type: string
+          maxLength: 32
+          minLength: 4
+          title: Codigo
+      additionalProperties: false
+      type: object
+      required:
+      - mfa_token
+      - codigo
+      title: MfaVerifyIn
+    RefreshIn:
+      properties:
+        refresh_token:
+          type: string
+          maxLength: 128
+          minLength: 8
+          title: Refresh Token
+      additionalProperties: false
+      type: object
+      required:
+      - refresh_token
+      title: RefreshIn
+    RefreshOut:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        refresh_token:
+          type: string
+          title: Refresh Token
+        expira_en:
+          type: integer
+          title: Expira En
+      additionalProperties: false
+      type: object
+      required:
+      - access_token
+      - refresh_token
+      - expira_en
+      title: RefreshOut
+    ReporteIn:
+      properties:
+        tipo:
+          type: string
+          title: Tipo
+        desde:
+          type: string
+          format: date
+          title: Desde
+        hasta:
+          type: string
+          format: date
+          title: Hasta
+        formato:
+          type: string
+          title: Formato
+          default: csv
+        tenant_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Tenant Id
+        incluir_identificables:
+          type: boolean
+          title: Incluir Identificables
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - tipo
+      - desde
+      - hasta
+      title: ReporteIn
+    ReporteOut:
+      properties:
+        report_id:
+          type: string
+          title: Report Id
+        estado:
+          type: string
+          title: Estado
+        estimacion_s:
+          type: integer
+          title: Estimacion S
+      additionalProperties: false
+      type: object
+      required:
+      - report_id
+      - estado
+      - estimacion_s
+      title: ReporteOut
+    ResetIn:
+      properties:
+        token:
+          type: string
+          maxLength: 128
+          minLength: 8
+          title: Token
+        password:
+          type: string
+          maxLength: 128
+          minLength: 12
+          title: Password
+      additionalProperties: false
+      type: object
+      required:
+      - token
+      - password
+      title: ResetIn
+    ResetOut:
+      properties:
+        sesiones_revocadas:
+          type: integer
+          title: Sesiones Revocadas
+      additionalProperties: false
+      type: object
+      required:
+      - sesiones_revocadas
+      title: ResetOut
+    RevocarIn:
+      properties:
+        motivo:
+          anyOf:
+          - type: string
+            maxLength: 280
+            minLength: 10
+          - type: 'null'
+          title: Motivo
+      additionalProperties: false
+      type: object
+      title: RevocarIn
+    RevocarOut:
+      properties:
+        grant_id:
+          type: string
+          title: Grant Id
+        revocada_en:
+          title: Revocada En
+      additionalProperties: false
+      type: object
+      required:
+      - grant_id
+      - revocada_en
+      title: RevocarOut
+    StaffMin:
+      properties:
+        id:
+          type: string
+          title: Id
+        nombre:
+          type: string
+          title: Nombre
+        rol:
+          type: string
+          title: Rol
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - nombre
+      - rol
+      title: StaffMin
+    TokensOut:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        refresh_token:
+          type: string
+          title: Refresh Token
+        staff:
+          $ref: '#/components/schemas/StaffMin'
+        expira_en:
+          type: integer
+          title: Expira En
+      additionalProperties: false
+      type: object
+      required:
+      - access_token
+      - refresh_token
+      - staff
+      - expira_en
+      title: TokensOut
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de acceso de personal (typ=staff, iss=kallicode-admin, aud=admin-v1)
+servers:
+- url: https://admin.internal.kallicode.com
+  description: Producción (red privada)
+- url: http://localhost:8010
+  description: Desarrollo local
+security:
+- BearerAuth: []

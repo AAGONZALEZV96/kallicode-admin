@@ -29,9 +29,9 @@ from kallicode_core.logging import log
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..audit import registrar_accion
-from ..db import admin_session, todos, uno
+from ..db import admin_session, read_session, todos, uno
 from ..deps import SOPORTE, Staff, StaffDep, exigir, limite_rl4
-from ..errors import concesion_duplicada, motivo_insuficiente
+from ..errors import concesion_duplicada, motivo_insuficiente, rol_staff_insuficiente
 from ..masking import JERARQUIA
 from ..pagination import Pagina, paginacion, sobre
 from ..settings import get_admin_settings
@@ -119,12 +119,14 @@ async def crear(cuerpo: CrearIn, st: Annotated[Staff, Depends(exigir(*SOPORTE))]
     if cuerpo.alcance == "contenido_codigo":
         minutos = min(minutos, s.grant_code_max_minutes)
 
-    async with admin_session() as db:
+    async with read_session() as db_ro:
         org = await uno(
-            db, "SELECT id FROM core.organizations WHERE id = :t", {"t": cuerpo.tenant_id}
+            db_ro, "SELECT id FROM core.organizations WHERE id = :t", {"t": cuerpo.tenant_id}
         )
         if org is None:
             raise no_encontrado("La organización")
+
+    async with admin_session() as db:
 
         vigente = await uno(
             db,
@@ -236,24 +238,18 @@ async def listar(
     if ambito not in ("propias", "todas"):
         raise validacion("Ámbito no válido.", {"ambito": ambito})
     if ambito == "todas" and st.role != "staff_admin":
-        from kallicode_core.errors import permiso_denegado
-
-<<<<<<< Updated upstream
-        raise permiso_denegado(
-            "Solo el rol de administración puede ver las concesiones de todo el "
-            "personal.")
-=======
         raise rol_staff_insuficiente(
             "Solo el rol de administración puede ver las concesiones de todo el personal."
         )
->>>>>>> Stashed changes
     if estado is not None and estado not in ("vigente", "caducada", "revocada"):
         raise validacion("Estado no válido.", {"estado": estado})
 
-    cond = ["(:ambito = 'todas' OR g.staff_id = :yo)",
-            "(:t IS NULL OR g.tenant_id = :t)",
-            "(:d IS NULL OR g.granted_at >= CAST(:d AS date))",
-            "(:h IS NULL OR g.granted_at < CAST(:h AS date) + 1)"]
+    cond = [
+        "(:ambito = 'todas' OR g.staff_id = :yo)",
+        "(CAST(:t AS text) IS NULL OR g.tenant_id = :t)",
+        "(CAST(:d AS text) IS NULL OR g.granted_at >= CAST(:d AS date))",
+        "(CAST(:h AS text) IS NULL OR g.granted_at < CAST(:h AS date) + 1)",
+    ]
     if estado == "vigente":
         cond.append("g.revoked_at IS NULL AND g.expires_at > now()")
     elif estado == "caducada":

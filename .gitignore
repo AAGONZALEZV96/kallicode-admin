@@ -9,12 +9,9 @@
 .secrets/gh_token.txt
 backlog_kallicode_admin_e6.md
 auditoria-proyecto.md
-<<<<<<< Updated upstream
-=======
-AGENTS.md
 .geminiignore
 CONTEX/*
->>>>>>> Stashed changes
+AGENTS.md
 # ==========================================
 # 2. Backend / Workers (Python)
 # ==========================================
