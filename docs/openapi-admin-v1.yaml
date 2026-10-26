@@ -1525,6 +1525,72 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
+    CustomerSummary:
+      properties:
+        tenant_id:
+          type: string
+          title: Tenant Id
+          description: Identificador de la organización del cliente
+        name:
+          type: string
+          title: Name
+          description: Razón social del cliente (enmascarada por defecto salvo concesión activa)
+        plan:
+          type: string
+          title: Plan
+          description: Plan contratado actualmente
+        status:
+          type: string
+          title: Status
+          description: Estado de la suscripción (activa, suspendida, etc.)
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+          description: Momento del alta del cliente
+      type: object
+      required:
+      - tenant_id
+      - name
+      - plan
+      - status
+      title: CustomerSummary
+    ErrorStandard:
+      properties:
+        codigo:
+          type: string
+          title: Codigo
+          description: Código de error canónico en mayúsculas
+        code:
+          type: string
+          title: Code
+          description: Código canónico en minúsculas
+        mensaje:
+          type: string
+          title: Mensaje
+          description: Descripción legible del error
+        detalle:
+          type: object
+          nullable: true
+          title: Detalle
+          description: Metadatos adicionales del fallo
+        trace_id:
+          type: string
+          title: Trace Id
+          description: Identificador único de correlación y traza
+        timestamp:
+          type: string
+          format: date-time
+          title: Timestamp
+          description: Momento de la ocurrencia en UTC
+      type: object
+      required:
+      - codigo
+      - mensaje
+      - detalle
+      - trace_id
+      - timestamp
+      title: ErrorStandard
     AcceptIn:
       properties:
         token:

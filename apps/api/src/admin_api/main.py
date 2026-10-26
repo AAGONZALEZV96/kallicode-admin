@@ -25,10 +25,12 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from kallicode_core.errors import AppError
 from kallicode_core.logging import (
@@ -203,3 +205,165 @@ def registrar_routers() -> None:
 
 
 registrar_routers()
+
+# ----------------------------------------------------------------- openapi 3.0.3
+TAGS_METADATA = [
+    {
+        "name": "Salud",
+        "description": "Sonda de disponibilidad e integridad de dependencias de la consola.",
+    },
+    {
+        "name": "Identidad y sesión",
+        "description": (
+            "Autenticación de personal con MFA obligatorio, rotación de sesiones y "
+            "recuperación."
+        ),
+    },
+    {
+        "name": "Gestión del personal",
+        "description": (
+            "Ciclo de vida de empleados de KalliCode: invitaciones, roles y desactivación."
+        ),
+    },
+    {
+        "name": "Concesiones de acceso",
+        "description": (
+            "Solicitud, consulta y revocación de concesiones temporales justificadas."
+        ),
+    },
+    {
+        "name": "Consola de negocio",
+        "description": (
+            "Métricas globales, clientes, suscripciones, tokens y reportes analíticos."
+        ),
+    },
+    {
+        "name": "Consola de operaciones",
+        "description": (
+            "Telemetría de agentes, colas, modelos de IA y acuerdos de nivel de servicio (SLA)."
+        ),
+    },
+    {
+        "name": "Auditoría del personal",
+        "description": (
+            "Registro append-only inmutable de acciones de personal y exportación certificada."
+        ),
+    },
+]
+
+
+def custom_openapi() -> dict[str, Any]:
+    """Genera y congela la especificación OpenAPI 3.0.3 con esquemas globales."""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version="3.0.3",
+        description=app.description,
+        routes=app.routes,
+        tags=TAGS_METADATA,
+    )
+
+    # 1. Congelar versión exacta a OpenAPI 3.0.3
+    openapi_schema["openapi"] = "3.0.3"
+
+    # 2. Inyectar esquema de seguridad BearerAuth
+    components = openapi_schema.setdefault("components", {})
+    security_schemes = components.setdefault("securitySchemes", {})
+    security_schemes["BearerAuth"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": (
+            "Token de acceso de personal (typ=staff, iss=kallicode-admin, aud=admin-v1)"
+        ),
+    }
+
+    # 3. Inyectar esquemas globales estandarizados
+    schemas = components.setdefault("schemas", {})
+    schemas["ErrorStandard"] = {
+        "type": "object",
+        "title": "ErrorStandard",
+        "required": ["codigo", "mensaje", "detalle", "trace_id", "timestamp"],
+        "properties": {
+            "codigo": {
+                "type": "string",
+                "title": "Codigo",
+                "description": "Código de error canónico en mayúsculas",
+            },
+            "code": {
+                "type": "string",
+                "title": "Code",
+                "description": "Código canónico en minúsculas",
+            },
+            "mensaje": {
+                "type": "string",
+                "title": "Mensaje",
+                "description": "Descripción legible del error",
+            },
+            "detalle": {
+                "type": "object",
+                "title": "Detalle",
+                "nullable": True,
+                "description": "Metadatos adicionales del fallo",
+            },
+            "trace_id": {
+                "type": "string",
+                "title": "Trace Id",
+                "description": "Identificador único de correlación y traza",
+            },
+            "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Timestamp",
+                "description": "Momento de la ocurrencia en UTC",
+            },
+        },
+    }
+
+    schemas["CustomerSummary"] = {
+        "type": "object",
+        "title": "CustomerSummary",
+        "required": ["tenant_id", "name", "plan", "status"],
+        "properties": {
+            "tenant_id": {
+                "type": "string",
+                "title": "Tenant Id",
+                "description": "Identificador de la organización del cliente",
+            },
+            "name": {
+                "type": "string",
+                "title": "Name",
+                "description": (
+                    "Razón social del cliente (enmascarada por defecto salvo concesión activa)"
+                ),
+            },
+            "plan": {
+                "type": "string",
+                "title": "Plan",
+                "description": "Plan contratado actualmente",
+            },
+            "status": {
+                "type": "string",
+                "title": "Status",
+                "description": "Estado de la suscripción (activa, suspendida, etc.)",
+            },
+            "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Created At",
+                "description": "Momento del alta del cliente",
+            },
+        },
+    }
+
+    # 4. Esquema global de seguridad para operaciones protegidas
+    openapi_schema["security"] = [{"BearerAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi  # type: ignore[method-assign]
