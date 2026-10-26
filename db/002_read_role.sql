@@ -77,20 +77,20 @@ INSERT INTO admin.access_inventory (table_name, column_name, screens, pii, ratio
  ('core.organizations','eliminado_en','biz-overview,biz-customers',false,'Borrado lógico: excluir de activos.'),
  ('core.organizations','idioma','biz-customers',false,'Idioma de la organización; contexto de soporte.'),
  -- planes y suscripciones
- ('core.plans','codigo','todas',false,'Plan vigente.'),
+ ('core.plans','codigo','todas',false,'Código identificador del plan comercial vigente del cliente.'),
  ('core.plans','nombre','biz-overview,biz-subs',false,'Nombre comercial del plan.'),
  ('core.plans','lineas','biz-customers,biz-subs',false,'Líneas contratadas del plan.'),
  ('core.plans','loc_mes','biz-customers,biz-tokens',false,'Cuota mensual: base del porcentaje de uso.'),
  ('core.plans','max_usuarios','biz-customers',false,'Cupo de usuarios del plan.'),
  ('core.subscriptions','tenant_id','todas',false,'Clave de agrupación.'),
  ('core.subscriptions','plan_codigo','todas',false,'Plan vigente del cliente.'),
- ('core.subscriptions','estado','biz-overview,biz-customers,biz-subs',false,'Estado comercial.'),
+ ('core.subscriptions','estado','biz-overview,biz-customers,biz-subs',false,'Estado comercial y administrativo de la suscripción del tenant.'),
  ('core.subscriptions','inicia_el','biz-subs',false,'Aniversario de contratación: base de la renovación.'),
- ('core.subscriptions','renueva_el','biz-subs,biz-overview',false,'Próxima renovación.'),
+ ('core.subscriptions','renueva_el','biz-subs,biz-overview',false,'Fecha calculada para la próxima renovación de la suscripción.'),
  ('core.subscriptions','finaliza_el','biz-subs',false,'Fin de la suscripción.'),
  ('core.upgrade_requests','id','biz-subs',false,'Solicitud de cambio de plan.'),
  ('core.upgrade_requests','tenant_id','biz-subs',false,'Cliente solicitante.'),
- ('core.upgrade_requests','plan_deseado','biz-subs',false,'Plan solicitado.'),
+ ('core.upgrade_requests','plan_deseado','biz-subs',false,'Plan comercial solicitado para el cambio de suscripción.'),
  ('core.upgrade_requests','comentario','biz-subs',true,'Texto libre del cliente: puede contener datos internos suyos.'),
  ('core.upgrade_requests','urgente','biz-subs',false,'Prioriza la cola comercial.'),
  ('core.upgrade_requests','estado','biz-subs',false,'Estado de la solicitud.'),
@@ -102,18 +102,18 @@ INSERT INTO admin.access_inventory (table_name, column_name, screens, pii, ratio
  ('core.usage_cycles','umbral','biz-tokens',false,'Umbral del plan en el ciclo.'),
  ('core.usage_tokens','tenant_id','biz-tokens,ops-models',false,'Clave de agrupación.'),
  ('core.usage_tokens','tier','biz-tokens,ops-models',false,'Tier del modelo: fable se reporta aparte.'),
- ('core.usage_tokens','modelo','biz-tokens,ops-models',false,'Modelo concreto.'),
- ('core.usage_tokens','etapa','ops-models',false,'Etapa del pipeline.'),
- ('core.usage_tokens','invocaciones','ops-models',false,'Número de llamadas.'),
- ('core.usage_tokens','tokens_in','biz-tokens,ops-models',false,'Tokens de entrada.'),
- ('core.usage_tokens','tokens_out','biz-tokens,ops-models',false,'Tokens de salida.'),
- ('core.usage_tokens','duracion_ms','ops-models',false,'Latencia observada.'),
- ('core.usage_tokens','creado_en','biz-tokens,ops-models',false,'Ventana temporal.'),
+ ('core.usage_tokens','modelo','biz-tokens,ops-models',false,'Identificador del modelo de lenguaje utilizado en la inferencia.'),
+ ('core.usage_tokens','etapa','ops-models',false,'Etapa operativa del pipeline donde ocurrió la invocación LLM.'),
+ ('core.usage_tokens','invocaciones','ops-models',false,'Número total de llamadas realizadas al modelo de lenguaje.'),
+ ('core.usage_tokens','tokens_in','biz-tokens,ops-models',false,'Cantidad total de tokens de entrada (prompt) consumidos.'),
+ ('core.usage_tokens','tokens_out','biz-tokens,ops-models',false,'Cantidad total de tokens de salida (completion) generados.'),
+ ('core.usage_tokens','duracion_ms','ops-models',false,'Tiempo de respuesta en milisegundos de la invocación LLM.'),
+ ('core.usage_tokens','creado_en','biz-tokens,ops-models',false,'Marca temporal del registro del consumo para ventanas métricas.'),
  ('core.usage_loc','tenant_id','biz-tokens',false,'Clave de agrupación.'),
- ('core.usage_loc','ciclo','biz-tokens',false,'Ciclo.'),
+ ('core.usage_loc','ciclo','biz-tokens',false,'Ciclo de facturación mensual correspondiente al consumo de LOC.'),
  ('core.usage_loc','tipo','biz-tokens',false,'Entrega o ajuste comercial.'),
  ('core.usage_loc','netas','biz-tokens',false,'Líneas netas del PR entregado.'),
- ('core.usage_loc','creado_en','biz-tokens',false,'Ventana temporal.'),
+ ('core.usage_loc','creado_en','biz-tokens',false,'Marca temporal de entrega del PR para imputación en el ciclo.'),
  -- usuarios del cliente: identificables
  ('core.users','tenant_id','biz-customers',false,'Clave de agrupación.'),
  ('core.users','nombre','biz-customers',true,'Nombre de una persona: enmascarado sin concesión.'),
@@ -129,48 +129,48 @@ INSERT INTO admin.access_inventory (table_name, column_name, screens, pii, ratio
  ('core.connections','ultimo_test','biz-customers',false,'Última verificación con éxito.'),
  -- líneas, jobs y tickets: metadatos, nunca contenido
  ('core.production_lines','tenant_id','ops-agents,biz-customers',false,'Clave de agrupación.'),
- ('core.production_lines','numero','ops-agents,biz-customers',false,'Número de línea.'),
+ ('core.production_lines','numero','ops-agents,biz-customers',false,'Identificador numérico correlativo de la línea de producción.'),
  ('core.production_lines','estado','ops-agents,biz-customers',false,'Libre, ocupada o en mantenimiento.'),
  ('core.jobs','tenant_id','ops-agents,ops-sla',false,'Clave de agrupación.'),
  ('core.jobs','id','ops-sla',false,'Caso para el desglose del reloj.'),
- ('core.jobs','ticket_id','ops-sla',false,'Ticket asociado.'),
+ ('core.jobs','ticket_id','ops-sla',false,'Identificador del ticket de trabajo vinculado a la ejecución.'),
  ('core.jobs','estado','ops-agents,ops-sla',false,'Estado de la máquina del pipeline.'),
- ('core.jobs','linea','ops-agents',false,'Línea ocupada.'),
+ ('core.jobs','linea','ops-agents',false,'Número de línea de producción asignada para la tarea.'),
  ('core.jobs','iteraciones','ops-sla',false,'Iteraciones consumidas.'),
- ('core.jobs','creado_en','ops-agents,ops-sla',false,'Inicio del caso.'),
- ('core.jobs','terminado_en','ops-agents,ops-sla',false,'Fin del caso.'),
+ ('core.jobs','creado_en','ops-agents,ops-sla',false,'Marca de tiempo que determina el inicio formal del trabajo.'),
+ ('core.jobs','terminado_en','ops-agents,ops-sla',false,'Marca de tiempo que determina la finalización del trabajo.'),
  ('core.tickets','tenant_id','biz-overview,ops-sla',false,'Clave de agrupación.'),
  ('core.tickets','id','ops-sla',false,'Identificador interno.'),
  ('core.tickets','numero','ops-sla',true,'Correlativo visible del cliente: identifica su trabajo.'),
  ('core.tickets','tipo','biz-overview',false,'Bug, mejora o funcionalidad.'),
- ('core.tickets','etapa','biz-overview,ops-sla',false,'Etapa del pipeline.'),
+ ('core.tickets','etapa','biz-overview,ops-sla',false,'Etapa operativa actual del ciclo de vida del ticket.'),
  ('core.tickets','gate_pendiente','ops-sla',false,'Gate en espera: causa de pausa del reloj.'),
- ('core.tickets','creado_en','biz-overview,ops-sla',false,'Inicio del caso.'),
- ('core.tickets','cerrado_en','biz-overview,ops-sla',false,'Cierre del caso.'),
+ ('core.tickets','creado_en','biz-overview,ops-sla',false,'Fecha y hora de registro inicial del ticket de cliente.'),
+ ('core.tickets','cerrado_en','biz-overview,ops-sla',false,'Fecha y hora de cierre formal y entrega del ticket.'),
  -- transiciones y firmas: tiempos, no contenido
  ('core.job_transitions','tenant_id','ops-agents,ops-sla',false,'Clave de agrupación.'),
- ('core.job_transitions','job_id','ops-agents,ops-sla',false,'Caso.'),
- ('core.job_transitions','de_estado','ops-agents,ops-sla',false,'Estado de origen.'),
- ('core.job_transitions','a_estado','ops-agents,ops-sla',false,'Estado de destino.'),
+ ('core.job_transitions','job_id','ops-agents,ops-sla',false,'Identificador del job cuyas transiciones reconstruyen el reloj.'),
+ ('core.job_transitions','de_estado','ops-agents,ops-sla',false,'Estado previo desde el cual se realiza la transición de fase.'),
+ ('core.job_transitions','a_estado','ops-agents,ops-sla',false,'Estado posterior hacia el cual transiciona el flujo de trabajo.'),
  ('core.job_transitions','creado_en','ops-agents,ops-sla',false,'Momento de la transición: base del reloj de SLA.'),
  ('core.gate_signatures','tenant_id','ops-sla',false,'Clave de agrupación.'),
- ('core.gate_signatures','ticket_id','ops-sla',false,'Ticket firmado.'),
- ('core.gate_signatures','gate','ops-sla',false,'Gate firmado.'),
+ ('core.gate_signatures','ticket_id','ops-sla',false,'Identificador del ticket al que corresponde la firma del gate.'),
+ ('core.gate_signatures','gate','ops-sla',false,'Identificador de la compuerta de validación cliente firmada.'),
  ('core.gate_signatures','accion','ops-sla',false,'Aprobado o cambios pedidos.'),
  ('core.gate_signatures','creado_en','ops-sla',false,'Momento de la firma: fin de la pausa del reloj.'),
  -- pasos LLM: métricas, nunca las referencias de entrada y salida
  ('core.llm_steps','tenant_id','ops-models',false,'Clave de agrupación.'),
- ('core.llm_steps','etapa','ops-models',false,'Etapa del pipeline.'),
+ ('core.llm_steps','etapa','ops-models',false,'Etapa operativa del flujo donde se invoca el paso de lenguaje.'),
  ('core.llm_steps','paso','ops-models',false,'Paso del catálogo de plantillas.'),
- ('core.llm_steps','modelo','ops-models',false,'Modelo invocado.'),
+ ('core.llm_steps','modelo','ops-models',false,'Nombre o identificador del modelo LLM ejecutado en el paso.'),
  ('core.llm_steps','tier','ops-models',false,'Tier: flash, pro o fable.'),
  ('core.llm_steps','confianza','ops-models',false,'Confianza declarada por el modelo.'),
  ('core.llm_steps','validacion','ops-models',false,'Resultado de la validación de esquema.'),
  ('core.llm_steps','reintentos','ops-models',false,'Reintentos consumidos: base de la tasa de escalado.'),
- ('core.llm_steps','tokens_in','ops-models',false,'Tokens de entrada.'),
- ('core.llm_steps','tokens_out','ops-models',false,'Tokens de salida.'),
+ ('core.llm_steps','tokens_in','ops-models',false,'Número de prompt tokens procesados por el modelo en el paso.'),
+ ('core.llm_steps','tokens_out','ops-models',false,'Número de completion tokens generados por el modelo en el paso.'),
  ('core.llm_steps','duracion_ms','ops-models',false,'Latencia por proveedor.'),
- ('core.llm_steps','creado_en','ops-models',false,'Ventana temporal.'),
+ ('core.llm_steps','creado_en','ops-models',false,'Marca temporal del paso para cálculo de percentiles de latencia.'),
  -- onboarding: solo el recuento y la fase, nunca el contenido del documento
  ('core.onboarding_documents','tenant_id','biz-customers',false,'Clave de agrupación.'),
  ('core.onboarding_documents','tipo_documento','biz-customers',false,'Tipo de documento aportado.'),
@@ -208,6 +208,9 @@ END $$;
 -- El propio esquema admin: lectura para las pantallas de auditoría y concesiones.
 GRANT SELECT ON admin.staff, admin.access_grants, admin.staff_actions,
                 admin.reports, admin.access_inventory TO kallicode_admin_ro;
+
+
+
 
 -- -----------------------------------------------------------------------------
 -- Políticas de lectura cross-tenant
@@ -327,6 +330,13 @@ COMMENT ON FUNCTION admin.validate_read_role IS
   'al aplicar la migración y en cada Pull Request, también tras cada migración '
   'de la plataforma, porque una tabla nueva en core podría abrir acceso sin que '
   'nadie lo revise.';
+
+-- Revocación de privilegios de ejecución sobre funciones mutacionales y de refresco
+ALTER DEFAULT PRIVILEGES IN SCHEMA admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, kallicode_admin_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, kallicode_admin_ro;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA admin FROM PUBLIC, kallicode_admin_ro;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA admin TO kallicode_admin_app;
+GRANT EXECUTE ON FUNCTION admin.validate_read_role() TO kallicode_admin_app, kallicode_admin_ro;
 
 DO $$
 DECLARE

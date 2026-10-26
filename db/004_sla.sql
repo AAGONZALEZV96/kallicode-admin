@@ -263,6 +263,9 @@ END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, pg_temp;
 
 ALTER FUNCTION admin.refresh_sla(int, boolean) OWNER TO kallicode_admin_agg;
 GRANT EXECUTE ON FUNCTION admin.refresh_sla(int, boolean) TO kallicode_admin_app;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA admin FROM PUBLIC, kallicode_admin_ro;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA admin TO kallicode_admin_app;
+GRANT EXECUTE ON FUNCTION admin.validate_read_role() TO kallicode_admin_ro;
 
 -- -----------------------------------------------------------------------------
 -- Semilla provisional de objetivos: pendiente de ratificación del PO (ADR 003)

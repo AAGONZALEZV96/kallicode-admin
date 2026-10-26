@@ -1,4 +1,4 @@
-.PHONY: up down sync lint format test test-int
+.PHONY: up down sync lint format test test-int no-fuga
 
 # Levanta la infraestructura de datos local
 up:
@@ -31,3 +31,9 @@ test-int:
 	KC_ADMIN_TEST_DSN="postgresql://postgres:postgres@localhost:5433/kallicode_test" \
 	KC_ADMIN_REDIS_URL="redis://localhost:6380/1" \
 	uv run pytest --cov-report=term-missing
+
+# Verificación de no-fuga y permisos del rol de lectura (Ticket KC-ADM-B2-01)
+no-fuga:
+	KC_ADMIN_TEST_DSN="postgresql://postgres:postgres@localhost:5433/kallicode_test" \
+	KC_ADMIN_REDIS_URL="redis://localhost:6380/1" \
+	uv run pytest tests/test_no_leak.py -v --no-cov
