@@ -28,11 +28,49 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .db import todos, uno
 
 Accion = Literal[
-    "grant_created", "grant_revoked", "read", "reveal", "report", "staff_managed", "admin_query"
+    "grant_created",
+    "grant_revoked",
+    "read",
+    "reveal",
+    "report",
+    "staff_managed",
+    "admin_query",
+    "grant_creado",
+    "grant_revocado",
+    "lectura",
+    "revelacion",
+    "informe",
+    "login",
+    "logout",
 ]
 
 # Acciones que exigen tenant afectado: son las que tocan datos de un cliente.
-_EXIGEN_TENANT: frozenset[str] = frozenset({"grant_created", "grant_revoked", "read", "reveal"})
+_EXIGEN_TENANT: frozenset[str] = frozenset({
+    "grant_created",
+    "grant_revoked",
+    "read",
+    "reveal",
+    "grant_creado",
+    "grant_revocado",
+    "lectura",
+    "revelacion",
+})
+
+
+class ResultadoIntegridadCadena(dict[str, Any]):
+    """Resultado estructurado de la verificación criptográfica de la cadena."""
+
+    @property
+    def integra(self) -> bool:
+        return bool(self.get("integra", False))
+
+    @property
+    def roturas(self) -> list[dict[str, Any]]:
+        return list(self.get("roturas", []))
+
+    @property
+    def total_roturas(self) -> int:
+        return int(self.get("total_roturas", 0))
 
 
 async def registrar_accion(
@@ -42,6 +80,7 @@ async def registrar_accion(
     staff_role: str,
     action: Accion,
     endpoint: str,
+    staff_email: str | None = None,
     tenant_id: str | None = None,
     grant_id: str | None = None,
     scope: str | None = None,
@@ -72,15 +111,16 @@ async def registrar_accion(
         db,
         """
         INSERT INTO admin.staff_actions
-            (staff_id, staff_role, action, tenant_id, grant_id, scope, reason,
+            (staff_id, staff_email, staff_role, action, tenant_id, grant_id, scope, reason,
              resource, endpoint, ip, user_agent, request_id, payload,
              prev_seal, seal)
-        VALUES (:sid, :rol, :act, :tid, :gid, :sc, :rz, :res, :ep, :ip, :ua,
+        VALUES (:sid, :sem, :rol, :act, :tid, :gid, :sc, :rz, :res, :ep, :ip, :ua,
                 :rq, CAST(:pl AS jsonb), '', '')
         RETURNING seal
     """,
         {
             "sid": staff_id,
+            "sem": staff_email,
             "rol": staff_role,
             "act": action,
             "tid": tenant_id,
@@ -178,3 +218,88 @@ async def verificar_cadena(
     """,
         {"d": desde, "h": hasta},
     )
+
+
+async def registrar_accion_staff(
+    db: AsyncSession,
+    *,
+    staff_id: str,
+    staff_email: str | None = None,
+    staff_rol: str | None = None,
+    staff_role: str | None = None,
+    accion: str | None = None,
+    action: str | None = None,
+    tenant_id: str | None = None,
+    alcance: str | None = None,
+    scope: str | None = None,
+    motivo: str | None = None,
+    reason: str | None = None,
+    recurso: str | None = None,
+    resource: str | None = None,
+    endpoint: str = "/admin/v1",
+    grant_id: str | None = None,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    request_id: str | None = None,
+    datos: dict[str, Any] | None = None,
+    payload: dict[str, Any] | None = None,
+) -> str:
+    """Registra atómicamente una acción del personal bajo la transacción DML.
+
+    Acepta parámetros tanto en nomenclatura en español como en inglés para
+    garantizar consistencia con los contratos funcionales y el backlog E6.
+    """
+    final_role = staff_rol or staff_role or "staff_admin"
+    final_action = accion or action or "admin_query"
+    final_scope = alcance if alcance is not None else scope
+    final_reason = motivo if motivo is not None else reason
+    final_resource = recurso if recurso is not None else resource
+    final_payload = datos if datos is not None else payload
+
+    return await registrar_accion(
+        db,
+        staff_id=staff_id,
+        staff_email=staff_email,
+        staff_role=final_role,
+        action=final_action,  # type: ignore[arg-type]
+        endpoint=endpoint,
+        tenant_id=tenant_id,
+        grant_id=grant_id,
+        scope=final_scope,
+        reason=final_reason,
+        resource=final_resource,
+        ip=ip,
+        user_agent=user_agent,
+        request_id=request_id,
+        payload=final_payload,
+    )
+
+
+async def verificar_cadena_staff_actions(
+    db: AsyncSession,
+    desde: str | None = None,
+    hasta: str | None = None,
+) -> ResultadoIntegridadCadena:
+    """Verifica la integridad criptográfica de la cadena completa o del rango indicado.
+
+    Retorna un objeto ResultadoIntegridadCadena con:
+      - integra = True si la cadena es íntegra y no ha sido alterada.
+      - roturas = lista de incidentes detectados si hay inconsistencias.
+    """
+    roturas = await verificar_cadena(db, desde=desde, hasta=hasta)
+    return ResultadoIntegridadCadena(
+        integra=(len(roturas) == 0),
+        roturas=roturas,
+        total_roturas=len(roturas),
+    )
+
+
+__all__ = [
+    "Accion",
+    "ResultadoIntegridadCadena",
+    "registrar_accion",
+    "registrar_accion_staff",
+    "registrar_lectura",
+    "verificar_cadena",
+    "verificar_cadena_staff_actions",
+]

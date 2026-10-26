@@ -187,7 +187,7 @@ GRANT USAGE ON SCHEMA admin TO kallicode_admin_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA admin TO kallicode_admin_app;
 -- ... salvo el registro de auditoría, que es append-only (los triggers de
 -- 001 lo impiden igualmente; esto lo hace explícito también en privilegios).
-REVOKE UPDATE, DELETE, TRUNCATE ON admin.staff_actions FROM kallicode_admin_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON admin.staff_actions FROM PUBLIC, kallicode_admin_app, kallicode_admin_ro;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA admin TO kallicode_admin_app;
 -- Necesita comprobar que un tenant existe al crear una concesión (§18.13).
 GRANT SELECT (id) ON core.organizations TO kallicode_admin_app;
@@ -333,7 +333,12 @@ COMMENT ON FUNCTION admin.validate_read_role IS
 
 -- Revocación de privilegios de ejecución sobre funciones mutacionales y de refresco
 ALTER DEFAULT PRIVILEGES IN SCHEMA admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, kallicode_admin_ro;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, kallicode_admin_ro;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
+        EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, kallicode_admin_ro';
+    END IF;
+END $$;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA admin FROM PUBLIC, kallicode_admin_ro;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA admin TO kallicode_admin_app;
 GRANT EXECUTE ON FUNCTION admin.validate_read_role() TO kallicode_admin_app, kallicode_admin_ro;

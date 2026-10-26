@@ -1,4 +1,11 @@
+import re
+
 import pytest
+from admin_api.audit import (
+    ResultadoIntegridadCadena,
+    registrar_accion_staff,
+    verificar_cadena_staff_actions,
+)
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, InternalError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -141,7 +148,7 @@ async def test_staff_actions_chain_verification(db, staff_factory):
 
 
 @pytest.mark.integracion
-async def test_schema_and_partitions_structure(dsn: str) -> None:
+async def test_schema_and_partitions_structure(dsn: str, esquema: str) -> None:
     """Valida la presencia del esquema, tablas RBAC y particiones de staff_actions."""
     engine = create_async_engine(
         dsn.replace("postgresql://", "postgresql+asyncpg://"),
@@ -182,3 +189,165 @@ async def test_schema_and_partitions_structure(dsn: str) -> None:
         assert num_particiones is not None and num_particiones >= 12
 
     await engine.dispose()
+
+
+@pytest.mark.integracion
+async def test_registrar_accion_staff(db: AsyncSession, staff_factory, dsn: str) -> None:
+    """Verifica el registro atómico de auditoría con registrar_accion_staff."""
+    staff = await staff_factory(rol="staff_soporte")
+    sid = staff["id"]
+    email = staff["email"]
+
+    # Crear organización como superusuario para satisfacer la FK
+    engine_su = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    async with AsyncSession(engine_su) as session_su:
+        await session_su.execute(
+            text("""
+            INSERT INTO core.organizations (id, nombre, idioma, timezone,
+                                            despliegue, fabrica_activa)
+            VALUES ('org_audit_unit', 'Audit Unit S.L.', 'es', 'Europe/Madrid', 'cloud', true)
+            ON CONFLICT (id) DO NOTHING;
+        """)
+        )
+        await session_su.commit()
+    await engine_su.dispose()
+
+    sello = await registrar_accion_staff(
+        db,
+        staff_id=sid,
+        staff_email=email,
+        staff_rol="staff_soporte",
+        accion="lectura",
+        tenant_id="org_audit_unit",
+        alcance="datos_negocio",
+        motivo="Revisión de ticket TK-2024",
+        recurso="tk_2024",
+        datos={"filtro": "facturacion"},
+    )
+
+    assert isinstance(sello, str)
+    assert len(sello) == 64
+    assert re.fullmatch(r"^[0-9a-f]{64}$", sello)
+
+    # Validar que los datos y el sello quedaron persistidos fielmente en admin.staff_actions
+    res = await db.execute(
+        text("SELECT * FROM admin.staff_actions WHERE seal = :s"),
+        {"s": sello},
+    )
+    row = res.mappings().fetchone()
+    assert row is not None
+    assert row["staff_id"] == sid
+    assert row["staff_email"] == email
+    assert row["staff_role"] == "staff_soporte"
+    assert row["action"] == "lectura"
+    assert row["tenant_id"] == "org_audit_unit"
+    assert row["scope"] == "datos_negocio"
+    assert row["reason"] == "Revisión de ticket TK-2024"
+    assert row["resource"] == "tk_2024"
+    assert row["seal"] == sello
+    assert row["payload"] == {"filtro": "facturacion"}
+
+
+@pytest.mark.integracion
+async def test_verificar_cadena_staff_actions_integra(db: AsyncSession, staff_factory) -> None:
+    """Verifica que la cadena íntegra devuelva integra = True."""
+    staff = await staff_factory(rol="staff_admin")
+    sid = staff["id"]
+
+    for i in range(3):
+        await registrar_accion_staff(
+            db,
+            staff_id=sid,
+            staff_rol="staff_admin",
+            accion="admin_query",
+            endpoint=f"/admin/v1/ops/test-{i}",
+            motivo=f"Comprobación de métricas #{i}",
+        )
+
+    res = await verificar_cadena_staff_actions(db)
+    assert isinstance(res, ResultadoIntegridadCadena)
+    assert res.integra is True
+    assert res["integra"] is True
+    assert res.roturas == []
+    assert res["roturas"] == []
+    assert res.total_roturas == 0
+
+
+@pytest.mark.integracion
+async def test_verificar_cadena_detecta_manipulacion(dsn: str, esquema: str) -> None:
+    """Verifica que cualquier alteración en los sellos sea detectada como rotura."""
+    engine = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    async with AsyncSession(engine) as session:
+        await session.execute(
+            text("""
+            INSERT INTO admin.staff (id, email, full_name, role, status)
+            VALUES ('st_tamper_test', 'tamper@kallicode.com', 'Tamper Staff',
+                    'staff_admin', 'invited')
+            ON CONFLICT (id) DO NOTHING;
+        """)
+        )
+        for i in range(3):
+            await registrar_accion_staff(
+                session,
+                staff_id="st_tamper_test",
+                staff_rol="staff_admin",
+                accion="admin_query",
+                endpoint=f"/admin/v1/ops/tamper-{i}",
+                motivo=f"Evento auditado #{i}",
+            )
+        await session.commit()
+
+        # Cadena debe ser íntegra antes de la manipulación
+        res_antes = await verificar_cadena_staff_actions(session)
+        assert res_antes.integra is True
+
+        # Simular manipulación: deshabilitar trigger, cambiar sello, rehabilitar trigger
+        await session.execute(
+            text("ALTER TABLE admin.staff_actions DISABLE TRIGGER trg_staff_actions_immutable;")
+        )
+        await session.execute(
+            text("""
+            UPDATE admin.staff_actions
+            SET seal = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+            WHERE id = (SELECT max(id) FROM admin.staff_actions);
+        """)
+        )
+        await session.execute(
+            text("ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable;")
+        )
+        await session.commit()
+
+        # La verificación debe detectar la rotura
+        res_despues = await verificar_cadena_staff_actions(session)
+        assert res_despues.integra is False
+        assert res_despues["integra"] is False
+        assert len(res_despues.roturas) > 0
+        assert res_despues.total_roturas > 0
+        assert any(
+            "sello no reproducible" in r["motivo"] or "encadenamiento roto" in r["motivo"]
+            for r in res_despues.roturas
+        )
+
+    await engine.dispose()
+
+
+@pytest.mark.integracion
+async def test_staff_actions_dml_privileges_revoked(db: AsyncSession) -> None:
+    """Verifica que UPDATE, DELETE y TRUNCATE estén revocados sobre staff_actions."""
+    res = await db.execute(
+        text("""
+        SELECT privilege_type, grantee
+        FROM information_schema.table_privileges
+        WHERE table_schema = 'admin' AND table_name = 'staff_actions'
+          AND grantee IN ('PUBLIC', 'kallicode_admin_app', 'kallicode_admin_ro')
+          AND privilege_type IN ('UPDATE', 'DELETE', 'TRUNCATE');
+    """)
+    )
+    rows = res.fetchall()
+    assert len(rows) == 0, f"Se encontraron privilegios DML mutacionales no revocados: {rows}"
