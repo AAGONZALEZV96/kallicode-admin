@@ -24,7 +24,9 @@ format:
 
 # Pruebas unitarias (Rápidas, sin BD)
 test:
-	uv run pytest -m "not integracion" -q
+	KC_ADMIN_TEST_DSN="postgresql://postgres:postgres@localhost:5433/kallicode_test" \
+	KC_ADMIN_REDIS_URL="redis://localhost:6380/1" \
+	uv run pytest -m "not integracion" -q --no-cov
 
 # Pruebas de integración usando la BD aislada en el puerto 5433
 test-int:

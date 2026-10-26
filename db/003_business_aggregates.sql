@@ -122,8 +122,20 @@ CREATE TABLE IF NOT EXISTS admin.agg_customer_state (
     tickets_abiertos   int,
     ultima_actividad   timestamptz,
     importe_mes        numeric(12,2),
-    moneda             text
+    moneda             text,
+    estado_comercial   text,
+    mrr_eur            numeric(12,2),
+    consumo_tokens_ciclo bigint DEFAULT 0,
+    actualizado_en     timestamptz DEFAULT now()
 );
+
+DO $$
+BEGIN
+    ALTER TABLE admin.agg_customer_state ADD COLUMN IF NOT EXISTS estado_comercial text;
+    ALTER TABLE admin.agg_customer_state ADD COLUMN IF NOT EXISTS mrr_eur numeric(12,2);
+    ALTER TABLE admin.agg_customer_state ADD COLUMN IF NOT EXISTS consumo_tokens_ciclo bigint DEFAULT 0;
+    ALTER TABLE admin.agg_customer_state ADD COLUMN IF NOT EXISTS actualizado_en timestamptz DEFAULT now();
+END $$;
 
 -- Consumo por cliente y ciclo: alimenta §18.21 y el histórico de §18.18.
 CREATE TABLE IF NOT EXISTS admin.agg_usage_cycle (
@@ -192,12 +204,40 @@ CREATE TABLE IF NOT EXISTS admin.agg_upgrade_requests (
 CREATE INDEX IF NOT EXISTS agg_upg_estado_ix
     ON admin.agg_upgrade_requests (estado, solicitado_el);
 
+-- Resumen comercial mensual cross-tenant: alimenta §18.16 y §18.21.
+CREATE TABLE IF NOT EXISTS admin.agg_monthly_business (
+    ciclo               text PRIMARY KEY,
+    mrr_total           numeric(14,2) NOT NULL DEFAULT 0,
+    clientes_activos    int NOT NULL DEFAULT 0,
+    total_tokens_flash  bigint NOT NULL DEFAULT 0,
+    total_tokens_pro    bigint NOT NULL DEFAULT 0,
+    total_tokens_fable  bigint NOT NULL DEFAULT 0,
+    actualizado_en      timestamptz NOT NULL DEFAULT now()
+);
+
+-- Consumo de tokens desglosado por cliente, ciclo y tier: alimenta §18.21.
+CREATE TABLE IF NOT EXISTS admin.agg_token_usage_by_tier (
+    cliente         text NOT NULL,
+    ciclo           text NOT NULL,
+    tier            text NOT NULL,
+    tokens_in       bigint NOT NULL DEFAULT 0,
+    tokens_out      bigint NOT NULL DEFAULT 0,
+    coste           numeric(14,2) NOT NULL DEFAULT 0,
+    actualizado_en  timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (cliente, ciclo, tier),
+    CONSTRAINT agg_tut_tier_chk CHECK (tier IN ('flash', 'pro', 'fable'))
+);
+
+CREATE INDEX IF NOT EXISTS agg_token_usage_tier_ciclo_ix
+    ON admin.agg_token_usage_by_tier (ciclo, tier);
+
 -- -----------------------------------------------------------------------------
 -- Privilegios: el rol de agregación escribe; el de lectura lee
 -- -----------------------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE, DELETE ON
     admin.agg_customer_state, admin.agg_usage_cycle, admin.agg_tokens_daily,
-    admin.agg_pipeline_daily, admin.agg_upgrade_requests, admin.aggregate_state
+    admin.agg_pipeline_daily, admin.agg_upgrade_requests, admin.aggregate_state,
+    admin.agg_monthly_business, admin.agg_token_usage_by_tier
     TO kallicode_admin_agg;
 GRANT SELECT ON admin.plan_prices, admin.token_rates TO kallicode_admin_agg;
 
@@ -239,7 +279,8 @@ END $$;
 GRANT SELECT ON
     admin.agg_customer_state, admin.agg_usage_cycle, admin.agg_tokens_daily,
     admin.agg_pipeline_daily, admin.agg_upgrade_requests, admin.aggregate_state,
-    admin.plan_prices, admin.token_rates
+    admin.plan_prices, admin.token_rates,
+    admin.agg_monthly_business, admin.agg_token_usage_by_tier
     TO kallicode_admin_ro;
 
 -- -----------------------------------------------------------------------------
@@ -251,6 +292,12 @@ DECLARE
 BEGIN
     DELETE FROM admin.agg_customer_state;
     INSERT INTO admin.agg_customer_state
+        (tenant_id, razon_social, despliegue, idioma, fabrica_activa,
+         alta_el, eliminado_en, plan_codigo, plan_nombre, suscripcion_estado,
+         inicia_el, renueva_el, finaliza_el, lineas_contratadas, lineas_activas,
+         loc_mes, usuarios_activos, usuarios_total, integraciones, docs_onboarding,
+         tickets_abiertos, ultima_actividad, importe_mes, moneda,
+         estado_comercial, mrr_eur, consumo_tokens_ciclo, actualizado_en)
     SELECT o.id, o.nombre, o.despliegue, o.idioma, o.fabrica_activa,
            o.creado_en, o.eliminado_en,
            s.plan_codigo, p.nombre, s.estado, s.inicia_el, s.renueva_el,
@@ -270,8 +317,15 @@ BEGIN
                AND t.etapa NOT IN ('cancelado', 'cerrado_duplicado')),
            greatest(
              (SELECT max(t.creado_en) FROM core.tickets t WHERE t.tenant_id = o.id),
-             (SELECT max(j.actualizado_en) FROM core.jobs j WHERE j.tenant_id = o.id)),
-           pr.importe_mes, pr.moneda
+             (SELECT max(j.creado_en) FROM core.jobs j WHERE j.tenant_id = o.id)),
+           pr.importe_mes, pr.moneda,
+           s.estado,
+           coalesce(pr.importe_mes, 0.00),
+           coalesce((SELECT sum(ut.tokens_in + ut.tokens_out)
+                     FROM core.usage_tokens ut
+                     WHERE ut.tenant_id = o.id
+                       AND to_char(ut.creado_en, 'YYYY-MM') = to_char(current_date, 'YYYY-MM')), 0)::bigint,
+           now()
     FROM core.organizations o
     LEFT JOIN core.subscriptions s
            ON s.tenant_id = o.id AND s.estado <> 'finalizada'
@@ -282,9 +336,81 @@ BEGIN
         ORDER BY pp.vigente_desde DESC LIMIT 1) pr ON true;
     SELECT count(*) INTO n FROM admin.agg_customer_state;
     RETURN n;
-END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, pg_temp;
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, public, pg_temp;
 
 ALTER FUNCTION admin.refresh_customer_state() OWNER TO kallicode_admin_agg;
+
+CREATE OR REPLACE FUNCTION admin.refresh_monthly_business(p_ciclos int DEFAULT 13)
+RETURNS bigint AS $$
+DECLARE
+    n bigint;
+    desde date := (date_trunc('month', current_date)
+                   - make_interval(months => p_ciclos - 1))::date;
+BEGIN
+    -- 1. Desglose de consumo por cliente, ciclo y tier (admin.agg_token_usage_by_tier)
+    DELETE FROM admin.agg_token_usage_by_tier
+     WHERE to_date(ciclo || '-01', 'YYYY-MM-DD') >= desde;
+
+    INSERT INTO admin.agg_token_usage_by_tier
+        (cliente, ciclo, tier, tokens_in, tokens_out, coste, actualizado_en)
+    SELECT ut.tenant_id,
+           to_char(ut.creado_en, 'YYYY-MM') AS ciclo,
+           ut.tier,
+           coalesce(sum(ut.tokens_in), 0),
+           coalesce(sum(ut.tokens_out), 0),
+           coalesce(sum((ut.tokens_in / 1000.0) * coalesce(tr.precio_in, 0)
+                      + (ut.tokens_out / 1000.0) * coalesce(tr.precio_out, 0)), 0),
+           now()
+    FROM core.usage_tokens ut
+    LEFT JOIN LATERAL (
+        SELECT precio_in, precio_out FROM admin.token_rates r
+        WHERE r.tier = ut.tier AND r.modelo IN (ut.modelo, '*')
+          AND r.vigente_desde <= ut.creado_en::date
+        ORDER BY (r.modelo = ut.modelo) DESC, r.vigente_desde DESC
+        LIMIT 1) tr ON true
+    WHERE ut.creado_en::date >= desde
+      AND ut.tier IN ('flash', 'pro', 'fable')
+    GROUP BY ut.tenant_id, to_char(ut.creado_en, 'YYYY-MM'), ut.tier;
+
+    -- 2. Resumen global mensual (admin.agg_monthly_business)
+    DELETE FROM admin.agg_monthly_business
+     WHERE to_date(ciclo || '-01', 'YYYY-MM-DD') >= desde;
+
+    INSERT INTO admin.agg_monthly_business
+        (ciclo, mrr_total, clientes_activos, total_tokens_flash,
+         total_tokens_pro, total_tokens_fable, actualizado_en)
+    SELECT c.ciclo,
+           coalesce((SELECT sum(coalesce(pr.importe_mes, 0))
+                     FROM core.subscriptions s
+                     JOIN LATERAL (
+                         SELECT importe_mes FROM admin.plan_prices pp
+                         WHERE pp.plan_codigo = s.plan_codigo
+                           AND pp.vigente_desde <= to_date(c.ciclo || '-01', 'YYYY-MM-DD')
+                         ORDER BY pp.vigente_desde DESC LIMIT 1) pr ON true
+                     WHERE s.inicia_el <= (to_date(c.ciclo || '-01', 'YYYY-MM-DD') + interval '1 month - 1 day')::date
+                       AND (s.finaliza_el IS NULL OR s.finaliza_el >= to_date(c.ciclo || '-01', 'YYYY-MM-DD'))
+                       AND s.estado IN ('activa', 'periodo_gracia')), 0.00),
+           coalesce((SELECT count(DISTINCT s.tenant_id)
+                     FROM core.subscriptions s
+                     WHERE s.inicia_el <= (to_date(c.ciclo || '-01', 'YYYY-MM-DD') + interval '1 month - 1 day')::date
+                       AND (s.finaliza_el IS NULL OR s.finaliza_el >= to_date(c.ciclo || '-01', 'YYYY-MM-DD'))
+                       AND s.estado IN ('activa', 'periodo_gracia')), 0),
+           coalesce(sum(CASE WHEN tut.tier = 'flash' THEN tut.tokens_in + tut.tokens_out END), 0),
+           coalesce(sum(CASE WHEN tut.tier = 'pro' THEN tut.tokens_in + tut.tokens_out END), 0),
+           coalesce(sum(CASE WHEN tut.tier = 'fable' THEN tut.tokens_in + tut.tokens_out END), 0),
+           now()
+    FROM (
+        SELECT to_char(d, 'YYYY-MM') AS ciclo
+        FROM generate_series(desde::timestamp, current_date::timestamp, interval '1 month') AS d
+    ) c
+    LEFT JOIN admin.agg_token_usage_by_tier tut ON tut.ciclo = c.ciclo
+    GROUP BY c.ciclo;
+
+    SELECT count(*) INTO n FROM admin.agg_monthly_business;
+    RETURN n;
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, public, pg_temp;
+
+ALTER FUNCTION admin.refresh_monthly_business(int) OWNER TO kallicode_admin_agg;
 
 CREATE OR REPLACE FUNCTION admin.refresh_usage_cycle(p_ciclos int DEFAULT 13)
 RETURNS bigint AS $$
@@ -300,13 +426,16 @@ BEGIN
         (tenant_id, ciclo, loc_consumidas, umbral, cuota_pct,
          tokens_in, tokens_out, tokens_flash, tokens_pro, tokens_fable,
          coste, moneda)
-    SELECT c.tenant_id, c.ciclo, c.loc_consumidas, c.umbral,
-           CASE WHEN coalesce(c.umbral, 0) > 0
-                THEN round(100.0 * c.loc_consumidas / c.umbral, 2) END,
+    SELECT c.tenant_id, c.ciclo, c.loc_consumidas, p.loc_mes,
+           CASE WHEN coalesce(p.loc_mes, 0) > 0
+                THEN round(100.0 * c.loc_consumidas / p.loc_mes, 2) END,
            coalesce(t.tin, 0), coalesce(t.tout, 0),
            coalesce(t.flash, 0), coalesce(t.pro, 0), coalesce(t.fable, 0),
            coalesce(t.coste, 0), coalesce(t.moneda, 'EUR')
     FROM core.usage_cycles c
+    LEFT JOIN core.subscriptions s
+           ON s.tenant_id = c.tenant_id AND s.estado <> 'finalizada'
+    LEFT JOIN core.plans p ON p.codigo = s.plan_codigo
     LEFT JOIN LATERAL (
         SELECT sum(ut.tokens_in) AS tin, sum(ut.tokens_out) AS tout,
                sum(CASE WHEN ut.tier = 'flash'
@@ -332,7 +461,7 @@ BEGIN
 
     SELECT count(*) INTO n FROM admin.agg_usage_cycle;
     RETURN n;
-END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, pg_temp;
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, public, pg_temp;
 
 ALTER FUNCTION admin.refresh_usage_cycle(int) OWNER TO kallicode_admin_agg;
 
@@ -367,7 +496,7 @@ BEGIN
 
     SELECT count(*) INTO n FROM admin.agg_tokens_daily;
     RETURN n;
-END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, pg_temp;
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, public, pg_temp;
 
 ALTER FUNCTION admin.refresh_tokens_daily(int) OWNER TO kallicode_admin_agg;
 
@@ -409,7 +538,7 @@ BEGIN
 
     SELECT count(*) INTO n FROM admin.agg_pipeline_daily;
     RETURN n;
-END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, pg_temp;
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, public, pg_temp;
 
 ALTER FUNCTION admin.refresh_pipeline_daily(int) OWNER TO kallicode_admin_agg;
 
@@ -430,16 +559,17 @@ BEGIN
            ON s.tenant_id = u.tenant_id AND s.estado <> 'finalizada';
     SELECT count(*) INTO n FROM admin.agg_upgrade_requests;
     RETURN n;
-END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, pg_temp;
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, public, pg_temp;
 
 ALTER FUNCTION admin.refresh_upgrade_requests() OWNER TO kallicode_admin_agg;
 
--- Orquestador: refresca todo y registra frescura y resultado por agregado.
-CREATE OR REPLACE FUNCTION admin.refresh_all() RETURNS TABLE (
+-- Orquestador de agregados de negocio: ejecuta todos los refrescos y registra estado.
+CREATE OR REPLACE FUNCTION admin.refresh_all_business_aggregates() RETURNS TABLE (
     agregado text, filas bigint, ms int, estado text) AS $$
+#variable_conflict use_column
 DECLARE
-    nombres text[] := ARRAY['customer_state', 'usage_cycle', 'tokens_daily',
-                            'pipeline_daily', 'upgrade_requests'];
+    nombres text[] := ARRAY['customer_state', 'monthly_business', 'usage_cycle',
+                            'tokens_daily', 'pipeline_daily', 'upgrade_requests'];
     nm text;
     t0 timestamptz;
     n  bigint;
@@ -455,7 +585,7 @@ BEGIN
                SET refreshed_at = now(), rows_total = n, status = 'ok',
                    error = NULL,
                    duration_ms = extract(milliseconds FROM clock_timestamp() - t0)::int
-             WHERE agregado = nm;
+             WHERE admin.aggregate_state.agregado = nm;
             RETURN QUERY SELECT nm, n,
                 extract(milliseconds FROM clock_timestamp() - t0)::int, 'ok';
         EXCEPTION WHEN OTHERS THEN
@@ -465,20 +595,30 @@ BEGIN
             UPDATE admin.aggregate_state
                SET status = 'fallido', error = SQLERRM,
                    duration_ms = extract(milliseconds FROM clock_timestamp() - t0)::int
-             WHERE agregado = nm;
+             WHERE admin.aggregate_state.agregado = nm;
             RETURN QUERY SELECT nm, 0::bigint,
                 extract(milliseconds FROM clock_timestamp() - t0)::int,
                 'fallido';
         END;
     END LOOP;
-END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, pg_temp;
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, public, pg_temp;
+
+ALTER FUNCTION admin.refresh_all_business_aggregates() OWNER TO kallicode_admin_agg;
+
+-- Orquestador retrocompatible: invoca admin.refresh_all_business_aggregates()
+CREATE OR REPLACE FUNCTION admin.refresh_all() RETURNS TABLE (
+    agregado text, filas bigint, ms int, estado text) AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM admin.refresh_all_business_aggregates();
+END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, public, pg_temp;
 
 ALTER FUNCTION admin.refresh_all() OWNER TO kallicode_admin_agg;
 
-GRANT EXECUTE ON FUNCTION admin.refresh_all() TO kallicode_admin_app;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA admin FROM PUBLIC, kallicode_admin_ro;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA admin TO kallicode_admin_app;
 GRANT EXECUTE ON FUNCTION admin.validate_read_role() TO kallicode_admin_ro;
+GRANT EXECUTE ON FUNCTION admin.refresh_all_business_aggregates() TO kallicode_admin_app, kallicode_admin_agg;
+GRANT EXECUTE ON FUNCTION admin.refresh_all() TO kallicode_admin_app, kallicode_admin_agg;
 
 -- -----------------------------------------------------------------------------
 -- Semilla provisional: pendiente de ratificación del Product Owner
@@ -496,7 +636,7 @@ INSERT INTO admin.token_rates (tier, modelo, precio_in, precio_out) VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO admin.aggregate_state (agregado) VALUES
-    ('customer_state'), ('usage_cycle'), ('tokens_daily'),
+    ('customer_state'), ('monthly_business'), ('usage_cycle'), ('tokens_daily'),
     ('pipeline_daily'), ('upgrade_requests')
 ON CONFLICT DO NOTHING;
 
