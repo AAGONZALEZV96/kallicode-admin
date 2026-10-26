@@ -20,6 +20,10 @@ _ERRORES_ADMIN = {
         "http": 401,
         "descripcion": "Correo o contraseña incorrectos.",
     },
+    "TOKEN_INVALIDO": {
+        "http": 401,
+        "descripcion": "Token de acceso de personal inválido o no reconocido.",
+    },
     "MFA_REQUERIDO": {"http": 403, "descripcion": "Verificación de segundo factor requerida."},
     "MFA_INVALIDO": {"http": 401, "descripcion": "El código de verificación no es correcto."},
     "MFA_NO_INSCRITO": {
@@ -70,10 +74,18 @@ __all__ = [
     "sla_sin_definicion",
     "staff_desactivado",
     "telemetria_no_disponible",
+    "token_invalido",
 ]
 
 
 # --------------------------------------------------------------- identidad
+def token_invalido(
+    msj: str = "Token de acceso de personal inválido.",
+) -> AppError:
+    """401 · token de acceso ausente, alterado, caducado o con claims incorrectos."""
+    return AppError("TOKEN_INVALIDO", 401, msj)
+
+
 def credenciales_invalidas(
     msj: str = "Correo o contraseña incorrectos.",
 ) -> AppError:

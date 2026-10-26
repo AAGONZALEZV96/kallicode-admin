@@ -380,6 +380,8 @@ __all__ = [
     "Staff",
     "StaffDep",
     "cerrar_redis",
+    "db_admin",
+    "db_lectura",
     "exigir",
     "exigir_concesion",
     "exigir_permiso",

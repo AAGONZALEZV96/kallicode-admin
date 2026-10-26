@@ -39,6 +39,7 @@ from kallicode_core.logging import (
     limpiar_contexto,
     log,
 )
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import db as dbmod
 from .deps import cerrar_redis
@@ -107,10 +108,42 @@ async def contexto_y_cabeceras(
     inicio = time.perf_counter()
     try:
         resp = await call_next(request)
-    finally:
+    except Exception as exc:
         latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-        log.info("http", metodo=request.method, ruta=request.url.path, latencia_ms=latencia_ms)
+        log.error(
+            "admin.error_no_controlado",
+            metodo=request.method,
+            ruta=request.url.path,
+            latencia_ms=latencia_ms,
+            excepcion=type(exc).__name__,
+        )
         limpiar_contexto()
+        return JSONResponse(
+            status_code=500,
+            content=_sobre(
+                "ERROR_INTERNO",
+                "Se ha producido un error interno. Contacta con la plataforma indicando "
+                "el identificador de traza.",
+                trace_id,
+            ),
+            headers={
+                "X-Trace-Id": trace_id,
+                "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "DENY",
+                "Referrer-Policy": "no-referrer",
+                "Content-Security-Policy": (
+                    "default-src 'self'; img-src 'self' data:; style-src 'self'; "
+                    "script-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+                ),
+                "Cache-Control": "no-store",
+            },
+        )
+    finally:
+        limpiar_contexto()
+
+    latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+    log.info("http", metodo=request.method, ruta=request.url.path, latencia_ms=latencia_ms)
 
     resp.headers["X-Trace-Id"] = trace_id
     resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -128,12 +161,13 @@ async def contexto_y_cabeceras(
 def _sobre(
     codigo: str, mensaje: str, trace_id: str, detalle: dict[str, object] | None = None
 ) -> dict[str, object]:
-    """Sobre de error idéntico al de /api/v1 (§3.6)."""
+    """Sobre de error idéntico al de /api/v1 (§3.6) y ErrorStandard."""
     return {
         "error": {
             "codigo": codigo,
             "code": codigo.lower(),
             "mensaje": mensaje,
+            "message": mensaje,
             "detalle": detalle,
             "trace_id": trace_id,
             "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -144,17 +178,42 @@ def _sobre(
 # ------------------------------------------------------- manejadores de error
 @app.exception_handler(AppError)
 async def _app_error(request: Request, exc: AppError) -> JSONResponse:
-    trace_id = getattr(request.state, "trace_id", "")
+    trace_id = getattr(request.state, "trace_id", "") or f"tr_{uuid.uuid4().hex[:24]}"
     nivel = log.warning if exc.http < 500 else log.error
     nivel("admin.error", codigo=exc.codigo, http=exc.http, ruta=request.url.path)
     return JSONResponse(
-        status_code=exc.http, content=_sobre(exc.codigo, exc.mensaje, trace_id, exc.detalle)
+        status_code=exc.http,
+        content=_sobre(exc.codigo, exc.mensaje, trace_id, exc.detalle),
+        headers={"X-Trace-Id": trace_id},
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    trace_id = getattr(request.state, "trace_id", "") or f"tr_{uuid.uuid4().hex[:24]}"
+    codigo_map = {
+        400: "PETICION_INVALIDA",
+        401: "TOKEN_INVALIDO",
+        403: "ROL_STAFF_INSUFICIENTE",
+        404: "RECURSO_NO_ENCONTRADO",
+        405: "METODO_NO_PERMITIDO",
+        413: "CUERPO_DEMASIADO_GRANDE",
+        429: "RATE_LIMIT_EXCEDIDO",
+    }
+    codigo = codigo_map.get(exc.status_code, "ERROR_HTTP")
+    mensaje = exc.detail if isinstance(exc.detail, str) else "Error en la petición HTTP."
+    headers = dict(exc.headers or {})
+    headers["X-Trace-Id"] = trace_id
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=_sobre(codigo, mensaje, trace_id),
+        headers=headers,
     )
 
 
 @app.exception_handler(RequestValidationError)
 async def _validacion(request: Request, exc: RequestValidationError) -> JSONResponse:
-    trace_id = getattr(request.state, "trace_id", "")
+    trace_id = getattr(request.state, "trace_id", "") or f"tr_{uuid.uuid4().hex[:24]}"
     campos = [
         {"campo": ".".join(str(p) for p in e["loc"][1:]), "error": e["msg"]}
         for e in exc.errors()
@@ -167,13 +226,14 @@ async def _validacion(request: Request, exc: RequestValidationError) -> JSONResp
             trace_id,
             {"campos": campos},
         ),
+        headers={"X-Trace-Id": trace_id},
     )
 
 
 @app.exception_handler(Exception)
 async def _no_controlado(request: Request, exc: Exception) -> JSONResponse:
     """Los 5xx no exponen ni el nombre de la excepción (§3.6, defecto BE-F39)."""
-    trace_id = getattr(request.state, "trace_id", "")
+    trace_id = getattr(request.state, "trace_id", "") or f"tr_{uuid.uuid4().hex[:24]}"
     log.error("admin.error_no_controlado", ruta=request.url.path, excepcion=type(exc).__name__)
     return JSONResponse(
         status_code=500,
@@ -183,6 +243,7 @@ async def _no_controlado(request: Request, exc: Exception) -> JSONResponse:
             "el identificador de traza.",
             trace_id,
         ),
+        headers={"X-Trace-Id": trace_id},
     )
 
 
