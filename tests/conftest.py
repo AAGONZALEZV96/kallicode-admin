@@ -138,6 +138,11 @@ def esquema(dsn: str) -> str:
         VALUES ('st_prueba', 'st_prueba@kallicode.com', 'Empleado Prueba',
                 'staff_admin', 'active', 'hash', 'totp', now())
         ON CONFLICT (id) DO NOTHING;
+        INSERT INTO core.organizations
+            (id, nombre, idioma, timezone, despliegue, fabrica_activa)
+        VALUES ('org_acme', 'Acme Logística S.L.', 'es', 'Europe/Madrid', 'cloud', true),
+               ('org_globex', 'Globex Industrial S.A.', 'es', 'Europe/Madrid', 'cloud', true)
+        ON CONFLICT (id) DO NOTHING;
     """,
     )
     return dsn
@@ -203,33 +208,43 @@ async def db_ro(entorno: None) -> AsyncIterator[Any]:
 
 # ============================================================ datos de prueba
 @pytest_asyncio.fixture
-async def dos_clientes(db: Any) -> list[str]:
+async def dos_clientes(dsn: str, esquema: str) -> list[str]:
     """Dos organizaciones con plan y consumo, para probar la no-fuga entre ellas."""
     from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.pool import NullPool
 
-    for tid, nombre in (
-        (TENANT_A, "Acme Logística S.L."),
-        (TENANT_B, "Globex Industrial S.A."),
-    ):
-        await db.execute(
-            text("""
-            INSERT INTO core.organizations (id, nombre, idioma, timezone,
-                                            despliegue, fabrica_activa)
-            VALUES (:i, :n, 'es', 'Europe/Madrid', 'cloud', true)
-            ON CONFLICT (id) DO NOTHING
-        """),
-            {"i": tid, "n": nombre},
-        )
-        await db.execute(
-            text("""
-            INSERT INTO core.subscriptions (id, tenant_id, plan_codigo, estado,
-                                            inicia_el, renueva_el)
-            VALUES (:s, :i, 'growth', 'activa', current_date - 90,
-                    current_date + 30)
-            ON CONFLICT DO NOTHING
-        """),
-            {"s": f"sub_{tid}", "i": tid},
-        )
+    engine = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    async with AsyncSession(engine) as session:
+        for tid, nombre in (
+            (TENANT_A, "Acme Logística S.L."),
+            (TENANT_B, "Globex Industrial S.A."),
+        ):
+            await session.execute(
+                text("""
+                INSERT INTO core.organizations (id, nombre, idioma, timezone,
+                                                despliegue, fabrica_activa)
+                VALUES (:i, :n, 'es', 'Europe/Madrid', 'cloud', true)
+                ON CONFLICT (id) DO NOTHING
+            """),
+                {"i": tid, "n": nombre},
+            )
+            await session.execute(
+                text("""
+                INSERT INTO core.subscriptions (id, tenant_id, plan_codigo, estado,
+                                                inicia_el, renueva_el)
+                VALUES (:s, :i, 'growth', 'activa', current_date - 90,
+                        current_date + 30)
+                ON CONFLICT DO NOTHING
+            """),
+                {"s": f"sub_{tid}", "i": tid},
+            )
+        await session.execute(text("SELECT admin.refresh_all_business_aggregates();"))
+        await session.commit()
+    await engine.dispose()
     return [TENANT_A, TENANT_B]
 
 

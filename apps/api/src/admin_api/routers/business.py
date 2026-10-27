@@ -314,11 +314,12 @@ async def customers(
     )
     where = """
         WHERE c.eliminado_en IS NULL
-          AND (:plan IS NULL OR c.plan_codigo = :plan)
-          AND (:est IS NULL OR c.suscripcion_estado = :est)
-          AND (:q IS NULL
-               OR c.tenant_id ILIKE '%' || :q || '%'
-               OR (:por_nombre AND c.razon_social ILIKE '%' || :q || '%'))
+          AND (CAST(:plan AS text) IS NULL OR c.plan_codigo = :plan)
+          AND (CAST(:est AS text) IS NULL OR c.suscripcion_estado = :est)
+          AND (CAST(:q AS text) IS NULL
+               OR c.tenant_id ILIKE '%' || CAST(:q AS text) || '%'
+               OR (CAST(:por_nombre AS boolean)
+                   AND c.razon_social ILIKE '%' || CAST(:q AS text) || '%'))
     """
     params = {
         "plan": plan,

@@ -276,6 +276,8 @@ async def actualizar(
         raise validacion("Indica al menos el rol o el estado.")
     if cuerpo.rol is not None and cuerpo.rol not in STAFF_ROLES:
         raise validacion("Rol de staff desconocido.", {"rol": cuerpo.rol})
+    if cuerpo.estado == "disabled":
+        cuerpo.estado = "deactivated"
     if cuerpo.estado is not None and cuerpo.estado not in ("active", "deactivated"):
         raise validacion("Estado no admitido.", {"estado": cuerpo.estado})
     if staff_id == st.id:

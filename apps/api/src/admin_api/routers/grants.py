@@ -58,6 +58,7 @@ class CrearIn(_Base):
     motivo: str = Field(min_length=20, max_length=500)
     duracion_min: int | None = Field(default=None, ge=15, le=480)
     referencia: str | None = Field(default=None, max_length=64)
+    recurso: str | None = Field(default=None, max_length=64)
 
 
 class CrearOut(_Base):
@@ -82,6 +83,8 @@ class RevocarOut(_Base):
 def _validar_motivo(motivo: str, alcance: str, referencia: str | None) -> None:
     """Rechaza motivos que no describen un caso concreto."""
     limpio = motivo.strip()
+    if len(limpio) < 20:
+        raise motivo_insuficiente("el motivo debe contener al menos 20 caracteres")
     if _PATRONES_VACIOS.match(limpio):
         raise motivo_insuficiente(
             "el motivo es genérico: describe el caso, la incidencia o la "
@@ -113,11 +116,18 @@ async def crear(cuerpo: CrearIn, st: Annotated[Staff, Depends(exigir(*SOPORTE))]
         raise validacion(
             "Alcance desconocido.", {"alcance": cuerpo.alcance, "permitidos": list(JERARQUIA)}
         )
-    _validar_motivo(cuerpo.motivo, cuerpo.alcance, cuerpo.referencia)
+    ref_efectiva = cuerpo.recurso or cuerpo.referencia
+    if not ref_efectiva and cuerpo.alcance == "contenido_codigo":
+        m = _TIENE_REFERENCIA.search(cuerpo.motivo)
+        if m:
+            ref_efectiva = m.group(0)
+    _validar_motivo(cuerpo.motivo, cuerpo.alcance, ref_efectiva)
 
     minutos = cuerpo.duracion_min or s.grant_default_minutes
     if cuerpo.alcance == "contenido_codigo":
         minutos = min(minutos, s.grant_code_max_minutes)
+    elif cuerpo.alcance in ("datos_negocio", "expediente"):
+        minutos = min(minutos, 240)
 
     async with read_session() as db_ro:
         org = await uno(
@@ -167,7 +177,7 @@ async def crear(cuerpo: CrearIn, st: Annotated[Staff, Depends(exigir(*SOPORTE))]
                 "t": cuerpo.tenant_id,
                 "sc": cuerpo.alcance,
                 "rz": cuerpo.motivo,
-                "rf": cuerpo.referencia,
+                "rf": ref_efectiva,
                 "m": minutos,
             },
         )
@@ -187,7 +197,11 @@ async def crear(cuerpo: CrearIn, st: Annotated[Staff, Depends(exigir(*SOPORTE))]
             ip=st.ip,
             user_agent=st.user_agent,
             request_id=st.request_id,
-            payload={"duracion_min": minutos, "referencia": cuerpo.referencia},
+            payload={
+                "duracion_min": minutos,
+                "referencia": ref_efectiva,
+                "recurso": ref_efectiva,
+            },
         )
 
     log.info(
@@ -355,7 +369,7 @@ async def revocar(
 
         # Idempotente: revocar una ya revocada o caducada no es un error.
         if g["revoked_at"] is not None:
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
+            return RevocarOut(grant_id=g["id"], revocada_en=g["revoked_at"])
 
         fila = await uno(
             db,

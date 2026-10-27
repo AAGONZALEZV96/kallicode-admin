@@ -45,16 +45,18 @@ Accion = Literal[
 ]
 
 # Acciones que exigen tenant afectado: son las que tocan datos de un cliente.
-_EXIGEN_TENANT: frozenset[str] = frozenset({
-    "grant_created",
-    "grant_revoked",
-    "read",
-    "reveal",
-    "grant_creado",
-    "grant_revocado",
-    "lectura",
-    "revelacion",
-})
+_EXIGEN_TENANT: frozenset[str] = frozenset(
+    {
+        "grant_created",
+        "grant_revoked",
+        "read",
+        "reveal",
+        "grant_creado",
+        "grant_revocado",
+        "lectura",
+        "revelacion",
+    }
+)
 
 
 class ResultadoIntegridadCadena(dict[str, Any]):

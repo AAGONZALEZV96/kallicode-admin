@@ -285,7 +285,8 @@ async def test_una_concesion_vencida_no_revela_nada(
 
     await db.execute(
         text("""
-        UPDATE admin.access_grants SET expires_at = now() - interval '1 minute'
+        UPDATE admin.access_grants
+        SET granted_at = now() - interval '2 minutes', expires_at = now() - interval '1 minute'
         WHERE id = :g
     """),
         {"g": grant_id},
@@ -379,7 +380,9 @@ async def test_el_esquema_impide_dos_concesiones_activas_iguales(
     await db.rollback()
 
 
-async def test_hay_techo_de_concesiones_simultaneas(cliente: Any, db: Any, sesion: Any) -> None:
+async def test_hay_techo_de_concesiones_simultaneas(
+    cliente: Any, db: Any, sesion: Any, dsn: str
+) -> None:
     """Un empleado no puede tener abiertas más de tres a la vez.
 
     El techo convierte el acceso en algo puntual. Sin él, acumular concesiones
@@ -387,20 +390,28 @@ async def test_hay_techo_de_concesiones_simultaneas(cliente: Any, db: Any, sesio
     con acceso a todo, construido en pequeños pasos justificados.
     """
     from sqlalchemy import text as t
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.pool import NullPool
 
     cab = sesion["cabeceras"]
-    for i in range(4):
-        tid = f"org_lote_{i}"
-        await db.execute(
-            t("""
-            INSERT INTO core.organizations (id, nombre, idioma, timezone,
-                                            despliegue, fabrica_activa)
-            VALUES (:i, :n, 'es', 'Europe/Madrid', 'cloud', true)
-            ON CONFLICT (id) DO NOTHING
-        """),
-            {"i": tid, "n": f"Cliente Lote {i} S.L."},
-        )
-    await db.commit()
+    engine = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    async with AsyncSession(engine) as session:
+        for i in range(4):
+            tid = f"org_lote_{i}"
+            await session.execute(
+                t("""
+                INSERT INTO core.organizations (id, nombre, idioma, timezone,
+                                                despliegue, fabrica_activa)
+                VALUES (:i, :n, 'es', 'Europe/Madrid', 'cloud', true)
+                ON CONFLICT (id) DO NOTHING
+            """),
+                {"i": tid, "n": f"Cliente Lote {i} S.L."},
+            )
+        await session.commit()
+    await engine.dispose()
 
     codigos = []
     for i in range(4):

@@ -307,32 +307,68 @@ async def test_verificar_cadena_detecta_manipulacion(dsn: str, esquema: str) -> 
         res_antes = await verificar_cadena_staff_actions(session)
         assert res_antes.integra is True
 
-        # Simular manipulación: deshabilitar trigger, cambiar sello, rehabilitar trigger
-        await session.execute(
-            text("ALTER TABLE admin.staff_actions DISABLE TRIGGER trg_staff_actions_immutable;")
-        )
-        await session.execute(
-            text("""
-            UPDATE admin.staff_actions
-            SET seal = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
-            WHERE id = (SELECT max(id) FROM admin.staff_actions);
-        """)
-        )
-        await session.execute(
-            text("ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable;")
-        )
-        await session.commit()
+        try:
+            # Simular manipulación: deshabilitar trigger, cambiar sello, rehabilitar trigger
+            await session.execute(
+                text(
+                    "ALTER TABLE admin.staff_actions "
+                    "DISABLE TRIGGER trg_staff_actions_immutable;"
+                )
+            )
+            await session.execute(
+                text("""
+                UPDATE admin.staff_actions
+                SET seal = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+                WHERE id = (SELECT max(id) FROM admin.staff_actions);
+            """)
+            )
+            await session.execute(
+                text(
+                    "ALTER TABLE admin.staff_actions "
+                    "ENABLE TRIGGER trg_staff_actions_immutable;"
+                )
+            )
+            await session.commit()
 
-        # La verificación debe detectar la rotura
-        res_despues = await verificar_cadena_staff_actions(session)
-        assert res_despues.integra is False
-        assert res_despues["integra"] is False
-        assert len(res_despues.roturas) > 0
-        assert res_despues.total_roturas > 0
-        assert any(
-            "sello no reproducible" in r["motivo"] or "encadenamiento roto" in r["motivo"]
-            for r in res_despues.roturas
-        )
+            # La verificación debe detectar la rotura
+            res_despues = await verificar_cadena_staff_actions(session)
+            assert res_despues.integra is False
+            assert res_despues["integra"] is False
+            assert len(res_despues.roturas) > 0
+            assert res_despues.total_roturas > 0
+            assert any(
+                "sello no reproducible" in r["motivo"] or "encadenamiento roto" in r["motivo"]
+                for r in res_despues.roturas
+            )
+        finally:
+            # Limpiar filas manipuladas para no contaminar tests posteriores
+            await session.execute(
+                text(
+                    "ALTER TABLE admin.staff_actions "
+                    "DISABLE TRIGGER trg_staff_actions_immutable;"
+                )
+            )
+            await session.execute(
+                text("DELETE FROM admin.staff_actions WHERE staff_id = 'st_tamper_test';")
+            )
+            await session.execute(
+                text(
+                    "ALTER TABLE admin.staff_actions "
+                    "ENABLE TRIGGER trg_staff_actions_immutable;"
+                )
+            )
+            await session.execute(
+                text("""
+                UPDATE admin.staff_action_head
+                SET last_seal = coalesce(
+                    (SELECT seal FROM admin.staff_actions ORDER BY id DESC LIMIT 1),
+                    '0000000000000000000000000000000000000000000000000000000000000000'
+                ),
+                events = (SELECT count(*) FROM admin.staff_actions)
+                WHERE lock_id = 1;
+            """)
+            )
+            await session.commit()
 
     await engine.dispose()
 
