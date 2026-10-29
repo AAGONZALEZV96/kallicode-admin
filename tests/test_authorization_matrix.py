@@ -29,6 +29,7 @@ import pytest
 
 ROLES = ("staff_soporte", "staff_operaciones", "staff_negocio", "staff_admin")
 TODOS = ROLES
+CLIENTES = ("staff_soporte", "staff_negocio", "staff_admin")
 NEGOCIO = ("staff_negocio", "staff_admin")
 OPS = ("staff_operaciones", "staff_admin")
 OPS_NEGOCIO = ("staff_operaciones", "staff_negocio", "staff_admin")
@@ -90,8 +91,8 @@ MATRIZ: list[tuple[str, str, tuple[str, ...], dict[str, Any] | None]] = [
     ("DELETE", "/admin/v1/access-grants/gr_x", TODOS, None),
     # ------------------------------------------------ §18.16 – §18.23 negocio
     ("GET", "/admin/v1/business/overview", NEGOCIO, None),
-    ("GET", "/admin/v1/business/customers", TODOS, None),
-    ("GET", "/admin/v1/business/customers/org_acme", TODOS, None),
+    ("GET", "/admin/v1/business/customers", CLIENTES, None),
+    ("GET", "/admin/v1/business/customers/org_acme", CLIENTES, None),
     ("GET", "/admin/v1/business/subscriptions", NEGOCIO, None),
     ("GET", "/admin/v1/business/upgrade-requests", NEGOCIO, None),
     ("GET", "/admin/v1/business/usage/tokens", NEGOCIO, None),
@@ -129,6 +130,43 @@ async def _pedir(cliente: Any, metodo: str, ruta: str, cuerpo: dict[str, Any] | 
 
 
 # ==================================================================== negativa
+COMBINACIONES_NEGATIVAS: list[tuple[str, str, str, dict[str, Any] | None]] = [
+    (metodo, ruta, rol, cuerpo)
+    for metodo, ruta, permitidos, cuerpo in MATRIZ
+    for rol in ROLES
+    if rol not in permitidos
+]
+
+
+@pytest.mark.parametrize(
+    ("metodo", "ruta", "rol", "cuerpo"),
+    COMBINACIONES_NEGATIVAS,
+    ids=[f"{m} {r} - {rol}" for m, r, rol, _ in COMBINACIONES_NEGATIVAS],
+)
+async def test_matriz_autorizacion_negativa_por_rol(
+    cliente: Any,
+    como: Any,
+    sin_limite: None,
+    metodo: str,
+    ruta: str,
+    rol: str,
+    cuerpo: dict[str, Any] | None,
+) -> None:
+    """Ninguna combinación de rol no autorizado puede acceder a endpoints protegidos."""
+    como(rol)
+    r = await _pedir(cliente, metodo, ruta, cuerpo)
+    assert r.status_code == 403, (
+        f"{metodo} {ruta} devolvió {r.status_code} al rol {rol}, "
+        f"que no está autorizado: {r.text[:300]}"
+    )
+    cuerpo_err = r.json()
+    assert cuerpo_err["error"]["codigo"] == "ROL_STAFF_INSUFICIENTE", cuerpo_err
+    assert cuerpo_err["error"]["code"] == "rol_staff_insuficiente", cuerpo_err
+    # El mensaje no debe enumerar los roles que sí pueden: eso es un mapa de
+    # la organización que el empleado no necesita.
+    assert "staff_admin" not in r.text, "el error revela qué roles tienen acceso"
+
+
 @pytest.mark.parametrize(
     ("metodo", "ruta", "permitidos", "cuerpo"),
     MATRIZ,
@@ -154,6 +192,7 @@ async def test_rol_no_autorizado_recibe_403(
             f"que no está autorizado: {r.text[:300]}"
         )
         cuerpo_err = r.json()
+        assert cuerpo_err["error"]["codigo"] == "ROL_STAFF_INSUFICIENTE", cuerpo_err
         assert cuerpo_err["error"]["code"] == "rol_staff_insuficiente", cuerpo_err
         # El mensaje no debe enumerar los roles que sí pueden: eso es un mapa de
         # la organización que el empleado no necesita.
@@ -253,12 +292,328 @@ def test_matriz_no_declara_endpoints_inexistentes(app: Any) -> None:
         assert existe, f"MATRIZ declara {ruta}, que no está publicado"
 
 
+def _dependencias_recursivas(dependant: Any) -> set[Any]:
+    """Obtiene el conjunto recursivo de funciones dependientes de una ruta."""
+    funcs: set[Any] = set()
+    if getattr(dependant, "call", None):
+        funcs.add(dependant.call)
+    for sub in getattr(dependant, "dependencies", []):
+        funcs |= _dependencias_recursivas(sub)
+    return funcs
+
+
+def test_todos_los_endpoints_protegidos_tienen_guardas_rbac(app: Any) -> None:
+    """Verifica que ningún endpoint protegido se publique sin pasar por staff_actual / RBAC.
+
+    Si alguien añade un endpoint a FastAPI olvidando asignarle una dependencia
+    de staff_actual o exigir_rol, este test falla de inmediato.
+    """
+    from admin_api.deps import staff_actual
+
+    vulnerables: list[str] = []
+    for ruta in app.routes:
+        camino = getattr(ruta, "path", "")
+        if not camino.startswith("/admin/v1") or camino in (
+            "/admin/v1/docs",
+            "/admin/v1/openapi.json",
+        ):
+            continue
+        metodos = getattr(ruta, "methods", set()) - {"HEAD", "OPTIONS"}
+        for m in metodos:
+            # Endpoints declarados públicos
+            es_publico = any(
+                m == pm
+                and (
+                    camino == pr
+                    or (
+                        len(camino.strip("/").split("/")) == len(pr.strip("/").split("/"))
+                        and all(
+                            c.startswith("{") or c == p
+                            for c, p in zip(
+                                camino.strip("/").split("/"),
+                                pr.strip("/").split("/"),
+                                strict=True,
+                            )
+                        )
+                    )
+                )
+                for pm, pr in PUBLICOS
+            )
+            if es_publico:
+                continue
+
+            dependant = getattr(ruta, "dependant", None)
+            if dependant is None or staff_actual not in _dependencias_recursivas(dependant):
+                vulnerables.append(f"{m} {camino}")
+
+    assert not vulnerables, (
+        f"Se encontraron endpoints sin guarda de staff_actual / RBAC: {vulnerables}"
+    )
+
+
+def test_validador_de_guardas_falla_si_se_agrega_endpoint_desprotegido() -> None:
+    """Comprueba que si se montara un endpoint sin guarda RBAC, la validación falla."""
+    from admin_api.deps import staff_actual
+    from fastapi import FastAPI
+
+    app_falsa = FastAPI()
+
+    @app_falsa.get("/admin/v1/test-inseguro")
+    async def ruta_insegura() -> dict[str, bool]:
+        return {"ok": True}
+
+    ruta_obj = next(
+        r for r in app_falsa.routes if getattr(r, "path", "") == "/admin/v1/test-inseguro"
+    )
+    dependant = getattr(ruta_obj, "dependant", None)
+    assert dependant is not None
+    assert staff_actual not in _dependencias_recursivas(dependant)
+
+
 # ================================================== sesión, segundo factor, estado
-async def test_sin_credencial_es_401_no_403(cliente: Any) -> None:
+@pytest.mark.parametrize(
+    "ruta_protegida",
+    [
+        "/admin/v1/staff/me",
+        "/admin/v1/staff",
+        "/admin/v1/business/overview",
+        "/admin/v1/business/customers",
+        "/admin/v1/ops/agents",
+        "/admin/v1/access-grants",
+    ],
+)
+async def test_sin_credencial_es_401_no_403(cliente: Any, ruta_protegida: str) -> None:
     """Sin cabecera de autorización la respuesta es 401, y sin pistas de rol."""
-    r = await cliente.get("/admin/v1/staff/me")
+    r = await cliente.get(ruta_protegida)
     assert r.status_code == 401
-    assert r.json()["error"]["code"] in ("no_autenticado", "token_invalido")
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
+    assert cuerpo["error"]["code"] in ("no_autenticado", "token_invalido")
+
+
+async def test_token_expirado_es_401(cliente: Any) -> None:
+    """Un token con exp en el pasado es rechazado con 401."""
+    import jwt
+    from admin_api.security import _claves
+    from admin_api.settings import get_admin_settings
+
+    s = get_admin_settings()
+    priv, _ = _claves()
+    pasado = datetime.now(UTC) - timedelta(hours=2)
+    token_expirado = jwt.encode(
+        {
+            "sub": "st_testexp",
+            "rol": "staff_admin",
+            "typ": "staff",
+            "mfa": int(pasado.timestamp()),
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "jti": "jti_expirado",
+            "iat": int(pasado.timestamp()),
+            "exp": int((pasado + timedelta(minutes=5)).timestamp()),
+        },
+        priv,
+        algorithm="RS256",
+    )
+    r = await cliente.get(
+        "/admin/v1/staff/me", headers={"authorization": f"Bearer {token_expirado}"}
+    )
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
+
+
+async def test_token_firma_alterada_es_401(cliente: Any, staff_factory: Any) -> None:
+    """Un token con la firma alterada es rechazado con 401."""
+    from admin_api.security import emitir_tokens_staff
+
+    empleado = await staff_factory("staff_soporte")
+    token = emitir_tokens_staff(empleado["id"], "staff_soporte", datetime.now(UTC))
+    token_alterado = token[:-8] + "ABCDEFGH"
+    r = await cliente.get(
+        "/admin/v1/staff/me", headers={"authorization": f"Bearer {token_alterado}"}
+    )
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
+
+
+async def test_token_firmado_con_otra_clave_es_401(cliente: Any) -> None:
+    """Un token firmado con un par de claves no reconocido es rechazado con 401."""
+    import jwt
+    from admin_api.settings import get_admin_settings
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    s = get_admin_settings()
+    clave_ajena = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem_ajena = clave_ajena.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
+
+    ahora = datetime.now(UTC)
+    token_ajeno = jwt.encode(
+        {
+            "sub": "st_hacker",
+            "rol": "staff_admin",
+            "typ": "staff",
+            "mfa": int(ahora.timestamp()),
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "jti": "jti_hacker",
+            "iat": int(ahora.timestamp()),
+            "exp": int((ahora + timedelta(minutes=15)).timestamp()),
+        },
+        pem_ajena,
+        algorithm="RS256",
+    )
+    r = await cliente.get(
+        "/admin/v1/staff/me", headers={"authorization": f"Bearer {token_ajeno}"}
+    )
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
+
+
+@pytest.mark.parametrize(
+    "token_basura",
+    [
+        "esto-no-es-un-jwt",
+        "abc.def.ghi",
+        "eyJh.eyJ.sig",
+    ],
+)
+async def test_token_malformado_es_401(cliente: Any, token_basura: str) -> None:
+    """Cabeceras con tokens malformados retornan 401."""
+    r = await cliente.get(
+        "/admin/v1/staff/me", headers={"authorization": f"Bearer {token_basura}"}
+    )
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
+
+
+async def test_token_sin_claim_mfa_es_401(cliente: Any) -> None:
+    """Un token sin el claim obligatorio 'mfa' es rechazado con 401."""
+    import jwt
+    from admin_api.security import _claves
+    from admin_api.settings import get_admin_settings
+
+    s = get_admin_settings()
+    priv, _ = _claves()
+    ahora = datetime.now(UTC)
+    token_sin_mfa = jwt.encode(
+        {
+            "sub": "st_sinmfa",
+            "rol": "staff_admin",
+            "typ": "staff",
+            # 'mfa' omitido
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "jti": "jti_sin_mfa",
+            "iat": int(ahora.timestamp()),
+            "exp": int((ahora + timedelta(minutes=15)).timestamp()),
+        },
+        priv,
+        algorithm="RS256",
+    )
+    r = await cliente.get(
+        "/admin/v1/staff/me", headers={"authorization": f"Bearer {token_sin_mfa}"}
+    )
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
+
+
+async def test_token_con_claim_mfa_invalido_es_401(cliente: Any) -> None:
+    """Un token con el claim 'mfa' no numérico es rechazado con 401."""
+    import jwt
+    from admin_api.security import _claves
+    from admin_api.settings import get_admin_settings
+
+    s = get_admin_settings()
+    priv, _ = _claves()
+    ahora = datetime.now(UTC)
+    token_mfa_malo = jwt.encode(
+        {
+            "sub": "st_mfamalo",
+            "rol": "staff_admin",
+            "typ": "staff",
+            "mfa": "marca_invalida",
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "jti": "jti_mfa_malo",
+            "iat": int(ahora.timestamp()),
+            "exp": int((ahora + timedelta(minutes=15)).timestamp()),
+        },
+        priv,
+        algorithm="RS256",
+    )
+    r = await cliente.get(
+        "/admin/v1/staff/me", headers={"authorization": f"Bearer {token_mfa_malo}"}
+    )
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
+
+
+@pytest.mark.integracion
+async def test_token_revocado_global_staff_es_401(cliente: Any, staff_factory: Any) -> None:
+    """Revocar globalmente la sesión por admin:staff:{sub}:revoked_at invalida tokens."""
+    from admin_api.deps import redis
+    from admin_api.security import emitir_tokens_staff
+
+    empleado = await staff_factory("staff_operaciones")
+    token = emitir_tokens_staff(empleado["id"], "staff_operaciones", datetime.now(UTC))
+    cabeceras = {"authorization": f"Bearer {token}"}
+
+    assert (await cliente.get("/admin/v1/staff/me", headers=cabeceras)).status_code == 200
+
+    # Se simula el corte global en Redis
+    corte = int(datetime.now(UTC).timestamp()) + 10
+    await redis().set(f"admin:staff:{empleado['id']}:revoked_at", corte, ex=60)
+
+    r = await cliente.get("/admin/v1/staff/me", headers=cabeceras)
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
+
+
+async def test_login_credenciales_invalidas_es_401(
+    cliente: Any, sin_limite: None
+) -> None:
+    """Login con contraseña incorrecta devuelve 401 y CREDENCIALES_INVALIDAS."""
+    import uuid
+
+    from admin_api.deps import redis
+
+    email = f"err_{uuid.uuid4().hex[:8]}@kallicode.com"
+    r = await cliente.post(
+        "/admin/v1/auth/login",
+        json={"email": email, "password": "Password-Incorrecto-99"},
+    )
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] == "CREDENCIALES_INVALIDAS"
+    assert cuerpo["error"]["code"] == "credenciales_invalidas"
+
+    # Limpiar cualquier clave residual de login
+    await redis().delete(f"admin:login:{email}:127.0.0.1", f"admin:login:{email}:sin-ip")
+
+
+async def test_mfa_verify_con_codigo_invalido_es_401(
+    cliente: Any, sin_limite: None
+) -> None:
+    """Verificación de segundo factor con token/código incorrecto devuelve 401."""
+    r = await cliente.post(
+        "/admin/v1/auth/mfa/verify",
+        json={"mfa_token": "mfa_token_invalido_123", "codigo": "000000"},
+    )
+    assert r.status_code == 401
+    cuerpo = r.json()
+    assert cuerpo["error"]["codigo"] in ("MFA_INVALIDO", "TOKEN_INVALIDO", "NO_AUTENTICADO")
 
 
 async def test_token_de_la_api_de_cliente_no_sirve_en_la_consola(cliente: Any) -> None:
@@ -423,3 +778,35 @@ async def test_filtrar_por_otro_empleado_exige_ambito_todas(
     como("staff_soporte")
     r = await cliente.get("/admin/v1/audit/staff-actions", params={"staff_id": "st_otro"})
     assert r.status_code in (400, 403), r.text
+
+
+@pytest.mark.integracion
+async def test_no_admin_no_puede_revocar_concesion_ajena(
+    cliente: Any, db: Any, staff_factory: Any
+) -> None:
+    """Un empleado no-admin no puede revocar la concesión de otro empleado."""
+    from admin_api.security import emitir_tokens_staff
+    from kallicode_core.ids import nuevo
+    from sqlalchemy import text
+
+    admin_emp = await staff_factory("staff_admin")
+    soporte_emp = await staff_factory("staff_soporte")
+
+    gid = nuevo("gr")
+    await db.execute(
+        text("""
+            INSERT INTO admin.access_grants (id, staff_id, tenant_id, scope, reason, expires_at)
+            VALUES (:id, :sid, 'org_acme', 'expediente',
+                    'Motivo justificado para revision del caso SUP-12345',
+                    now() + interval '1 hour')
+        """),
+        {"id": gid, "sid": admin_emp["id"]},
+    )
+    await db.commit()
+
+    token_soporte = emitir_tokens_staff(soporte_emp["id"], "staff_soporte", datetime.now(UTC))
+    cabeceras = {"authorization": f"Bearer {token_soporte}"}
+
+    # Soporte intenta revocar concesión de admin: denegado por anti-enumeración (404)
+    r = await cliente.delete(f"/admin/v1/access-grants/{gid}", headers=cabeceras)
+    assert r.status_code == 404, r.text

@@ -239,6 +239,7 @@ def exigir_permiso(*permisos: str) -> Callable[[Staff], Coroutine[Any, Any, Staf
 
 
 SOPORTE = ("staff_soporte", "staff_operaciones", "staff_negocio", "staff_admin")
+CLIENTES = ("staff_soporte", "staff_negocio", "staff_admin")
 NEGOCIO = ("staff_negocio", "staff_admin")
 OPS = ("staff_operaciones", "staff_admin")
 OPS_NEGOCIO = ("staff_operaciones", "staff_negocio", "staff_admin")

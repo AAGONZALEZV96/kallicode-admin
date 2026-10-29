@@ -21,6 +21,7 @@
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS admin;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 COMMENT ON SCHEMA admin IS
   'Dominio propio de la consola de administración: personal de KalliCode, '

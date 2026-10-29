@@ -31,7 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..audit import registrar_accion, registrar_lectura
 from ..db import admin_session, read_session, todos, uno
-from ..deps import NEGOCIO, SOPORTE, Staff, exigir, exigir_concesion, limite_rl4
+from ..deps import CLIENTES, NEGOCIO, Staff, exigir, exigir_concesion, limite_rl4
 from ..errors import acceso_no_justificado, agregado_no_disponible
 from ..masking import enmascarar, enmascarar_filas
 from ..pagination import Pagina, paginacion, sobre
@@ -282,7 +282,7 @@ async def overview(
 # ------------------------------------------------------------------ §18.17
 @router.get("/customers", summary="Listar clientes")
 async def customers(
-    st: Annotated[Staff, Depends(exigir(*SOPORTE))],
+    st: Annotated[Staff, Depends(exigir(*CLIENTES))],
     p: Annotated[Pagina, Depends(paginacion)],
     plan: Annotated[str | None, Query()] = None,
     estado: Annotated[
@@ -375,7 +375,7 @@ async def customers(
 # ------------------------------------------------------------------ §18.18
 @router.get("/customers/{tenant_id}", summary="Ficha de cliente")
 async def customer(
-    st: Annotated[Staff, Depends(exigir(*SOPORTE))],
+    st: Annotated[Staff, Depends(exigir(*CLIENTES))],
     tenant_id: Annotated[str, Path(description="Organización a consultar.")],
     incluir: Annotated[
         str | None, Query(description="usuarios, integraciones, historico, grafo.")

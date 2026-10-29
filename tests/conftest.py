@@ -119,6 +119,7 @@ def esquema(dsn: str) -> str:
         DROP SCHEMA IF EXISTS admin, core, vec, audit CASCADE;
         CREATE EXTENSION IF NOT EXISTS vector;
         CREATE EXTENSION IF NOT EXISTS pg_trgm;
+        CREATE EXTENSION IF NOT EXISTS pgcrypto;
     """,
     )
     # Contraseñas de prueba de los roles: las crea el propio script y aquí solo se
