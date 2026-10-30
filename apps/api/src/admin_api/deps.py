@@ -374,9 +374,7 @@ class UsuarioPortal:
     email: str | None = None
 
 
-ROLES_PORTAL_AUDITORIA: frozenset[str] = frozenset(
-    {"owner", "admin", "architect", "approver"}
-)
+ROLES_PORTAL_AUDITORIA: frozenset[str] = frozenset({"owner", "admin", "architect", "approver"})
 
 
 def validar_token_portal(request: Request) -> dict[str, Any]:

@@ -581,9 +581,7 @@ async def test_token_revocado_global_staff_es_401(cliente: Any, staff_factory: A
     assert cuerpo["error"]["codigo"] in ("TOKEN_INVALIDO", "NO_AUTENTICADO")
 
 
-async def test_login_credenciales_invalidas_es_401(
-    cliente: Any, sin_limite: None
-) -> None:
+async def test_login_credenciales_invalidas_es_401(cliente: Any, sin_limite: None) -> None:
     """Login con contraseña incorrecta devuelve 401 y CREDENCIALES_INVALIDAS."""
     import uuid
 
@@ -603,9 +601,7 @@ async def test_login_credenciales_invalidas_es_401(
     await redis().delete(f"admin:login:{email}:127.0.0.1", f"admin:login:{email}:sin-ip")
 
 
-async def test_mfa_verify_con_codigo_invalido_es_401(
-    cliente: Any, sin_limite: None
-) -> None:
+async def test_mfa_verify_con_codigo_invalido_es_401(cliente: Any, sin_limite: None) -> None:
     """Verificación de segundo factor con token/código incorrecto devuelve 401."""
     r = await cliente.post(
         "/admin/v1/auth/mfa/verify",

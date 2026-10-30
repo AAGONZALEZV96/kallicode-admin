@@ -24,52 +24,81 @@ import asyncio
 import csv
 import io
 import signal
+import uuid
 from typing import Any
 
 from admin_api.audit import registrar_accion
 from admin_api.db import admin_session, cerrar, read_session, todos, uno
 from admin_api.servicios.blob import ruta_informe, subir_informe
 from admin_api.settings import get_admin_settings
-from kallicode_core.logging import Cronometro, bind_contexto, configurar_logging, log
+from kallicode_core.logging import bind_contexto, configurar_logging, log
 from sqlalchemy import text
+
+from admin_workers.lider import LOCK_IDS, ejecutar_con_lider
 
 _parar = asyncio.Event()
 
 # Bloqueo de asesoramiento por trabajo: solo la réplica que lo obtiene ejecuta.
-_LOCKS: dict[str, int] = {
-    "refrescar_agregados": 918_401,
-    "generar_informes": 918_402,
-    "caducar_concesiones": 918_403,
-}
+_LOCKS: dict[str, int] = LOCK_IDS
 
 
 async def _con_lider(nombre: str, cuerpo: Any) -> None:
     """Ejecuta el trabajo solo si esta réplica obtiene el bloqueo."""
-    async with admin_session() as db:
-        obtenido = await uno(
-            db, "SELECT pg_try_advisory_xact_lock(:k) AS ok", {"k": _LOCKS[nombre]}
-        )
-        if not obtenido or not obtenido["ok"]:
-            log.debug("admin.worker.sin_liderazgo", trabajo=nombre)
-            return
-        cron = Cronometro()
-        try:
-            await cuerpo(db)
-            log.info("admin.worker.ok", trabajo=nombre, ms=cron.ms())
-        except Exception as exc:
-            log.error(
-                "admin.worker.fallido",
-                trabajo=nombre,
-                excepcion=type(exc).__name__,
-                ms=cron.ms(),
-            )
-            raise
+    await ejecutar_con_lider(nombre, cuerpo)
 
 
 # ------------------------------------------------------------------ agregados
+async def comprobar_frescura_agregados(
+    db: Any | None = None, max_antiguedad_s: int = 21_600
+) -> list[dict[str, Any]]:
+    """Verifica si algún agregado excede el umbral de antigüedad máxima.
+
+    Emite alerta WARN admin.business.frescura_alta por cada agregado obsoleto.
+    """
+    if db is not None:
+        filas = await todos(
+            db,
+            """
+            SELECT agregado, rows_total, duration_ms,
+                   refreshed_at, status, error,
+                   EXTRACT(EPOCH FROM (now() - refreshed_at))::int AS antiguedad_s
+            FROM admin.aggregate_state
+            """,
+        )
+    else:
+        async with read_session() as rdb:
+            filas = await todos(
+                rdb,
+                """
+                SELECT agregado, rows_total, duration_ms,
+                       refreshed_at, status, error,
+                       EXTRACT(EPOCH FROM (now() - refreshed_at))::int AS antiguedad_s
+                FROM admin.aggregate_state
+                """,
+            )
+
+    desactualizados: list[dict[str, Any]] = []
+    for f in filas:
+        antiguedad = f.get("antiguedad_s")
+        if antiguedad is not None and antiguedad > max_antiguedad_s:
+            minutos = antiguedad // 60
+            log.warning(
+                "admin.business.frescura_alta",
+                agregado=f["agregado"],
+                minutos_transcurridos=minutos,
+                antiguedad_s=antiguedad,
+                estado=f["status"],
+            )
+            desactualizados.append(f)
+    return desactualizados
+
+
 async def refrescar_agregados(db: Any) -> None:
     """Recalcula los agregados de negocio y los casos de nivel de servicio."""
-    filas = await todos(db, "SELECT * FROM admin.refresh_all()")
+    bind_contexto(worker="refrescar_agregados", trace_id=f"tr_{uuid.uuid4().hex[:16]}")
+    s = get_admin_settings()
+
+    filas = await todos(db, "SELECT * FROM admin.refresh_all_business_aggregates()")
     for f in filas:
         nivel = log.info if f["estado"] == "ok" else log.error
         nivel(
@@ -87,6 +116,8 @@ async def refrescar_agregados(db: Any) -> None:
 
     n = await uno(db, "SELECT admin.refresh_sla(95, false) AS n")
     log.info("admin.sla.recalculado", casos=int(n["n"]) if n else 0)
+
+    await comprobar_frescura_agregados(max_antiguedad_s=s.aggregate_max_age_s)
 
 
 # ------------------------------------------------------------------- informes

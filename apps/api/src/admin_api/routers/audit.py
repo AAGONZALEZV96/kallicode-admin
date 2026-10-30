@@ -72,9 +72,7 @@ async def listar_accesos_staff_portal(
         str | None, Query(description="Filtra por identificador de caso/incidencia (KC-####)")
     ] = None,
     page: Annotated[int, Query(ge=1, description="Número de página, >= 1")] = 1,
-    page_size: Annotated[
-        int, Query(ge=1, le=100, description="Tamaño de página, 1..100")
-    ] = 25,
+    page_size: Annotated[int, Query(ge=1, le=100, description="Tamaño de página, 1..100")] = 25,
 ) -> dict[str, Any]:
     """Consulta los accesos de staff registrados sobre los datos del cliente autenticado."""
     hoy = datetime.now(UTC).date()
