@@ -445,7 +445,12 @@ export const handlers = [
       filtrados.sort((a, b) => {
         if (campo === "mrr_eur") return (a.mrr_eur - b.mrr_eur) * mult;
         if (campo === "tenant_id") return a.tenant_id.localeCompare(b.tenant_id) * mult;
-        if (campo === "nombre") return a.razon_social.localeCompare(b.razon_social) * mult;
+        if (campo === "nombre" || campo === "razon_social") return a.razon_social.localeCompare(b.razon_social) * mult;
+        if (campo === "plan") return a.plan.localeCompare(b.plan) * mult;
+        if (campo === "estado") return a.estado.localeCompare(b.estado) * mult;
+        if (campo === "consumo") return (a.consumo_ciclo.loc - b.consumo_ciclo.loc) * mult;
+        if (campo === "alta" || campo === "creado_en") return a.alta_el.localeCompare(b.alta_el) * mult;
+        if (campo === "actualizado_en") return a.ultima_actividad.localeCompare(b.ultima_actividad) * mult;
         return 0;
       });
     }
@@ -470,21 +475,30 @@ export const handlers = [
         tickets_abiertos: c.tickets_abiertos,
         ultima_actividad: c.ultima_actividad,
         consumo_ciclo: c.consumo_ciclo,
+        mrr_eur: c.mrr_eur,
         enmascarado: masked,
       };
     });
 
     const pages = pageSize > 0 ? Math.ceil(total / pageSize) : 0;
+    const traceId = request.headers.get("x-trace-id") || "trc_customers_list_001";
 
-    return HttpResponse.json({
-      items,
-      total,
-      page,
-      page_size: pageSize,
-      pages,
-      frescura: "2026-10-30T14:00:00.000Z",
-      alguna_enmascarada: !conConcesion,
-    });
+    return HttpResponse.json(
+      {
+        items,
+        total,
+        page,
+        page_size: pageSize,
+        pages,
+        frescura: "2026-10-30T14:00:00.000Z",
+        alguna_enmascarada: !conConcesion,
+      },
+      {
+        headers: {
+          "x-trace-id": traceId,
+        },
+      }
+    );
   }),
 
   // 4. GET /admin/v1/business/customers/:tenant_id

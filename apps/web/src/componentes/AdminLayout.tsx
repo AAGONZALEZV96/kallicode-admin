@@ -17,6 +17,7 @@ export const AdminLayout: React.FC = () => {
 
   const rol = usuario?.role as RolStaff | undefined;
   const tienePermisoNegocio = rol === "staff_negocio" || rol === "staff_admin";
+  const tienePermisoClientes = rol === "staff_soporte" || rol === "staff_negocio" || rol === "staff_admin";
   const tienePermisoOps = rol === "staff_operaciones" || rol === "staff_admin";
 
   const getBadgeVariant = (r?: RolStaff): "accent" | "warn" | "good" | "neutro" => {
@@ -85,6 +86,30 @@ export const AdminLayout: React.FC = () => {
                 }}
               >
                 Panel Negocio
+              </Link>
+            )}
+
+            {tienePermisoClientes && (
+              <Link
+                to="/business/customers"
+                style={{
+                  fontSize: "0.875rem",
+                  padding: "0.375rem 0.75rem",
+                  borderRadius: "0.375rem",
+                  textDecoration: "none",
+                  color:
+                    isActive("/business/customers") || isActive("/customers")
+                      ? "var(--text, #f8fafc)"
+                      : "var(--muted, #94a3b8)",
+                  backgroundColor:
+                    isActive("/business/customers") || isActive("/customers")
+                      ? "var(--surface2, #334155)"
+                      : "transparent",
+                  fontWeight:
+                    isActive("/business/customers") || isActive("/customers") ? 600 : 400,
+                }}
+              >
+                Clientes
               </Link>
             )}
 
