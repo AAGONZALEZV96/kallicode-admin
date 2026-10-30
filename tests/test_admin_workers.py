@@ -134,7 +134,7 @@ async def test_alerta_frescura_alta_mayor_6_horas(
 
     monkeypatch.setattr("admin_workers.main.todos", mock_todos)
 
-    desactualizados = await comprobar_frescura_agregados(None, max_antiguedad_s=21_600)
+    desactualizados = await comprobar_frescura_agregados(AsyncMock(), max_antiguedad_s=21_600)
     assert len(desactualizados) == 1
     assert desactualizados[0]["agregado"] == "customer_state"
 
@@ -190,9 +190,15 @@ async def test_resiliencia_ejecutar_con_lider_ante_error(
 
 
 @pytest.mark.asyncio
-async def test_bucle_runner_no_muere_por_excepcion() -> None:
+async def test_bucle_runner_no_muere_por_excepcion(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifica que el bucle del runner no se interrumpa ante excepciones transitorias."""
     llamadas = 0
+
+    async def mock_con_lider(nombre: str, fn: Any) -> bool:
+        await fn(None)
+        return True
+
+    monkeypatch.setattr("admin_workers.main._con_lider", mock_con_lider)
 
     async def fallo_transitorio(sesion: Any) -> None:
         nonlocal llamadas

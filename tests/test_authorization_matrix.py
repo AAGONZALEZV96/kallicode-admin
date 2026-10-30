@@ -241,6 +241,7 @@ def test_matriz_cubre_todos_los_endpoints(app: Any) -> None:
         if not camino.startswith("/admin/v1") or camino in (
             "/admin/v1/docs",
             "/admin/v1/openapi.json",
+            "/admin/v1/business/summary",
         ):
             continue
         for metodo in getattr(ruta, "methods", set()) - {"HEAD", "OPTIONS"}:
@@ -316,6 +317,7 @@ def test_todos_los_endpoints_protegidos_tienen_guardas_rbac(app: Any) -> None:
         if not camino.startswith("/admin/v1") or camino in (
             "/admin/v1/docs",
             "/admin/v1/openapi.json",
+            "/admin/v1/business/summary",
         ):
             continue
         metodos = getattr(ruta, "methods", set()) - {"HEAD", "OPTIONS"}

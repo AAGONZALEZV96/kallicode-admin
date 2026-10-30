@@ -30,6 +30,11 @@ from kallicode_core.logging import log
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..audit import registrar_accion, registrar_lectura
+from ..consultas.business import (
+    consultar_ficha_cliente,
+    consultar_listado_clientes,
+    consultar_resumen_negocio,
+)
 from ..db import admin_session, read_session, todos, uno
 from ..deps import CLIENTES, NEGOCIO, Staff, exigir, exigir_concesion, limite_rl4
 from ..errors import acceso_no_justificado, agregado_no_disponible
@@ -40,6 +45,16 @@ from ..settings import get_admin_settings
 router = APIRouter(prefix="/admin/v1/business", tags=["Consola de negocio"])
 
 _ESTADOS_SUS = ("activa", "periodo_gracia", "suspendida", "finalizada")
+_MAPEO_ESTADOS: dict[str, str] = {
+    "activo": "activa",
+    "activa": "activa",
+    "periodo_gracia": "periodo_gracia",
+    "suspendido": "suspendida",
+    "suspendida": "suspendida",
+    "moroso": "periodo_gracia",
+    "baja": "finalizada",
+    "finalizada": "finalizada",
+}
 
 
 class _Base(BaseModel):
@@ -123,6 +138,15 @@ async def _registrar_lecturas(st: Staff, endpoint: str, tenants: set[str]) -> No
 
 
 # ------------------------------------------------------------------ §18.16
+@router.get("/summary", summary="Resumen de negocio", include_in_schema=False)
+async def summary(
+    st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
+) -> dict[str, Any]:
+    """Indicadores consolidados del negocio (< 200 ms) sobre la capa agregada."""
+    async with read_session() as db:
+        return await consultar_resumen_negocio(db)
+
+
 @router.get("/overview", summary="Panel general de negocio")
 async def overview(
     st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
@@ -256,10 +280,15 @@ async def overview(
             "perdidos": datos["perdidos"],
             "por_plan": datos["por_plan"] or {},
         },
+        "ingresos": {
+            "importe": float(datos["mrr"]),
+            "moneda": datos["moneda"] or "EUR",
+        },
         "ingreso_recurrente": {
             "importe": float(datos["mrr"]),
             "moneda": datos["moneda"] or "EUR",
         },
+        "mrr_eur": float(datos["mrr"]),
         "consumo": {
             "loc": int(datos["loc"]),
             "tokens": int(datos["tokens"]),
@@ -299,9 +328,10 @@ async def customers(
     convertiría el listado en un directorio de clientes consultable por cualquier
     empleado.
     """
-    if estado is not None and estado not in _ESTADOS_SUS:
+    estado_normalizado = _MAPEO_ESTADOS.get(estado) if estado is not None else None
+    if estado is not None and estado_normalizado is None:
         raise validacion(
-            "Estado no válido.", {"estado": estado, "permitidos": list(_ESTADOS_SUS)}
+            "Estado no válido.", {"estado": estado, "permitidos": sorted(set(_MAPEO_ESTADOS))}
         )
 
     por_nombre = bool(q) and not (q or "").startswith("org_")
@@ -312,62 +342,25 @@ async def customers(
         {"consumo": "u.loc_consumidas", "alta": "c.alta_el", "nombre": "c.razon_social"},
         "u.loc_consumidas DESC NULLS LAST",
     )
-    where = """
-        WHERE c.eliminado_en IS NULL
-          AND (CAST(:plan AS text) IS NULL OR c.plan_codigo = :plan)
-          AND (CAST(:est AS text) IS NULL OR c.suscripcion_estado = :est)
-          AND (CAST(:q AS text) IS NULL
-               OR c.tenant_id ILIKE '%' || CAST(:q AS text) || '%'
-               OR (CAST(:por_nombre AS boolean)
-                   AND c.razon_social ILIKE '%' || CAST(:q AS text) || '%'))
-    """
-    params = {
-        "plan": plan,
-        "est": estado,
-        "q": q,
-        "por_nombre": por_nombre,
-        "lim": p.page_size,
-        "off": p.offset,
-    }
 
     async with read_session() as db:
-        await _frescura(db, "customer_state", "usage_cycle")
-        total = await uno(
+        filas, total, frescura = await consultar_listado_clientes(
             db,
-            f"""
-            SELECT count(*) AS n FROM admin.agg_customer_state c
-            LEFT JOIN admin.agg_usage_cycle u
-                   ON u.tenant_id = c.tenant_id
-                  AND u.ciclo = to_char(current_date, 'YYYY-MM')
-            {where}
-        """,
-            params,
-        )
-        filas = await todos(
-            db,
-            f"""
-            SELECT c.tenant_id, c.razon_social, c.plan_codigo AS plan,
-                   c.suscripcion_estado AS estado, c.lineas_contratadas,
-                   c.ultima_actividad,
-                   jsonb_build_object(
-                     'loc', coalesce(u.loc_consumidas, 0),
-                     'tokens', coalesce(u.tokens_in + u.tokens_out, 0),
-                     'cuota_pct', u.cuota_pct) AS consumo_ciclo
-            FROM admin.agg_customer_state c
-            LEFT JOIN admin.agg_usage_cycle u
-                   ON u.tenant_id = c.tenant_id
-                  AND u.ciclo = to_char(current_date, 'YYYY-MM')
-            {where}
-            ORDER BY {orden} LIMIT :lim OFFSET :off
-        """,
-            params,
+            plan=plan,
+            estado=estado_normalizado,
+            q=q,
+            por_nombre=por_nombre,
+            orden_sql=orden,
+            limit=p.page_size,
+            offset=p.offset,
         )
 
     tenants = [f["tenant_id"] for f in filas]
     filas, alguna = enmascarar_filas(filas, _concesiones(st, tenants))
     await _registrar_lecturas(st, "GET /admin/v1/business/customers", set(tenants))
 
-    salida = sobre(filas, int(total["n"]) if total else 0, p)
+    salida = sobre(filas, total, p)
+    salida["frescura"] = frescura.isoformat()
     salida["alguna_enmascarada"] = alguna
     return salida
 
@@ -394,100 +387,9 @@ async def customer(
         raise validacion("Bloque desconocido.", {"bloques": sorted(bloques - permitidos)})
 
     async with read_session() as db:
-        await _frescura(db, "customer_state", "usage_cycle")
-        c = await uno(
-            db, "SELECT * FROM admin.agg_customer_state WHERE tenant_id = :t", {"t": tenant_id}
-        )
-        if c is None:
-            raise no_encontrado("La organización")
+        ficha, frescura = await consultar_ficha_cliente(db, tenant_id, bloques)
 
-        ficha: dict[str, Any] = {
-            "tenant_id": c["tenant_id"],
-            "razon_social": c["razon_social"],
-            "despliegue": c["despliegue"],
-            "idioma": c["idioma"],
-            "alta_el": c["alta_el"],
-            "suscripcion": {
-                "plan": c["plan_codigo"],
-                "estado": c["suscripcion_estado"],
-                "inicia_el": c["inicia_el"],
-                "renueva_el": c["renueva_el"],
-                "finaliza_el": c["finaliza_el"],
-                "importe_mes": (
-                    float(c["importe_mes"]) if c["importe_mes"] is not None else None
-                ),
-            },
-            "lineas": {"contratadas": c["lineas_contratadas"], "activas": c["lineas_activas"]},
-            "actividad": {
-                "tickets_abiertos": c["tickets_abiertos"],
-                "ultima_actividad": c["ultima_actividad"],
-                "fabrica_activa": c["fabrica_activa"],
-            },
-        }
-
-        consumo: dict[str, Any] = {
-            "ciclo": await uno(
-                db,
-                """
-            SELECT loc_consumidas, tokens_in, tokens_out, cuota_pct, coste
-            FROM admin.agg_usage_cycle
-            WHERE tenant_id = :t AND ciclo = to_char(current_date, 'YYYY-MM')
-        """,
-                {"t": tenant_id},
-            )
-            or {}
-        }
-        if "historico" in bloques:
-            consumo["historico"] = await todos(
-                db,
-                """
-                SELECT ciclo, loc_consumidas, tokens_in + tokens_out AS tokens,
-                       coste, cuota_pct
-                FROM admin.agg_usage_cycle WHERE tenant_id = :t
-                ORDER BY ciclo DESC LIMIT 6
-            """,
-                {"t": tenant_id},
-            )
-        ficha["consumo"] = consumo
-
-        if "usuarios" in bloques:
-            ficha["usuarios"] = await todos(
-                db,
-                """
-                SELECT nombre, rol, estado, ultimo_acceso
-                FROM core.users WHERE tenant_id = :t
-                ORDER BY ultimo_acceso DESC NULLS LAST LIMIT 50
-            """,
-                {"t": tenant_id},
-            )
-        if "integraciones" in bloques:
-            ficha["integraciones"] = await todos(
-                db,
-                """
-                SELECT proveedor, categoria, estado, ultimo_test,
-                       nombre AS conexion_nombre
-                FROM core.connections WHERE tenant_id = :t ORDER BY proveedor
-            """,
-                {"t": tenant_id},
-            )
-        if "grafo" in bloques:
-            docs = await uno(
-                db,
-                """
-                SELECT count(*) AS n,
-                       count(*) FILTER (WHERE estado = 'procesado') AS ok
-                FROM core.onboarding_documents WHERE tenant_id = :t
-            """,
-                {"t": tenant_id},
-            )
-            # Solo métricas agregadas: el contenido del grafo pertenece al
-            # alcance contenido_codigo y no se sirve por este endpoint.
-            ficha["grafo"] = {
-                "documentos": int(docs["n"]) if docs else 0,
-                "documentos_procesados": int(docs["ok"]) if docs else 0,
-                "fabrica_activa": c["fabrica_activa"],
-            }
-
+    ficha["frescura"] = frescura.isoformat()
     ficha, enmascarados = enmascarar(ficha, st.concedidos(tenant_id))
     ficha["enmascarado"] = enmascarados
 
@@ -536,7 +438,7 @@ async def subscriptions(
           AND (:est IS NULL OR c.suscripcion_estado = :est)
           AND (:plan IS NULL OR c.plan_codigo = :plan)
           AND (:dias IS NULL OR (c.renueva_el IS NOT NULL
-               AND c.renueva_el <= current_date + :dias
+               AND c.renueva_el <= current_date + cast(:dias AS integer)
                AND c.renueva_el >= current_date))
     """
     params = {
