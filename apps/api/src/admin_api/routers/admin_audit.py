@@ -63,6 +63,17 @@ class ExportOut(_Base):
     eventos_estimados: int
 
 
+ALLOWLIST_ACCIONES_STAFF: dict[str, str] = {
+    "ocurrido": "a.occurred_at",
+    "occurred_at": "a.occurred_at",
+    "creado_en": "a.occurred_at",
+    "accion": "a.action",
+    "action": "a.action",
+    "tenant_id": "a.tenant_id",
+    "staff_id": "a.staff_id",
+}
+
+
 # ------------------------------------------------------------------ §18.29
 @router.get("/staff-actions", summary="Acciones del personal sobre datos de cliente")
 async def acciones(
@@ -128,7 +139,7 @@ async def acciones(
         "lim": p.page_size,
         "off": p.offset,
     }
-    orden = p.clausula_order({"ocurrido": "a.occurred_at"}, "a.occurred_at DESC")
+    orden = p.clausula_order(ALLOWLIST_ACCIONES_STAFF, "a.occurred_at DESC")
 
     async with admin_session() as db:
         total = await uno(

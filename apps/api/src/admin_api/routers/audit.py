@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 from ..audit import consultar_accesos_staff_para_portal
 from ..db import admin_session
 from ..deps import UsuarioPortal, usuario_portal_actual
+from ..pagination import calcular_paginas
 
 router = APIRouter(tags=["Auditoría del portal cliente"])
 
@@ -48,6 +49,7 @@ class StaffAccessesOut(BaseModel):
     total: int
     page: int
     page_size: int
+    pages: int
 
 
 @router.get(
@@ -105,11 +107,13 @@ async def listar_accesos_staff_portal(
             offset=offset,
         )
 
+    pages = calcular_paginas(total, page_size)
     return {
         "items": items,
         "total": total,
         "page": page,
         "page_size": page_size,
+        "pages": pages,
     }
 
 

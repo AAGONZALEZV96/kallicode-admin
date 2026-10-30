@@ -309,6 +309,19 @@ async def overview(
 
 
 # ------------------------------------------------------------------ §18.17
+ALLOWLIST_CLIENTES: dict[str, str] = {
+    "tenant_id": "c.tenant_id",
+    "plan": "c.plan_codigo",
+    "estado": "c.suscripcion_estado",
+    "mrr_eur": "c.mrr_eur",
+    "creado_en": "c.alta_el",
+    "actualizado_en": "c.actualizado_en",
+    "consumo": "u.loc_consumidas",
+    "alta": "c.alta_el",
+    "nombre": "c.razon_social",
+}
+
+
 @router.get("/customers", summary="Listar clientes")
 async def customers(
     st: Annotated[Staff, Depends(exigir(*CLIENTES))],
@@ -339,7 +352,7 @@ async def customers(
         raise acceso_no_justificado(alcance="datos_negocio")
 
     orden = p.clausula_order(
-        {"consumo": "u.loc_consumidas", "alta": "c.alta_el", "nombre": "c.razon_social"},
+        ALLOWLIST_CLIENTES,
         "u.loc_consumidas DESC NULLS LAST",
     )
 
@@ -415,6 +428,21 @@ async def customer(
 
 
 # ------------------------------------------------------------------ §18.19
+ALLOWLIST_SUSCRIPCIONES: dict[str, str] = {
+    "renovacion": "c.renueva_el",
+    "renueva_el": "c.renueva_el",
+    "nombre": "c.razon_social",
+    "razon_social": "c.razon_social",
+    "importe": "c.importe_mes",
+    "importe_mes": "c.importe_mes",
+    "tenant_id": "c.tenant_id",
+    "plan": "c.plan_codigo",
+    "estado": "c.suscripcion_estado",
+    "inicia_el": "c.inicia_el",
+    "finaliza_el": "c.finaliza_el",
+}
+
+
 @router.get("/subscriptions", summary="Suscripciones y renovaciones")
 async def subscriptions(
     st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
@@ -435,9 +463,9 @@ async def subscriptions(
 
     where = """
         WHERE c.eliminado_en IS NULL
-          AND (:est IS NULL OR c.suscripcion_estado = :est)
-          AND (:plan IS NULL OR c.plan_codigo = :plan)
-          AND (:dias IS NULL OR (c.renueva_el IS NOT NULL
+          AND (CAST(:est AS text) IS NULL OR c.suscripcion_estado = :est)
+          AND (CAST(:plan AS text) IS NULL OR c.plan_codigo = :plan)
+          AND (CAST(:dias AS integer) IS NULL OR (c.renueva_el IS NOT NULL
                AND c.renueva_el <= current_date + cast(:dias AS integer)
                AND c.renueva_el >= current_date))
     """
@@ -449,7 +477,7 @@ async def subscriptions(
         "off": p.offset,
     }
     orden = p.clausula_order(
-        {"renovacion": "c.renueva_el", "nombre": "c.razon_social", "importe": "c.importe_mes"},
+        ALLOWLIST_SUSCRIPCIONES,
         "c.renueva_el ASC NULLS LAST",
     )
 
@@ -462,7 +490,8 @@ async def subscriptions(
             db,
             f"""
             SELECT c.tenant_id, c.razon_social, c.plan_codigo AS plan,
-                   c.suscripcion_estado AS estado, c.inicia_el, c.renueva_el,
+                   c.suscripcion_estado AS estado, c.suscripcion_estado,
+                   c.inicia_el, c.renueva_el,
                    c.finaliza_el,
                    (c.renueva_el - current_date) AS dias_para_renovacion,
                    c.importe_mes, c.moneda,
