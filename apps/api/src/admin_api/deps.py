@@ -42,6 +42,7 @@ from .security import (
     PERMISOS_ROL,
     exigir_mfa_vigente,
     exigir_rol_staff,
+    verificar_token_portal,
     verificar_token_staff,
 )
 from .settings import get_admin_settings
@@ -362,6 +363,54 @@ async def revocar_todas_sesiones_redis(staff_id: str) -> None:
     await redis().set(f"admin:staff:{staff_id}:revoked_at", ahora_ts, ex=ttl)
 
 
+# ---------------------------------------------------------------- portal cliente
+@dataclass(slots=True)
+class UsuarioPortal:
+    """Identidad efectiva del usuario del portal cliente (§11.6)."""
+
+    id: str
+    tenant_id: str
+    role: str
+    email: str | None = None
+
+
+ROLES_PORTAL_AUDITORIA: frozenset[str] = frozenset(
+    {"owner", "admin", "architect", "approver"}
+)
+
+
+def validar_token_portal(request: Request) -> dict[str, Any]:
+    """Extrae y valida el JWT de la cabecera Authorization para el portal cliente."""
+    cabecera = request.headers.get("authorization", "")
+    if not cabecera.lower().startswith("bearer "):
+        raise no_autenticado("Cabecera Authorization ausente o inválida.")
+    token = cabecera[7:].strip()
+    if not token:
+        raise no_autenticado("Token ausente.")
+    return verificar_token_portal(token)
+
+
+async def usuario_portal_actual(request: Request) -> UsuarioPortal:
+    """Resuelve el usuario autenticado del portal de clientes y valida rol permitido."""
+    claims = validar_token_portal(request)
+    tenant_id = str(claims.get("org") or claims.get("tenant_id") or "")
+    if not tenant_id:
+        raise no_autenticado("Token sin organización asignada.")
+
+    rol = str(claims.get("rol") or "")
+    if rol not in ROLES_PORTAL_AUDITORIA:
+        from kallicode_core.errors import permiso_denegado
+
+        raise permiso_denegado("Rol insuficiente para consultar la auditoría de accesos.")
+
+    return UsuarioPortal(
+        id=str(claims["sub"]),
+        tenant_id=tenant_id,
+        role=rol,
+        email=claims.get("email") if isinstance(claims.get("email"), str) else None,
+    )
+
+
 async def cerrar_redis() -> None:
     global _redis
     if _redis is not None:
@@ -371,15 +420,18 @@ async def cerrar_redis() -> None:
 
 __all__ = [
     "ADMIN",
+    "CLIENTES",
     "NEGOCIO",
     "OPS",
     "OPS_NEGOCIO",
+    "ROLES_PORTAL_AUDITORIA",
     "SOPORTE",
     "AppError",
     "DbAdmin",
     "DbLectura",
     "Staff",
     "StaffDep",
+    "UsuarioPortal",
     "cerrar_redis",
     "db_admin",
     "db_lectura",
@@ -397,5 +449,7 @@ __all__ = [
     "revocar_jti",
     "revocar_todas_sesiones_redis",
     "staff_actual",
+    "usuario_portal_actual",
+    "validar_token_portal",
     "validar_token_staff",
 ]

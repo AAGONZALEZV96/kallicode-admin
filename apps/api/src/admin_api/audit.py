@@ -20,6 +20,7 @@ comprobar el encadenamiento real. Es la corrección de origen del defecto DB-F04
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 from typing import Any, Literal
 
 from kallicode_core.logging import log
@@ -296,9 +297,135 @@ async def verificar_cadena_staff_actions(
     )
 
 
+def formatear_nombre_publico(nombre_completo: str | None) -> str:
+    """Convierte el nombre completo del empleado en un identificador público seguro.
+
+    Maneja limpiamente nombres de una sola palabra, cadenas vacías o valores None
+    devolviendo 'Staff KalliCode' para proteger la privacidad y evitar excepciones.
+
+    Ejemplos:
+      - 'Laura Prieto' -> 'L. Prieto'
+      - 'Laura Prieto González' -> 'L. Prieto González'
+      - 'L. Prieto' -> 'L. Prieto'
+      - 'Laura' -> 'Laura'
+      - '' / '   ' / None -> 'Staff KalliCode'
+    """
+    if not nombre_completo:
+        return "Staff KalliCode"
+    limpio = nombre_completo.strip()
+    if not limpio:
+        return "Staff KalliCode"
+    partes = limpio.split()
+    if not partes:
+        return "Staff KalliCode"
+    if len(partes) == 1:
+        return partes[0]
+    inicial = partes[0][0].upper()
+    resto = " ".join(partes[1:])
+    if partes[0].endswith("."):
+        return f"{partes[0].upper()} {resto}"
+    return f"{inicial}. {resto}"
+
+
+async def consultar_accesos_staff_para_portal(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    desde: date,
+    hasta: date,
+    ticket_id: str | None = None,
+    limit: int = 25,
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], int]:
+    """Consulta las concesiones de acceso del personal sobre los datos del cliente (§11.6).
+
+    Aplica aislamiento estricto por tenant_id, paginación, filtros de fecha y ticket_id,
+    enmascaramiento del personal en el objeto actor y verificación forense SHA-256.
+    """
+    cond = [
+        "g.tenant_id = :tid",
+        "g.granted_at >= CAST(:d AS date)",
+        "g.granted_at < CAST(:h AS date) + 1",
+    ]
+    params: dict[str, Any] = {
+        "tid": tenant_id,
+        "d": desde,
+        "h": hasta,
+        "lim": limit,
+        "off": offset,
+    }
+    if ticket_id and ticket_id.strip():
+        cond.append("(g.reference ILIKE :tid_pat OR g.reason ILIKE :tid_pat)")
+        params["tid_pat"] = f"%{ticket_id.strip()}%"
+
+    where = "WHERE " + " AND ".join(cond)
+
+    total_row = await uno(
+        db,
+        f"SELECT count(*) AS n FROM admin.access_grants g {where}",
+        params,
+    )
+    total = int(total_row["n"]) if total_row else 0
+
+    filas = await todos(
+        db,
+        f"""
+        SELECT g.id, g.scope AS alcance, g.reason AS motivo, g.reference AS referencia,
+               g.granted_at AS concedido_en, g.expires_at AS caduca_en,
+               g.reads AS accesos,
+               s.full_name AS staff_nombre, s.role AS staff_rol
+        FROM admin.access_grants g
+        JOIN admin.staff s ON s.id = g.staff_id
+        {where}
+        ORDER BY g.granted_at DESC
+        LIMIT :lim OFFSET :off
+    """,
+        params,
+    )
+
+    # Verificación de integridad criptográfica de la cadena en la ventana
+    rupturas = await verificar_cadena(db, str(desde), str(hasta + timedelta(days=1)))
+    integra = not rupturas
+
+    items: list[dict[str, Any]] = []
+    for f in filas:
+        concedido = f["concedido_en"]
+        caduca = f["caduca_en"]
+        concedido_str = (
+            concedido.isoformat().replace("+00:00", "Z")
+            if hasattr(concedido, "isoformat")
+            else str(concedido)
+        )
+        caduca_str = (
+            caduca.isoformat().replace("+00:00", "Z")
+            if hasattr(caduca, "isoformat")
+            else str(caduca)
+        )
+
+        items.append(
+            {
+                "id": str(f["id"]),
+                "actor": {
+                    "nombre": formatear_nombre_publico(f.get("staff_nombre")),
+                    "rol": str(f.get("staff_rol") or "staff_soporte"),
+                },
+                "motivo": str(f.get("motivo") or ""),
+                "alcance": str(f.get("alcance") or "datos_negocio"),
+                "concedido_en": concedido_str,
+                "caduca_en": caduca_str,
+                "accesos": int(f.get("accesos") or 0),
+                "verificado": integra,
+            }
+        )
+
+    return items, total
+
+
 __all__ = [
     "Accion",
     "ResultadoIntegridadCadena",
+    "consultar_accesos_staff_para_portal",
+    "formatear_nombre_publico",
     "registrar_accion",
     "registrar_accion_staff",
     "registrar_lectura",

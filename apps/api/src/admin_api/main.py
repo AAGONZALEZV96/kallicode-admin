@@ -254,7 +254,7 @@ def registrar_routers() -> None:
     Se hace en una función para que las pruebas puedan construir la aplicación
     sin arrancar el ciclo de vida completo.
     """
-    from .routers import admin_audit, auth, business, grants, health, ops, staff
+    from .routers import admin_audit, audit, auth, business, grants, health, ops, staff
 
     app.include_router(health.router)  # §18.31
     app.include_router(auth.router)  # §18.1 – §18.8
@@ -263,6 +263,7 @@ def registrar_routers() -> None:
     app.include_router(business.router)  # §18.16 – §18.23
     app.include_router(ops.router)  # §18.24 – §18.28
     app.include_router(admin_audit.router)  # §18.29 – §18.30
+    app.include_router(audit.router)  # §11.6 · Portal cliente
 
 
 registrar_routers()

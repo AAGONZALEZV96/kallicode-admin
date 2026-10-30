@@ -53,6 +53,7 @@ __all__ = [
     "validar_politica_password",
     "validar_token_staff",
     "verificar_password",
+    "verificar_token_portal",
     "verificar_token_staff",
     "verificar_totp",
 ]
@@ -212,6 +213,43 @@ def verificar_token_staff(token: str) -> dict[str, object]:
 
 
 validar_token_staff = verificar_token_staff
+
+
+def verificar_token_portal(token: str) -> dict[str, object]:
+    """Valida firma, expiración, tipo y claims de un token del portal de clientes.
+
+    Acepta typ='user' o 'portal' y rechaza categóricamente tokens de personal (typ='staff').
+    """
+    from kallicode_core.errors import no_autenticado
+
+    _, pub = _claves()
+    try:
+        claims = jwt.decode(
+            token,
+            pub,
+            algorithms=["RS256"],
+            options={"verify_aud": False, "require": ["sub", "typ", "iat", "exp"]},
+        )
+    except jwt.ExpiredSignatureError as exc:
+        raise no_autenticado("El token ha expirado.") from exc
+    except jwt.InvalidTokenError as exc:
+        raise no_autenticado() from exc
+
+    if claims.get("typ") not in ("user", "portal"):
+        raise no_autenticado("Tipo de token incorrecto para esta API.")
+
+    iss = claims.get("iss")
+    if iss not in ("kc-portal", "kallicode-portal"):
+        raise no_autenticado("Emisor no reconocido.")
+
+    aud = claims.get("aud")
+    if aud not in ("kc-portal-api", "portal-v1"):
+        raise no_autenticado("Audiencia no reconocida.")
+
+    return cast(dict[str, object], claims)
+
+
+validar_token_portal = verificar_token_portal
 
 
 def exigir_rol_staff(rol_actual: str, permitidos: tuple[str, ...]) -> None:
