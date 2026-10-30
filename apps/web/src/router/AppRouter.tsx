@@ -17,6 +17,7 @@ import { Error404 } from "../vistas/Error404";
 import { OpsAgents } from "../vistas/OpsAgents";
 import { OpsModels } from "../vistas/OpsModels";
 import { OpsSLA } from "../vistas/OpsSLA";
+import { BizOverview } from "../vistas/BizOverview";
 
 const InicioRedireccion: React.FC = () => {
   const { usuario } = useAuth();
@@ -27,17 +28,6 @@ const InicioRedireccion: React.FC = () => {
   }
   return <Navigate to="/overview" replace />;
 };
-
-const VistaOverviewPlaceholder: React.FC = () => (
-  <div style={{ padding: "1.5rem", backgroundColor: "var(--card, #1e293b)", borderRadius: "0.5rem", border: "1px solid var(--border, #334155)" }}>
-    <h1 style={{ fontSize: "1.25rem", fontWeight: 600, color: "var(--text, #f8fafc)", marginBottom: "0.5rem" }}>
-      Panel General de Negocio (Overview)
-    </h1>
-    <p style={{ color: "var(--muted, #94a3b8)", fontSize: "0.875rem" }}>
-      Consola administrativa conectada a la capa agregada de PostgreSQL.
-    </p>
-  </div>
-);
 
 export const AppRouter: React.FC = () => {
   return (
@@ -58,7 +48,7 @@ export const AppRouter: React.FC = () => {
               path="/overview"
               element={
                 <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
-                  <VistaOverviewPlaceholder />
+                  <BizOverview />
                 </RutaProtegidaPorRol>
               }
             />
