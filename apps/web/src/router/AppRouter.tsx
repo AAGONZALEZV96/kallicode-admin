@@ -52,6 +52,14 @@ export const AppRouter: React.FC = () => {
                 </RutaProtegidaPorRol>
               }
             />
+            <Route
+              path="/business/overview"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
+                  <BizOverview />
+                </RutaProtegidaPorRol>
+              }
+            />
 
             {/* Rutas de Operaciones: Exclusivo staff_operaciones y staff_admin */}
             <Route

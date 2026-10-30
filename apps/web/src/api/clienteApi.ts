@@ -22,13 +22,15 @@ export class ApiError extends Error {
   public readonly status: number;
   public readonly codigo: string;
   public readonly detalle?: unknown;
+  public readonly traceId?: string;
 
-  constructor(status: number, codigo: string, mensaje: string, detalle?: unknown) {
+  constructor(status: number, codigo: string, mensaje: string, detalle?: unknown, traceId?: string) {
     super(mensaje);
     this.name = "ApiError";
     this.status = status;
     this.codigo = codigo;
     this.detalle = detalle;
+    this.traceId = traceId;
   }
 }
 
@@ -150,7 +152,14 @@ export async function peticionApi<T = unknown>(
       manejarNoAutorizado();
     }
 
-    throw new ApiError(respuesta.status, codigo, mensaje, errorData.detalle);
+    const traceId =
+      (respuesta.headers && typeof respuesta.headers.get === "function"
+        ? respuesta.headers.get("x-trace-id")
+        : undefined) ||
+      (errorData as Record<string, unknown>)?.trace_id as string | undefined ||
+      (errorData as Record<string, unknown>)?.traceId as string | undefined;
+
+    throw new ApiError(respuesta.status, codigo, mensaje, errorData.detalle, traceId);
   }
 
   if (respuesta.status === 204) {

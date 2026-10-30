@@ -12,12 +12,14 @@ export interface MockConfig {
   concesionActiva: boolean;
   estadoAgregados: "ok" | "obsoleto" | "fallido";
   rolStaff: "staff_admin" | "staff_negocio" | "staff_soporte" | "staff_operaciones";
+  frescuraCustom: string | null;
 }
 
 const configDefecto: MockConfig = {
   concesionActiva: false,
   estadoAgregados: "ok",
   rolStaff: "staff_negocio",
+  frescuraCustom: null,
 };
 
 let estadoGlobal: MockConfig = { ...configDefecto };
@@ -30,6 +32,11 @@ export function setMockConcesionActiva(activa: boolean): void {
 /** Modifica dinámicamente el estado de frescura de los agregados. */
 export function setMockEstadoAgregados(estado: "ok" | "obsoleto" | "fallido"): void {
   estadoGlobal.estadoAgregados = estado;
+}
+
+/** Configura una fecha ISO personalizada para simular agregados obsoletos o recientes. */
+export function setMockFrescura(fechaIso: string | null): void {
+  estadoGlobal.frescuraCustom = fechaIso;
 }
 
 /** Modifica dinámicamente el rol del staff simulado. */
@@ -181,6 +188,7 @@ function verificarAutenticacion(request: Request): Response | null {
 function verificarFrescuraAgregados(request: Request): Response | null {
   const force503 = request.headers.get("x-mock-status") === "503";
   if (force503 || estadoGlobal.estadoAgregados !== "ok") {
+    const traceId = request.headers.get("x-trace-id") || "trc_503_frescura_001";
     return HttpResponse.json(
       {
         error: {
@@ -189,9 +197,15 @@ function verificarFrescuraAgregados(request: Request): Response | null {
           mensaje:
             "La capa de agregados analíticos está en refresco o no ha completado el ciclo.",
           detalle: { estado: estadoGlobal.estadoAgregados },
+          trace_id: traceId,
         },
       },
-      { status: 503 }
+      {
+        status: 503,
+        headers: {
+          "x-trace-id": traceId,
+        },
+      }
     );
   }
   return null;
@@ -248,55 +262,115 @@ export const handlers = [
     if (errFrescura) return errFrescura;
 
     const rol = obtenerRol(request);
-    if (rol === "staff_operaciones") {
+    if (rol === "staff_operaciones" || rol === "staff_soporte") {
+      const traceId = request.headers.get("x-trace-id") || "trc_403_rol";
       return HttpResponse.json(
         {
           error: {
             codigo: "ROL_STAFF_INSUFICIENTE",
             code: "rol_staff_insuficiente",
-            mensaje: "Acceso denegado para el rol staff_operaciones.",
+            mensaje: `Acceso denegado para el rol ${rol}.`,
+            trace_id: traceId,
           },
         },
-        { status: 403 }
+        {
+          status: 403,
+          headers: { "x-trace-id": traceId },
+        }
       );
     }
 
-    return HttpResponse.json({
-      frescura: "2026-10-30T14:00:00.000Z",
-      clientes: {
-        activos: 128,
-        altas: 14,
-        perdidos: 2,
-        por_plan: {
-          starter: 40,
-          growth: 65,
-          enterprise: 23,
+    const url = new URL(request.url);
+    const periodo = url.searchParams.get("periodo") || "mes_actual";
+    const compararCon = url.searchParams.get("comparar_con") || "periodo_anterior";
+
+    // Permitir configurar frescura explícita vía estadoGlobal, header o query param
+    const frescura =
+      request.headers.get("x-mock-frescura") ||
+      url.searchParams.get("frescura") ||
+      estadoGlobal.frescuraCustom ||
+      "2026-10-30T14:00:00.000Z";
+
+    const traceId = request.headers.get("x-trace-id") || "trc_overview_ok_001";
+
+    let mrr = 45000.0;
+    let clientesActivos = 128;
+    let tokens = 125000000;
+    let tickets = 450;
+    let variacionPct = 12.5;
+
+    if (periodo === "mes_anterior") {
+      mrr = 42000.0;
+      clientesActivos = 120;
+      tokens = 110000000;
+      tickets = 410;
+      variacionPct = 8.2;
+    } else if (periodo === "trimestre") {
+      mrr = 135000.0;
+      clientesActivos = 135;
+      tokens = 380000000;
+      tickets = 1320;
+      variacionPct = 18.0;
+    } else if (periodo === "ano") {
+      mrr = 520000.0;
+      clientesActivos = 150;
+      tokens = 1400000000;
+      tickets = 5100;
+      variacionPct = 25.4;
+    }
+
+    return HttpResponse.json(
+      {
+        periodo: {
+          inicio: "2026-10-01",
+          fin: "2026-10-31",
+          tipo: periodo,
+          comparar_con: compararCon,
+        },
+        frescura,
+        variacion_pct: variacionPct,
+        clientes: {
+          activos: clientesActivos,
+          nuevos: 14,
+          altas: 14,
+          perdidos: 2,
+          por_plan: {
+            starter: 40,
+            growth: 65,
+            enterprise: 23,
+          },
+        },
+        ingresos: {
+          importe: mrr,
+          moneda: "EUR",
+        },
+        ingreso_recurrente: {
+          importe: mrr,
+          moneda: "EUR",
+        },
+        mrr_eur: mrr,
+        consumo: {
+          loc: 320000,
+          tokens,
+          coste_estimado: Math.round(tokens / 100000) * 1.0,
+        },
+        pipeline: {
+          tickets_entregados: tickets,
+          tiempo_e2e_p50_h: 2.4,
+          escalado_humano_pct: 4.5,
+        },
+        tendencia: {
+          mrr: variacionPct,
+          consumo: 15.2,
+          pipeline: 8.5,
         },
       },
-      ingresos: {
-        importe: 45000.0,
-        moneda: "EUR",
-      },
-      ingreso_recurrente: {
-        importe: 45000.0,
-        moneda: "EUR",
-      },
-      mrr_eur: 45000.0,
-      consumo: {
-        loc: 320000,
-        tokens: 125000000,
-        coste_estimado: 1250.0,
-      },
-      pipeline: {
-        tickets_entregados: 450,
-        tiempo_e2e_p50_h: 2.4,
-        escalado_humano_pct: 4.5,
-      },
-      tendencia: {
-        consumo: 15.2,
-        pipeline: 8.5,
-      },
-    });
+      {
+        headers: {
+          "x-trace-id": traceId,
+        },
+      }
+    );
   }),
 
   // 3. GET /admin/v1/business/customers
