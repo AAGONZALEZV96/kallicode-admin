@@ -39,6 +39,7 @@ apps/web/node_modules/
 apps/web/dist/
 apps/web/build/
 apps/web/coverage/
+*.tsbuildinfo
 coverage/
 npm-debug.log*
 yarn-debug.log*
@@ -102,6 +103,7 @@ apps/web/node_modules/
 apps/web/dist/
 apps/web/build/
 apps/web/coverage/
+*.tsbuildinfo
 coverage/
 npm-debug.log*
 yarn-debug.log*

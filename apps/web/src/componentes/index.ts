@@ -5,3 +5,5 @@ export * from "./Modal";
 export * from "./Input";
 export * from "./Select";
 export * from "./ControlesLiveRefresh";
+export * from "./ErrorBoundary";
+export * from "./AdminLayout";
