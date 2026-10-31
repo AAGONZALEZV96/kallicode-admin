@@ -543,56 +543,131 @@ export const handlers = [
 
     const razonSocial = conConcesion ? cliente.razon_social : "A•••• S.L.";
     const dominio = conConcesion ? cliente.dominio : "a••••.com";
-    const enmascarados = conConcesion ? [] : ["razon_social", "dominio"];
+    const enmascarados = conConcesion ? [] : ["identificacion", "usuarios", "integraciones"];
+    const traceId = request.headers.get("x-trace-id") || "trc_cust_detail_001";
 
-    return HttpResponse.json({
-      tenant_id: cliente.tenant_id,
-      razon_social: razonSocial,
-      dominio,
-      frescura: "2026-10-30T14:00:00.000Z",
-      enmascarado: enmascarados,
-      identificacion: {
+    return HttpResponse.json(
+      {
         tenant_id: cliente.tenant_id,
         razon_social: razonSocial,
-        despliegue: "cloud",
-        idioma: "es",
-        alta_el: cliente.alta_el,
+        dominio,
+        frescura: "2026-10-30T14:00:00.000Z",
+        enmascarado: enmascarados,
+        identificacion: {
+          tenant_id: cliente.tenant_id,
+          razon_social: razonSocial,
+          dominio,
+          despliegue: "cloud",
+          idioma: "es",
+          alta_el: cliente.alta_el,
+        },
+        suscripcion: {
+          plan_codigo: cliente.plan,
+          plan_nombre: `Plan ${cliente.plan.toUpperCase()}`,
+          estado: cliente.estado,
+          inicia_el: "2026-01-15",
+          renueva_el: "2027-01-15",
+          finaliza_el: null,
+          importe_mes: cliente.mrr_eur,
+          moneda: "EUR",
+          solicitudes_pendientes: ["Cambio a plan Enterprise en revisión"],
+        },
+        lineas: {
+          contratadas: cliente.lineas_contratadas,
+          activas: cliente.lineas_activas,
+          utilizacion_media_pct: 80.0,
+          loc_mes: 20000,
+        },
+        actividad: {
+          cobertura_pct: 88.5,
+          nodos: 1420,
+          aristas: 3850,
+          rendimiento_e2e_horas: 3.4,
+          usuarios_activos: cliente.usuarios_activos,
+          usuarios_total: cliente.usuarios_activos + 5,
+          integraciones: 4,
+          docs_onboarding: 8,
+          tickets_abiertos: cliente.tickets_abiertos,
+          ultima_actividad: cliente.ultima_actividad,
+        },
+        grafo_actividad: {
+          cobertura_pct: 88.5,
+          nodos: 1420,
+          aristas: 3850,
+          rendimiento_e2e_horas: 3.4,
+        },
+        consumo: {
+          loc_consumidas: cliente.consumo_ciclo.loc,
+          cuota_pct: cliente.consumo_ciclo.cuota_pct,
+          tokens_in: 3000000,
+          tokens_out: 1500000,
+          tokens_total: 4500000,
+          coste: 45.5,
+          historico: [
+            { ciclo: "2026-05", loc: 12000, tokens: 3800000, cuota_pct: 60.0 },
+            { ciclo: "2026-06", loc: 13500, tokens: 4100000, cuota_pct: 67.5 },
+            { ciclo: "2026-07", loc: 14000, tokens: 4200000, cuota_pct: 70.0 },
+            { ciclo: "2026-08", loc: 14200, tokens: 4300000, cuota_pct: 71.0 },
+            { ciclo: "2026-09", loc: 14800, tokens: 4400000, cuota_pct: 74.0 },
+            {
+              ciclo: "2026-10",
+              loc: cliente.consumo_ciclo.loc,
+              tokens: cliente.consumo_ciclo.tokens,
+              cuota_pct: cliente.consumo_ciclo.cuota_pct,
+            },
+          ],
+        },
+        usuarios: [
+          {
+            id: "usr_01",
+            nombre: conConcesion ? "Juan Pérez" : "J•••• P••••",
+            email: conConcesion ? "admin@acme.com" : "u••••@acme.com",
+            rol: "owner",
+            idioma: "es",
+            estado: "activo",
+          },
+          {
+            id: "usr_02",
+            nombre: conConcesion ? "Ana Gómez" : "A•••• G••••",
+            email: conConcesion ? "ana.gomez@acme.com" : "a••••@acme.com",
+            rol: "developer",
+            idioma: "en",
+            estado: "activo",
+          },
+        ],
+        integraciones: [
+          {
+            id: "int_01",
+            tipo: "github",
+            nombre: conConcesion ? "acme-corp/core-api" : "repo-••••",
+            estado: "conectado",
+          },
+          {
+            id: "int_02",
+            tipo: "jira",
+            nombre: conConcesion ? "acme.atlassian.net" : "jira-••••",
+            estado: "conectado",
+          },
+          {
+            id: "int_03",
+            tipo: "ci_cd",
+            nombre: conConcesion ? "GitHub Actions CI" : "ci-••••",
+            estado: "activo",
+          },
+          {
+            id: "int_04",
+            tipo: "database",
+            nombre: conConcesion ? "pg-prod.acme.internal" : "db-••••",
+            estado: "conectado",
+          },
+        ],
       },
-      suscripcion: {
-        plan_codigo: cliente.plan,
-        plan_nombre: `Plan ${cliente.plan.toUpperCase()}`,
-        estado: cliente.estado,
-        inicia_el: "2026-01-15",
-        renueva_el: "2027-01-15",
-        finaliza_el: null,
-        importe_mes: cliente.mrr_eur,
-        moneda: "EUR",
-      },
-      lineas: {
-        contratadas: cliente.lineas_contratadas,
-        activas: cliente.lineas_activas,
-        loc_mes: 20000,
-      },
-      actividad: {
-        usuarios_activos: cliente.usuarios_activos,
-        usuarios_total: cliente.usuarios_activos + 5,
-        integraciones: 3,
-        docs_onboarding: 8,
-        tickets_abiertos: cliente.tickets_abiertos,
-        ultima_actividad: cliente.ultima_actividad,
-      },
-      consumo: {
-        loc_consumidas: cliente.consumo_ciclo.loc,
-        cuota_pct: cliente.consumo_ciclo.cuota_pct,
-        tokens_in: 3000000,
-        tokens_out: 1500000,
-        coste: 45.5,
-      },
-      usuarios: [
-        { id: "usr_01", email: conConcesion ? "admin@acme.com" : "a••••@acme.com", rol: "owner", estado: "activo" },
-      ],
-      integraciones: [{ id: "int_01", tipo: "github", estado: "conectado" }],
-    });
+      {
+        headers: {
+          "x-trace-id": traceId,
+        },
+      }
+    );
   }),
 
   // 5. GET /admin/v1/business/subscriptions
@@ -680,5 +755,90 @@ export const handlers = [
       page_size: 25,
       pages: 1,
     });
+  }),
+
+  // 7. POST /admin/v1/access-grants
+  http.post("*/admin/v1/access-grants", async ({ request }) => {
+    const errAuth = verificarAutenticacion(request);
+    if (errAuth) return errAuth;
+
+    const rol = obtenerRol(request);
+    if (rol === "staff_operaciones") {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "ROL_STAFF_INSUFICIENTE",
+            code: "rol_staff_insuficiente",
+            mensaje: "staff_operaciones no puede solicitar concesiones de acceso.",
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "CUERPO_INVALIDO",
+            code: "cuerpo_invalido",
+            mensaje: "El cuerpo de la petición debe ser JSON válido.",
+          },
+        },
+        { status: 422 }
+      );
+    }
+
+    const tenantId = (body.tenant_id as string) || "";
+    const alcance = (body.alcance as string) || "datos_negocio";
+    const motivo = (body.motivo as string) || "";
+    const duracionMin = Number(body.duracion_min) || 240;
+    const referencia = (body.referencia as string) || "";
+
+    const motivoLimpio = motivo.trim();
+    const patronTicket = /(KC|SUP)-\d{3,}/i;
+    const refEfectiva = referencia || (patronTicket.test(motivoLimpio) ? motivoLimpio : "");
+
+    if (motivoLimpio.length < 20 || !patronTicket.test(refEfectiva || motivoLimpio)) {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "MOTIVO_INSUFICIENTE",
+            code: "motivo_insuficiente",
+            mensaje:
+              "El motivo debe contener al menos 20 caracteres y una referencia válida a ticket KC-#### o SUP-####.",
+          },
+        },
+        { status: 422 }
+      );
+    }
+
+    estadoGlobal.concesionActiva = true;
+
+    const concedidoEn = new Date().toISOString();
+    const caducaEn = new Date(Date.now() + duracionMin * 60 * 1000).toISOString();
+
+    return HttpResponse.json(
+      {
+        grant_id: "gr_mock_" + Math.random().toString(36).substring(2, 9),
+        tenant_id: tenantId,
+        alcance,
+        motivo: motivoLimpio,
+        duracion_min: duracionMin,
+        referencia: refEfectiva,
+        concedido_en: concedidoEn,
+        caduca_en: caducaEn,
+        visible_para_cliente_en: concedidoEn,
+      },
+      {
+        status: 201,
+        headers: {
+          "x-trace-id": request.headers.get("x-trace-id") || "trc_grant_001",
+        },
+      }
+    );
   }),
 ];

@@ -19,6 +19,7 @@ import { OpsModels } from "../vistas/OpsModels";
 import { OpsSLA } from "../vistas/OpsSLA";
 import { BizOverview } from "../vistas/BizOverview";
 import { BizCustomers } from "../vistas/BizCustomers";
+import { CustomerDetail } from "../vistas/CustomerDetail";
 
 const InicioRedireccion: React.FC = () => {
   const { usuario } = useAuth();
@@ -72,10 +73,26 @@ export const AppRouter: React.FC = () => {
               }
             />
             <Route
+              path="/business/customers/:tenant_id"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_soporte", "staff_negocio", "staff_admin"]}>
+                  <CustomerDetail />
+                </RutaProtegidaPorRol>
+              }
+            />
+            <Route
               path="/customers"
               element={
                 <RutaProtegidaPorRol rolesPermitidos={["staff_soporte", "staff_negocio", "staff_admin"]}>
                   <BizCustomers />
+                </RutaProtegidaPorRol>
+              }
+            />
+            <Route
+              path="/customers/:tenant_id"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_soporte", "staff_negocio", "staff_admin"]}>
+                  <CustomerDetail />
                 </RutaProtegidaPorRol>
               }
             />
