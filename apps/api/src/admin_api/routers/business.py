@@ -588,8 +588,8 @@ async def usage_tokens(
         "cliente": (
             """
             SELECT count(*) AS n FROM admin.agg_usage_cycle u
-            WHERE u.ciclo = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
-              AND (:t IS NULL OR u.tenant_id = :t)""",
+            WHERE u.ciclo = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
+              AND (CAST(:t AS text) IS NULL OR u.tenant_id = :t)""",
             """
             SELECT u.tenant_id AS clave, u.tenant_id, u.tokens_in, u.tokens_out,
                    jsonb_build_object('flash', u.tokens_flash, 'pro', u.tokens_pro,
@@ -600,15 +600,15 @@ async def usage_tokens(
                          WHERE c.tenant_id = u.tenant_id AND c.ciclo = u.ciclo),
                         u.loc_consumidas)) AS cuadra_con_facturacion
             FROM admin.agg_usage_cycle u
-            WHERE u.ciclo = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
-              AND (:t IS NULL OR u.tenant_id = :t)
+            WHERE u.ciclo = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
+              AND (CAST(:t AS text) IS NULL OR u.tenant_id = :t)
             ORDER BY u.coste DESC LIMIT :lim OFFSET :off""",
         ),
         "tier": (
             """
             SELECT count(DISTINCT d.tier) AS n FROM admin.agg_tokens_daily d
             WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))""",
+                      = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))""",
             """
             SELECT d.tier AS clave, NULL::text AS tenant_id,
                    sum(d.tokens_in) AS tokens_in, sum(d.tokens_out) AS tokens_out,
@@ -618,8 +618,8 @@ async def usage_tokens(
                    NULL::numeric AS cuota_pct, true AS cuadra_con_facturacion
             FROM admin.agg_tokens_daily d
             WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
-              AND (:t IS NULL OR d.tenant_id = :t)
+                      = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
+              AND (CAST(:t AS text) IS NULL OR d.tenant_id = :t)
             GROUP BY d.tier ORDER BY sum(d.coste) DESC
             LIMIT :lim OFFSET :off""",
         ),
@@ -627,7 +627,7 @@ async def usage_tokens(
             """
             SELECT count(DISTINCT d.dia) AS n FROM admin.agg_tokens_daily d
             WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))""",
+                      = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))""",
             """
             SELECT d.dia::text AS clave, NULL::text AS tenant_id,
                    sum(d.tokens_in) AS tokens_in, sum(d.tokens_out) AS tokens_out,
@@ -636,8 +636,8 @@ async def usage_tokens(
                    NULL::numeric AS cuota_pct, true AS cuadra_con_facturacion
             FROM admin.agg_tokens_daily d
             WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
-              AND (:t IS NULL OR d.tenant_id = :t)
+                      = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
+              AND (CAST(:t AS text) IS NULL OR d.tenant_id = :t)
             GROUP BY d.dia ORDER BY d.dia DESC LIMIT :lim OFFSET :off""",
         ),
     }
@@ -651,8 +651,8 @@ async def usage_tokens(
             SELECT coalesce(sum(tokens_in + tokens_out), 0) AS tokens,
                    coalesce(sum(coste), 0) AS coste, max(moneda) AS moneda
             FROM admin.agg_usage_cycle
-            WHERE ciclo = coalesce(:ciclo, to_char(current_date, 'YYYY-MM'))
-              AND (:t IS NULL OR tenant_id = :t)
+            WHERE ciclo = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
+              AND (CAST(:t AS text) IS NULL OR tenant_id = :t)
         """,
             params,
         )

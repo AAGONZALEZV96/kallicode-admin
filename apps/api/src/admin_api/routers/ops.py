@@ -196,7 +196,7 @@ async def models(
             SELECT d.tier, sum(d.tokens_in + d.tokens_out) AS tokens,
                    sum(d.coste) AS coste
             FROM admin.agg_tokens_daily d
-            WHERE d.dia > current_date - :dias
+            WHERE d.dia > current_date - CAST(:dias AS int)
             GROUP BY d.tier
         """,
             {"dias": dias},
