@@ -34,6 +34,7 @@ dev = [
     "httpx>=0.28,<0.29",
     "testcontainers[postgres]>=4.8,<5",
     "respx>=0.22,<0.23",                # dobles del contrato de telemetría
+    "schemathesis>=4.0,<5",             # pruebas de contrato y fuzzing OpenAPI v1.0
     "freezegun>=1.5,<2",                # caducidad de concesiones y relojes de SLA
     "ruff>=0.8,<0.13",
     "black>=24.10,<26",

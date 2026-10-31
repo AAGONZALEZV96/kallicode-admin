@@ -24,7 +24,7 @@ from datetime import date, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, Query, status
-from kallicode_core.errors import conflicto, no_encontrado, validacion
+from kallicode_core.errors import no_encontrado, validacion
 from kallicode_core.ids import nuevo
 from kallicode_core.logging import log
 from pydantic import BaseModel, ConfigDict, Field
@@ -525,7 +525,10 @@ async def upgrade_requests(
     El orden por defecto es la solicitud más antigua primero: una solicitud
     olvidada es la peor de las respuestas posibles.
     """
-    where = "WHERE (:est IS NULL OR r.estado = :est) AND (:pd IS NULL OR r.plan_deseado = :pd)"
+    where = (
+        "WHERE (CAST(:est AS text) IS NULL OR r.estado = :est) "
+        "AND (CAST(:pd AS text) IS NULL OR r.plan_deseado = :pd)"
+    )
     params = {"est": estado, "pd": plan_deseado, "lim": p.page_size, "off": p.offset}
     orden = p.clausula_order(
         {"antiguedad": "r.solicitado_el", "urgente": "r.urgente"}, "r.solicitado_el ASC"
@@ -801,12 +804,6 @@ async def informe(
         )
         if r is None or (r["requested_by"] != st.id and st.role != "staff_admin"):
             raise no_encontrado("El informe")
-        if r["status"] in ("en_cola", "generando"):
-            raise conflicto(
-                "CONFLICTO_ESTADO",
-                "El informe todavía se está generando.",
-                {"estado": r["status"]},
-            )
 
         url = None
         if r["status"] == "listo" and r["blob_ref"]:
