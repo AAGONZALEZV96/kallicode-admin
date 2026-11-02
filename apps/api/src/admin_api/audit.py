@@ -19,8 +19,9 @@ comprobar el encadenamiento real. Es la corrección de origen del defecto DB-F04
 
 from __future__ import annotations
 
+import hashlib
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
 from kallicode_core.logging import log
@@ -68,12 +69,24 @@ class ResultadoIntegridadCadena(dict[str, Any]):
         return bool(self.get("integra", False))
 
     @property
+    def verificado(self) -> bool:
+        return bool(self.get("verificado", self.integra))
+
+    @property
     def roturas(self) -> list[dict[str, Any]]:
         return list(self.get("roturas", []))
 
     @property
     def total_roturas(self) -> int:
         return int(self.get("total_roturas", 0))
+
+    @property
+    def primer_evento_roto(self) -> dict[str, Any] | None:
+        primer = self.get("primer_evento_roto")
+        if primer is not None:
+            return primer  # type: ignore[no-any-return]
+        roturas = self.roturas
+        return roturas[0] if roturas else None
 
 
 async def registrar_accion(
@@ -287,13 +300,160 @@ async def verificar_cadena_staff_actions(
 
     Retorna un objeto ResultadoIntegridadCadena con:
       - integra = True si la cadena es íntegra y no ha sido alterada.
+      - verificado = True solo si el tramo evaluado es íntegro.
       - roturas = lista de incidentes detectados si hay inconsistencias.
+      - total_roturas = número de incidentes.
+      - primer_evento_roto = primer incidente detectado (o None si es íntegra).
     """
     roturas = await verificar_cadena(db, desde=desde, hasta=hasta)
+    integro = len(roturas) == 0
+    primer = roturas[0] if roturas else None
     return ResultadoIntegridadCadena(
-        integra=(len(roturas) == 0),
+        integra=integro,
+        verificado=integro,
         roturas=roturas,
         total_roturas=len(roturas),
+        primer_evento_roto=primer,
+    )
+
+
+def calcular_sello_staff_action(
+    *,
+    prev_seal: str,
+    occurred_at: datetime | str,
+    staff_id: str,
+    action: str,
+    endpoint: str,
+    tenant_id: str | None = None,
+    scope: str | None = None,
+    reason: str | None = None,
+    resource: str | None = None,
+    payload: dict[str, Any] | str | None = None,
+) -> str:
+    """Recalcula de forma determinista el sello SHA-256 de una acción de personal.
+
+    Reproduce de manera idéntica la lógica del trigger PostgreSQL admin.seal_staff_action():
+      sello = SHA-256(
+          prev_seal || occurred_at::text || staff_id || action
+          || coalesce(tenant_id, '') || coalesce(scope, '')
+          || coalesce(reason, '') || coalesce(resource, '')
+          || endpoint || coalesce(payload::text, '')
+      )
+    """
+    ts_str = str(occurred_at)
+
+    if payload is None:
+        pl_str = ""
+    elif isinstance(payload, str):
+        pl_str = payload
+    else:
+        pl_str = json.dumps(payload, separators=(", ", ": "))
+
+    raw = (
+        prev_seal
+        + ts_str
+        + staff_id
+        + action
+        + (tenant_id or "")
+        + (scope or "")
+        + (reason or "")
+        + (resource or "")
+        + endpoint
+        + pl_str
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+async def recalcular_y_verificar_cadena(
+    db: AsyncSession,
+    *,
+    desde: str | None = None,
+    hasta: str | None = None,
+    tenant_id: str | None = None,
+) -> ResultadoIntegridadCadena:
+    """Recorre secuencialmente admin.staff_actions recalculando en Python los sellos SHA-256.
+
+    Comprueba:
+      1. Coincidencia estricta de cada sello almacenado con el hash recalculado.
+      2. Continuidad criptográfica (prev_seal coincide con el seal anterior).
+      3. Aislamiento opcional por cliente (tenant_id) y rango temporal (desde, hasta).
+    """
+    conds: list[str] = []
+    params: dict[str, Any] = {
+        "d": desde,
+        "h": hasta,
+        "tid": tenant_id,
+    }
+    if desde:
+        conds.append("occurred_at >= CAST(CAST(:d AS text) AS timestamptz)")
+    if hasta:
+        conds.append("occurred_at < CAST(CAST(:h AS text) AS timestamptz)")
+    if tenant_id:
+        conds.append("tenant_id = :tid")
+
+    where_clause = f"WHERE {' AND '.join(conds)}" if conds else ""
+    filas = await todos(
+        db,
+        f"""
+        SELECT id, occurred_at, occurred_at::text AS ts, staff_id, action,
+               tenant_id, scope, reason, resource, endpoint,
+               payload::text AS pl, prev_seal, seal
+        FROM admin.staff_actions
+        {where_clause}
+        ORDER BY occurred_at, id
+    """,
+        params,
+    )
+
+    roturas: list[dict[str, Any]] = []
+    expected_seal: str | None = None
+
+    for r in filas:
+        prev = r.get("prev_seal") or ""
+        # Si es verificación de continuidad global (sin filtro de tenant), verificar enlace
+        if tenant_id is None and expected_seal is not None and prev != expected_seal:
+            roturas.append(
+                {
+                    "broken_at": r["occurred_at"],
+                    "broken_id": r["id"],
+                    "motivo": f"encadenamiento roto: se esperaba {expected_seal[:12]}",
+                }
+            )
+            break
+
+        sello_calculado = calcular_sello_staff_action(
+            prev_seal=prev,
+            occurred_at=r["ts"],
+            staff_id=r["staff_id"],
+            action=r["action"],
+            endpoint=r["endpoint"],
+            tenant_id=r.get("tenant_id"),
+            scope=r.get("scope"),
+            reason=r.get("reason"),
+            resource=r.get("resource"),
+            payload=r.get("pl") or "",
+        )
+
+        if r["seal"] != sello_calculado:
+            roturas.append(
+                {
+                    "broken_at": r["occurred_at"],
+                    "broken_id": r["id"],
+                    "motivo": "sello no reproducible",
+                }
+            )
+            break
+
+        expected_seal = r["seal"]
+
+    integro = len(roturas) == 0
+    primer = roturas[0] if roturas else None
+    return ResultadoIntegridadCadena(
+        integra=integro,
+        verificado=integro,
+        roturas=roturas,
+        total_roturas=len(roturas),
+        primer_evento_roto=primer,
     )
 
 
@@ -424,8 +584,10 @@ async def consultar_accesos_staff_para_portal(
 __all__ = [
     "Accion",
     "ResultadoIntegridadCadena",
+    "calcular_sello_staff_action",
     "consultar_accesos_staff_para_portal",
     "formatear_nombre_publico",
+    "recalcular_y_verificar_cadena",
     "registrar_accion",
     "registrar_accion_staff",
     "registrar_lectura",
