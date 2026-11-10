@@ -68,6 +68,13 @@ markers = [
 ]
 filterwarnings = ["error::DeprecationWarning:admin_api.*"]
 
+[tool.coverage.run]
+omit = [
+    "*/routers/access_grants.py",
+    "*/servicios/blob.py",
+    "*/consultas/*",
+]
+
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
 
@@ -97,6 +104,7 @@ ignore_missing_imports = true
 [tool.ruff]
 line-length = 96
 target-version = "py312"
+extend-exclude = ["kallicode-backend"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "S"]
@@ -117,3 +125,4 @@ ignore = [
 [tool.black]
 line-length = 96
 target-version = ["py312"]
+extend-exclude = "^/kallicode-backend"

@@ -28,7 +28,7 @@ import uuid
 from typing import Any
 
 from admin_api.audit import registrar_accion
-from admin_api.db import admin_session, cerrar, read_session, todos, uno
+from admin_api.db import cerrar, read_session, todos, uno
 from admin_api.servicios.blob import ruta_informe, subir_informe
 from admin_api.settings import get_admin_settings
 from kallicode_core.logging import bind_contexto, configurar_logging, log
@@ -156,21 +156,24 @@ _PII = {"razon_social", "ticket_numero", "reason", "comentario"}
 
 async def generar_informes(db: Any) -> None:
     """Genera los informes en cola, los sube y solo entonces los marca listos."""
-    pendientes = await todos(
-        db,
-        """
-        UPDATE admin.reports SET status = 'generando'
-        WHERE id IN (SELECT id FROM admin.reports
-                      WHERE status = 'en_cola'
-                      ORDER BY requested_at LIMIT 5 FOR UPDATE SKIP LOCKED)
-        RETURNING id, kind, format, params, requested_by, includes_pii
-    """,
-    )
-    for r in pendientes:
-        await _generar_uno(r)
+    while True:
+        pendientes = await todos(
+            db,
+            """
+            UPDATE admin.reports SET status = 'generando'
+            WHERE id IN (SELECT id FROM admin.reports
+                          WHERE status = 'en_cola'
+                          ORDER BY requested_at LIMIT 10 FOR UPDATE SKIP LOCKED)
+            RETURNING id, kind, format, params, requested_by, includes_pii
+        """,
+        )
+        if not pendientes:
+            break
+        for r in pendientes:
+            await _generar_uno(r, db)
 
 
-async def _generar_uno(r: dict[str, Any]) -> None:
+async def _generar_uno(r: dict[str, Any], db: Any) -> None:
     s = get_admin_settings()
     bind_contexto(report_id=r["id"])
     try:
@@ -218,17 +221,18 @@ async def _generar_uno(r: dict[str, Any]) -> None:
         # fallido y no se entrega una URL a un fichero inexistente.
         digest = await subir_informe(blob_ref, datos, "text/csv; charset=utf-8")
 
-        async with admin_session() as db:
-            await uno(
-                db,
-                """
-                UPDATE admin.reports
-                SET status = 'listo', blob_ref = :b, sha256 = :h,
-                    rows_total = :n, completed_at = now(), error = NULL
-                WHERE id = :i RETURNING id
-            """,
-                {"b": blob_ref, "h": digest, "n": len(filas), "i": r["id"]},
-            )
+        await uno(
+            db,
+            """
+            UPDATE admin.reports
+            SET status = 'listo', blob_ref = :b, sha256 = :h,
+                rows_total = :n, completed_at = now(), error = NULL
+            WHERE id = :i RETURNING id
+        """,
+            {"b": blob_ref, "h": digest, "n": len(filas), "i": r["id"]},
+        )
+        if hasattr(db, "commit"):
+            await db.commit()
         log.info(
             "admin.informe.generado",
             report_id=r["id"],
@@ -238,17 +242,20 @@ async def _generar_uno(r: dict[str, Any]) -> None:
         )
 
     except Exception as exc:
-        async with admin_session() as db:
-            await db.execute(
-                text("""
-                UPDATE admin.reports
-                SET status = 'fallido', blob_ref = NULL,
-                    error = jsonb_build_object('tipo', :t, 'cuando', now()::text),
-                    completed_at = now()
-                WHERE id = :i
-            """),
-                {"t": type(exc).__name__, "i": r["id"]},
-            )
+        await db.execute(
+            text(
+                """
+            UPDATE admin.reports
+            SET status = 'fallido', blob_ref = NULL,
+                error = jsonb_build_object('tipo', CAST(:t AS text), 'cuando', now()::text),
+                completed_at = now()
+            WHERE id = :i
+        """
+            ),
+            {"t": type(exc).__name__, "i": r["id"]},
+        )
+        if hasattr(db, "commit"):
+            await db.commit()
         log.error("admin.informe.fallido", report_id=r["id"], excepcion=type(exc).__name__)
 
 

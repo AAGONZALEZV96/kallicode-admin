@@ -76,11 +76,13 @@ async def _crear_concesion_y_accion(
     caduca = ahora + timedelta(minutes=duracion_min)
 
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO admin.access_grants
             (id, staff_id, tenant_id, scope, reason, reference, granted_at, expires_at, reads)
         VALUES (:id, :s, :t, :sc, :rz, :ref, :g_at, :e_at, :reads)
-    """),
+    """
+        ),
         {
             "id": grant_id,
             "s": staff_id,
@@ -462,13 +464,15 @@ async def test_recalculo_determinista_sha256_coincide_con_base_de_datos(
     await db.commit()
 
     res = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, occurred_at::text AS ts, staff_id, action,
                tenant_id, scope, reason, resource, endpoint,
                payload::text AS pl, prev_seal, seal
         FROM admin.staff_actions
         ORDER BY occurred_at, id
-    """)
+    """
+        )
     )
     filas = res.fetchall()
     assert len(filas) >= 5
@@ -486,9 +490,7 @@ async def test_recalculo_determinista_sha256_coincide_con_base_de_datos(
             resource=f.resource,
             payload=f.pl or "",
         )
-        assert f.seal == sello_py, (
-            f"Fallo en recálculo ID {f.id}: DB {f.seal} != PY {sello_py}"
-        )
+        assert f.seal == sello_py, f"Fallo en recálculo ID {f.id}: DB {f.seal} != PY {sello_py}"
         assert len(f.seal) == 64
         assert re.match(r"^[0-9a-f]{64}$", f.seal)
 
@@ -568,11 +570,13 @@ async def test_tamper_alteracion_payload_detecta_ruptura_y_primer_evento_roto(
     )
     async with engine_su.begin() as conn:
         res = await conn.execute(
-            text("""
+            text(
+                """
             SELECT id, payload::text AS pl FROM admin.staff_actions
             WHERE endpoint = '/admin/v1/tamper-payload'
             ORDER BY id DESC LIMIT 1
-        """)
+        """
+            )
         )
         row = res.fetchone()
         assert row is not None
@@ -588,17 +592,18 @@ async def test_tamper_alteracion_payload_detecta_ruptura_y_primer_evento_roto(
                 )
             )
             await conn.execute(
-                text("""
+                text(
+                    """
                 UPDATE admin.staff_actions
                 SET payload = '{"inmutable": false, "inyeccion": "maliciosa"}'::jsonb
                 WHERE id = :id
-            """),
+            """
+                ),
                 {"id": target_id},
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -626,17 +631,18 @@ async def test_tamper_alteracion_payload_detecta_ruptura_y_primer_evento_roto(
                 )
             )
             await conn.execute(
-                text("""
+                text(
+                    """
                 UPDATE admin.staff_actions
                 SET payload = CAST(:pl AS jsonb)
                 WHERE id = :id
-            """),
+            """
+                ),
                 {"pl": orig_pl, "id": target_id},
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -669,11 +675,13 @@ async def test_tamper_alteracion_motivo_detecta_ruptura_inmediata(
     )
     async with engine_su.begin() as conn:
         res = await conn.execute(
-            text("""
+            text(
+                """
             SELECT id, reason FROM admin.staff_actions
             WHERE endpoint = '/admin/v1/tamper-reason'
             ORDER BY id DESC LIMIT 1
-        """)
+        """
+            )
         )
         row = res.fetchone()
         assert row is not None
@@ -696,8 +704,7 @@ async def test_tamper_alteracion_motivo_detecta_ruptura_inmediata(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -726,8 +733,7 @@ async def test_tamper_alteracion_motivo_detecta_ruptura_inmediata(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -758,11 +764,13 @@ async def test_tamper_alteracion_timestamp_detecta_ruptura_inmediata(
     )
     async with engine_su.begin() as conn:
         res = await conn.execute(
-            text("""
+            text(
+                """
             SELECT id, occurred_at FROM admin.staff_actions
             WHERE endpoint = '/admin/v1/tamper-timestamp'
             ORDER BY id DESC LIMIT 1
-        """)
+        """
+            )
         )
         row = res.fetchone()
         assert row is not None
@@ -786,8 +794,7 @@ async def test_tamper_alteracion_timestamp_detecta_ruptura_inmediata(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -815,8 +822,7 @@ async def test_tamper_alteracion_timestamp_detecta_ruptura_inmediata(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -866,24 +872,28 @@ async def test_tamper_supresion_registro_intermedio_detecta_discontinuidad(
     )
     async with engine_su.begin() as conn:
         res = await conn.execute(
-            text("""
+            text(
+                """
             SELECT id, occurred_at, staff_id, staff_email, staff_role, action,
                    tenant_id, grant_id, scope, reason, resource, endpoint,
                    ip, user_agent, request_id, payload, prev_seal, seal
             FROM admin.staff_actions
             WHERE endpoint = '/admin/v1/del-step-2'
             ORDER BY id DESC LIMIT 1
-        """)
+        """
+            )
         )
         row_del = res.fetchone()
         assert row_del is not None
 
         res_post = await conn.execute(
-            text("""
+            text(
+                """
             SELECT id FROM admin.staff_actions
             WHERE endpoint = '/admin/v1/del-step-3'
             ORDER BY id DESC LIMIT 1
-        """)
+        """
+            )
         )
         row_post = res_post.fetchone()
         assert row_post is not None
@@ -903,8 +913,7 @@ async def test_tamper_supresion_registro_intermedio_detecta_discontinuidad(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -929,13 +938,11 @@ async def test_tamper_supresion_registro_intermedio_detecta_discontinuidad(
                 )
             )
             await conn.execute(
-                text(
-                    "ALTER TABLE admin.staff_actions "
-                    "DISABLE TRIGGER trg_staff_actions_seal"
-                )
+                text("ALTER TABLE admin.staff_actions DISABLE TRIGGER trg_staff_actions_seal")
             )
             await conn.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO admin.staff_actions (
                     id, occurred_at, staff_id, staff_email, staff_role, action,
                     tenant_id, grant_id, scope, reason, resource, endpoint,
@@ -945,7 +952,8 @@ async def test_tamper_supresion_registro_intermedio_detecta_discontinuidad(
                     :tid, :gid, :sc, :rz, :res, :ep,
                     :ip, :ua, :rq, :pl, :prev, :seal
                 )
-            """),
+            """
+                ),
                 {
                     "id": row_del.id,
                     "o_at": row_del.occurred_at,
@@ -968,15 +976,11 @@ async def test_tamper_supresion_registro_intermedio_detecta_discontinuidad(
                 },
             )
             await conn.execute(
-                text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_seal"
-                )
+                text("ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_seal")
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -1009,11 +1013,13 @@ async def test_trigger_inmutabilidad_bloquea_update_para_superusuario_y_app(
     async with engine_su.connect() as conn:
         with pytest.raises((InternalError, DBAPIError)) as excinfo:
             await conn.execute(
-                text("""
+                text(
+                    """
                 UPDATE admin.staff_actions
                 SET reason = 'mutacion no autorizada'
                 WHERE endpoint = '/admin/v1/trigger-update'
-            """)
+            """
+                )
             )
         assert "append-only" in str(excinfo.value)
         assert "UPDATE no está permitido" in str(excinfo.value)
@@ -1043,10 +1049,12 @@ async def test_trigger_inmutabilidad_bloquea_delete_para_superusuario_y_app(
     async with engine_su.connect() as conn:
         with pytest.raises((InternalError, DBAPIError)) as excinfo:
             await conn.execute(
-                text("""
+                text(
+                    """
                 DELETE FROM admin.staff_actions
                 WHERE endpoint = '/admin/v1/trigger-delete'
-            """)
+            """
+                )
             )
         assert "append-only" in str(excinfo.value)
         assert "DELETE no está permitido" in str(excinfo.value)
@@ -1087,10 +1095,7 @@ async def test_roles_app_y_ro_tienen_privilegios_dml_revocados(
     async with engine_app.connect() as conn_app:
         with pytest.raises(ProgrammingError) as exc_del:
             await conn_app.execute(
-                text(
-                    "DELETE FROM admin.staff_actions "
-                    "WHERE endpoint = '/admin/v1/perms-dml'"
-                )
+                text("DELETE FROM admin.staff_actions WHERE endpoint = '/admin/v1/perms-dml'")
             )
         assert "permission denied for table staff_actions" in str(exc_del.value).lower()
 
@@ -1114,10 +1119,7 @@ async def test_roles_app_y_ro_tienen_privilegios_dml_revocados(
     async with engine_ro.connect() as conn_ro:
         with pytest.raises(ProgrammingError) as exc_ro_del:
             await conn_ro.execute(
-                text(
-                    "DELETE FROM admin.staff_actions "
-                    "WHERE endpoint = '/admin/v1/perms-dml'"
-                )
+                text("DELETE FROM admin.staff_actions WHERE endpoint = '/admin/v1/perms-dml'")
             )
         assert "permission denied for table staff_actions" in str(exc_ro_del.value).lower()
 
@@ -1149,9 +1151,7 @@ async def test_verificacion_por_rango_temporal(db: Any, staff_factory: Any) -> N
 
     pasado_desde = (ahora - timedelta(days=30)).isoformat()
     pasado_hasta = (ahora - timedelta(days=29)).isoformat()
-    res_vacio = await recalcular_y_verificar_cadena(
-        db, desde=pasado_desde, hasta=pasado_hasta
-    )
+    res_vacio = await recalcular_y_verificar_cadena(db, desde=pasado_desde, hasta=pasado_hasta)
     assert res_vacio.integra is True
     assert res_vacio.verificado is True
     assert res_vacio.total_roturas == 0
@@ -1193,4 +1193,3 @@ async def test_verificacion_por_tenant_id(db: Any, staff_factory: Any) -> None:
     assert res_globex.integra is True
     assert res_globex.verificado is True
     assert res_globex.total_roturas == 0
-

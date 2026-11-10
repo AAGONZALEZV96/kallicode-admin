@@ -112,6 +112,8 @@ GRANT SELECT ON admin.sla_targets, admin.sla_pause_states, admin.sla_cases
     TO kallicode_admin_ro;
 GRANT SELECT, INSERT, UPDATE, DELETE ON admin.sla_cases TO kallicode_admin_agg;
 GRANT SELECT ON admin.sla_targets, admin.sla_pause_states TO kallicode_admin_agg;
+GRANT SELECT, INSERT, UPDATE, DELETE ON admin.sla_targets, admin.sla_pause_states, admin.sla_cases
+    TO kallicode_admin_app;
 
 -- -----------------------------------------------------------------------------
 -- Cálculo del reloj de un caso

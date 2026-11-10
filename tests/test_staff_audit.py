@@ -46,9 +46,11 @@ async def _registrar(db: Any, staff_id: str, n: int = 3, tenant: str = "org_acme
             resource=f"customer:{tenant}",
         )
     filas = await db.execute(
-        text("""
+        text(
+            """
         SELECT id FROM admin.staff_actions WHERE staff_id = :s ORDER BY id
-    """),
+    """
+        ),
         {"s": staff_id},
     )
     return [f[0] for f in filas.fetchall()]
@@ -61,9 +63,11 @@ async def test_cada_accion_se_sella_con_la_anterior(db: Any, staff_factory: Any)
     await _registrar(db, empleado["id"], n=5)
 
     filas = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, prev_seal, seal FROM admin.staff_actions ORDER BY id
-    """)
+    """
+        )
     )
     anterior = None
     for _id, prev, seal in filas.fetchall():
@@ -80,9 +84,11 @@ async def test_la_cadena_intacta_no_reporta_roturas(db: Any, staff_factory: Any)
     await db.commit()
 
     roturas = await db.execute(
-        text("""
+        text(
+            """
         SELECT * FROM admin.verify_staff_action_chain(NULL, NULL)
-    """)
+    """
+        )
     )
     assert roturas.fetchall() == []
 
@@ -101,39 +107,62 @@ async def test_verificar_cadena_desde_la_api_confirma_la_integridad(
 
 
 # ================================================================ append-only
-async def test_no_se_puede_modificar_una_accion_registrada(db: Any, staff_factory: Any) -> None:
+async def test_no_se_puede_modificar_una_accion_registrada(
+    dsn: str, db: Any, staff_factory: Any
+) -> None:
     """Cambiar el motivo de una lectura ya registrada es imposible.
 
     Reescribir el motivo a posteriori es precisamente el fraude que el registro
     debe hacer imposible: convertiría un acceso injustificado en uno justificado.
     """
     from sqlalchemy.exc import DBAPIError, InternalError
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
 
     empleado = await staff_factory("staff_soporte")
     ids = await _registrar(db, empleado["id"], n=1)
     await db.commit()
 
-    with pytest.raises((InternalError, DBAPIError)) as exc:
-        await db.execute(
-            text("""
-            UPDATE admin.staff_actions SET reason = 'motivo reescrito' WHERE id = :i
-        """),
-            {"i": ids[0]},
-        )
-    assert "append" in str(exc.value).lower() or "inmutable" in str(exc.value).lower()
-    await db.rollback()
+    engine_su = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    async with engine_su.begin() as conn:
+        with pytest.raises((InternalError, DBAPIError)) as exc:
+            await conn.execute(
+                text(
+                    """
+                UPDATE admin.staff_actions SET reason = 'motivo reescrito' WHERE id = :i
+            """
+                ),
+                {"i": ids[0]},
+            )
+        assert "append" in str(exc.value).lower() or "inmutable" in str(exc.value).lower()
+    await engine_su.dispose()
 
 
-async def test_no_se_puede_borrar_una_accion_registrada(db: Any, staff_factory: Any) -> None:
+async def test_no_se_puede_borrar_una_accion_registrada(
+    dsn: str, db: Any, staff_factory: Any
+) -> None:
     from sqlalchemy.exc import DBAPIError, InternalError
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
 
     empleado = await staff_factory("staff_soporte")
     ids = await _registrar(db, empleado["id"], n=1)
     await db.commit()
 
-    with pytest.raises((InternalError, DBAPIError)):
-        await db.execute(text("DELETE FROM admin.staff_actions WHERE id = :i"), {"i": ids[0]})
-    await db.rollback()
+    engine_su = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    async with engine_su.begin() as conn:
+        with pytest.raises((InternalError, DBAPIError)) as exc:
+            await conn.execute(
+                text("DELETE FROM admin.staff_actions WHERE id = :i"), {"i": ids[0]}
+            )
+        assert "append" in str(exc.value).lower() or "inmutable" in str(exc.value).lower()
+    await engine_su.dispose()
 
 
 async def test_el_rol_de_lectura_no_puede_escribir_en_el_registro(db_ro: Any) -> None:
@@ -147,17 +176,19 @@ async def test_el_rol_de_lectura_no_puede_escribir_en_el_registro(db_ro: Any) ->
 
     with pytest.raises((ProgrammingError, InternalError, DBAPIError)):
         await db_ro.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff_actions (staff_id, staff_role, action,
                                              endpoint)
             VALUES ('st_x', 'staff_admin', 'read', 'falso')
-        """)
+        """
+            )
         )
 
 
 # =========================================== detección de manipulación real
 async def test_se_detecta_la_supresion_de_un_tramo_intermedio(
-    db: Any, staff_factory: Any
+    dsn: str, db: Any, staff_factory: Any
 ) -> None:
     """Borrar una fila del medio rompe la cadena y la verificación lo dice.
 
@@ -166,30 +197,57 @@ async def test_se_detecta_la_supresion_de_un_tramo_intermedio(
     imposible: contra un superusuario no hay disparador que valga, así que la
     defensa es que la manipulación deje marca.
     """
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
     empleado = await staff_factory("staff_soporte")
     ids = await _registrar(db, empleado["id"], n=5)
     await db.commit()
 
-    await db.execute(text("ALTER TABLE admin.staff_actions DISABLE TRIGGER USER"))
-    await db.execute(text("DELETE FROM admin.staff_actions WHERE id = :i"), {"i": ids[2]})
-    await db.execute(text("ALTER TABLE admin.staff_actions ENABLE TRIGGER USER"))
-    await db.commit()
-
-    roturas = (
-        await db.execute(
-            text("""
-        SELECT broken_id, motivo FROM admin.verify_staff_action_chain(NULL, NULL)
-    """)
-        )
-    ).fetchall()
-    assert roturas, "se borró una fila intermedia y la verificación no lo detectó"
-    assert ids[3] in [r[0] for r in roturas], (
-        f"la rotura debía señalar la fila {ids[3]}, siguiente a la borrada: {roturas}"
+    engine_su = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
     )
+    disable_trigger = (
+        "ALTER TABLE admin.staff_actions " "DISABLE TRIGGER trg_staff_actions_immutable"
+    )
+    enable_trigger = (
+        "ALTER TABLE admin.staff_actions " "ENABLE TRIGGER trg_staff_actions_immutable"
+    )
+    try:
+        async with engine_su.begin() as conn:
+            await conn.execute(text(disable_trigger))
+            await conn.execute(
+                text("DELETE FROM admin.staff_actions WHERE id = :i"), {"i": ids[2]}
+            )
+            await conn.execute(text(enable_trigger))
+
+        roturas = (
+            await db.execute(
+                text(
+                    """
+            SELECT broken_id, motivo FROM admin.verify_staff_action_chain(NULL, NULL)
+        """
+                )
+            )
+        ).fetchall()
+        assert roturas, "se borró una fila intermedia y la verificación no lo detectó"
+        assert ids[3] in [
+            r[0] for r in roturas
+        ], f"la rotura debía señalar la fila {ids[3]}, siguiente a la borrada: {roturas}"
+    finally:
+        async with engine_su.begin() as conn:
+            await conn.execute(text(disable_trigger))
+            await conn.execute(
+                text("DELETE FROM admin.staff_actions WHERE staff_id = :sid"),
+                {"sid": empleado["id"]},
+            )
+            await conn.execute(text(enable_trigger))
+        await engine_su.dispose()
 
 
 async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
-    db: Any, staff_factory: Any
+    dsn: str, db: Any, staff_factory: Any
 ) -> None:
     """El ataque que la primera versión de la función no detectaba.
 
@@ -199,6 +257,9 @@ async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
     parecería intacta. La función compara además `prev_seal` con el sello **real**
     de la fila anterior, que es lo que hace que este caso se vea.
     """
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
     empleado = await staff_factory("staff_soporte")
     ids = await _registrar(db, empleado["id"], n=5)
     await db.commit()
@@ -206,36 +267,64 @@ async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
     sellos = dict(
         (
             await db.execute(
-                text("""
+                text(
+                    """
         SELECT id, seal FROM admin.staff_actions ORDER BY id
-    """)
+    """
+                )
             )
         ).fetchall()
     )
 
-    await db.execute(text("ALTER TABLE admin.staff_actions DISABLE TRIGGER USER"))
-    await db.execute(text("DELETE FROM admin.staff_actions WHERE id = :i"), {"i": ids[2]})
-    # Se recompone el eslabón para que apunte a la fila que ahora la precede.
-    await db.execute(
-        text("""
-        UPDATE admin.staff_actions SET prev_seal = :p WHERE id = :i
-    """),
-        {"p": sellos[ids[1]], "i": ids[3]},
+    engine_su = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
     )
-    await db.execute(text("ALTER TABLE admin.staff_actions ENABLE TRIGGER USER"))
-    await db.commit()
+    disable_trigger = (
+        "ALTER TABLE admin.staff_actions " "DISABLE TRIGGER trg_staff_actions_immutable"
+    )
+    enable_trigger = (
+        "ALTER TABLE admin.staff_actions " "ENABLE TRIGGER trg_staff_actions_immutable"
+    )
+    try:
+        async with engine_su.begin() as conn:
+            await conn.execute(text(disable_trigger))
+            await conn.execute(
+                text("DELETE FROM admin.staff_actions WHERE id = :i"), {"i": ids[2]}
+            )
+            # Se recompone el eslabón para que apunte a la fila que ahora la precede.
+            await conn.execute(
+                text(
+                    """
+                UPDATE admin.staff_actions SET prev_seal = :p WHERE id = :i
+            """
+                ),
+                {"p": sellos[ids[1]], "i": ids[3]},
+            )
+            await conn.execute(text(enable_trigger))
 
-    roturas = (
-        await db.execute(
-            text("""
-        SELECT broken_id, motivo FROM admin.verify_staff_action_chain(NULL, NULL)
-    """)
+        roturas = (
+            await db.execute(
+                text(
+                    """
+            SELECT broken_id, motivo FROM admin.verify_staff_action_chain(NULL, NULL)
+        """
+                )
+            )
+        ).fetchall()
+        assert roturas, (
+            "se reescribió el eslabón tras borrar una fila y la cadena pareció "
+            "intacta: la verificación está comprobando el sello contra sí mismo"
         )
-    ).fetchall()
-    assert roturas, (
-        "se reescribió el eslabón tras borrar una fila y la cadena pareció "
-        "intacta: la verificación está comprobando el sello contra sí mismo"
-    )
+    finally:
+        async with engine_su.begin() as conn:
+            await conn.execute(text(disable_trigger))
+            await conn.execute(
+                text("DELETE FROM admin.staff_actions WHERE staff_id = :sid"),
+                {"sid": empleado["id"]},
+            )
+            await conn.execute(text(enable_trigger))
+        await engine_su.dispose()
 
 
 async def test_la_verificacion_por_tramos_no_denuncia_su_propio_corte(
@@ -255,18 +344,22 @@ async def test_la_verificacion_por_tramos_no_denuncia_su_propio_corte(
 
     fechas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT min(occurred_at), max(occurred_at) FROM admin.staff_actions
-    """)
+    """
+            )
         )
     ).fetchone()
     assert fechas is not None
 
     roturas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT * FROM admin.verify_staff_action_chain(:d, :h)
-    """),
+    """
+            ),
             {"d": fechas[0], "h": fechas[1]},
         )
     ).fetchall()
@@ -326,11 +419,13 @@ async def test_el_registro_guarda_quien_desde_donde_y_por_que(
 
     fila = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT staff_id, staff_role, action, tenant_id, scope, reason, resource,
                endpoint, ip, user_agent, request_id, occurred_at
         FROM admin.staff_actions ORDER BY id DESC LIMIT 1
-    """)
+    """
+            )
         )
     ).fetchone()
     assert fila is not None
@@ -378,16 +473,18 @@ async def test_el_registro_no_guarda_el_dato_leido(db: Any, staff_factory: Any) 
 
     fila = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT payload::text FROM admin.staff_actions ORDER BY id DESC LIMIT 1
-    """)
+    """
+            )
         )
     ).fetchone()
     assert fila is not None
     texto = fila[0] or ""
-    assert "Acme" not in texto, (
-        "el registro contiene el valor revelado, no solo el campo consultado"
-    )
+    assert (
+        "Acme" not in texto
+    ), "el registro contiene el valor revelado, no solo el campo consultado"
     assert "razon_social" in texto, "el registro no dice qué campos se revelaron"
 
 
@@ -405,12 +502,14 @@ async def test_hay_particiones_creadas_por_delante(db: Any) -> None:
     hoy = datetime.now(UTC)
     filas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT c.relname FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'admin' AND c.relname LIKE 'staff_actions_%'
         ORDER BY c.relname
-    """)
+    """
+            )
         )
     ).fetchall()
     nombres = [f[0] for f in filas]

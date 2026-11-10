@@ -153,25 +153,25 @@ def verificar_enmascaramiento_cliente(
         if isinstance(enm, bool):
             assert enm is True, f"Se esperaba enmascarado=True pero fue {enm}"
         elif isinstance(enm, list):
-            assert "razon_social" in enm or "dominio" in enm, (
-                f"Lista 'enmascarado' debe indicar los campos protegidos: {enm}"
-            )
+            assert (
+                "razon_social" in enm or "dominio" in enm
+            ), f"Lista 'enmascarado' debe indicar los campos protegidos: {enm}"
         else:
             raise AssertionError(f"Tipo inesperado en campo 'enmascarado': {type(enm)} ({enm})")
     else:
         if rs is not None:
-            assert "•" not in rs, (
-                f"razon_social sigue ofuscada a pesar de concesión activa: '{rs}'"
-            )
+            assert (
+                "•" not in rs
+            ), f"razon_social sigue ofuscada a pesar de concesión activa: '{rs}'"
         if dom is not None:
             assert "•" not in dom, f"dominio sigue ofuscado a pesar de concesión: '{dom}'"
 
         if isinstance(enm, bool):
             assert enm is False, f"Se esperaba enmascarado=False pero fue {enm}"
         elif isinstance(enm, list):
-            assert "razon_social" not in enm and "dominio" not in enm, (
-                f"razon_social o dominio siguen enmascarados con concesión: {enm}"
-            )
+            assert (
+                "razon_social" not in enm and "dominio" not in enm
+            ), f"razon_social o dominio siguen enmascarados con concesión: {enm}"
 
 
 # ==============================================================================
@@ -186,20 +186,52 @@ async def agregados_frescos(db: Any, dos_clientes: list[str]) -> None:
 
 
 @pytest_asyncio.fixture
-async def concesion_acme(db: Any) -> None:
+async def concesion_acme(db: Any) -> Any:
     """Registra una concesión activa en admin.access_grants para org_acme."""
     await db.execute(
-        text("""
+        text(
+            """
+        UPDATE admin.access_grants
+        SET revoked_at = now(),
+            revoked_by = 'st_prueba',
+            revoked_reason = 'Limpieza previa'
+        WHERE staff_id = 'st_prueba' AND tenant_id = 'org_acme'
+          AND revoked_at IS NULL;
+        """
+        )
+    )
+    await db.execute(
+        text(
+            """
         INSERT INTO admin.access_grants (
-            id, staff_id, tenant_id, scope, reason, expires_at
+            id, staff_id, tenant_id, scope, reason, expires_at, revoked_at, revoked_by
         )
         VALUES (
             'gr_org_acme', 'st_prueba', 'org_acme', 'expediente',
             'Incidencia de soporte SUP-1234 justificada',
-            now() + interval '1 hour'
+            now() + interval '1 hour',
+            NULL, NULL
         )
-        ON CONFLICT (id) DO NOTHING;
-        """)
+        ON CONFLICT (id) DO UPDATE
+        SET scope = 'expediente',
+            expires_at = now() + interval '1 hour',
+            revoked_at = NULL,
+            revoked_by = NULL;
+        """
+        )
+    )
+    await db.commit()
+    yield
+    await db.execute(
+        text(
+            """
+        UPDATE admin.access_grants
+        SET revoked_at = now(),
+            revoked_by = 'st_prueba',
+            revoked_reason = 'Fin de prueba'
+        WHERE id = 'gr_org_acme';
+        """
+        )
     )
     await db.commit()
 
@@ -431,9 +463,9 @@ async def test_minimo_privilegio_staff_operaciones(
 
     for metodo, ruta in rutas_negocio_prohibidas:
         r = await cliente.request(metodo, ruta)
-        assert r.status_code == 403, (
-            f"staff_operaciones debió recibir 403 en {metodo} {ruta}, obtuvo {r.status_code}"
-        )
+        assert (
+            r.status_code == 403
+        ), f"staff_operaciones debió recibir 403 en {metodo} {ruta}, obtuvo {r.status_code}"
         body = r.json()
         assert body["error"]["codigo"] == "ROL_STAFF_INSUFICIENTE"
         inspeccionar_payload_recursivo(body)
@@ -486,9 +518,9 @@ async def test_minimo_privilegio_staff_soporte(
 
     for metodo, ruta in rutas_bloqueadas:
         r = await cliente.request(metodo, ruta)
-        assert r.status_code == 403, (
-            f"staff_soporte debió recibir 403 en {metodo} {ruta}, obtuvo {r.status_code}"
-        )
+        assert (
+            r.status_code == 403
+        ), f"staff_soporte debió recibir 403 en {metodo} {ruta}, obtuvo {r.status_code}"
         body = r.json()
         assert body["error"]["codigo"] == "ROL_STAFF_INSUFICIENTE"
         inspeccionar_payload_recursivo(body)
@@ -532,9 +564,9 @@ async def test_minimo_privilegio_staff_negocio(
 
     for metodo, ruta in rutas_prohibidas:
         r = await cliente.request(metodo, ruta)
-        assert r.status_code == 403, (
-            f"staff_negocio debió recibir 403 en {metodo} {ruta}, obtuvo {r.status_code}"
-        )
+        assert (
+            r.status_code == 403
+        ), f"staff_negocio debió recibir 403 en {metodo} {ruta}, obtuvo {r.status_code}"
         body = r.json()
         assert body["error"]["codigo"] == "ROL_STAFF_INSUFICIENTE"
         inspeccionar_payload_recursivo(body)
@@ -652,9 +684,9 @@ async def test_sanitizacion_estricta_respuestas_error(
         else:
             r = await cliente.request(metodo, ruta, json=cuerpo)
 
-        assert r.status_code == status_esperado, (
-            f"Esperado {status_esperado} en {metodo} {ruta}, obtenido {r.status_code}: {r.text}"
-        )
+        assert (
+            r.status_code == status_esperado
+        ), f"Esperado {status_esperado} en {metodo} {ruta}, obtenido {r.status_code}: {r.text}"
 
         # Validación del sobre estándar de error
         body = r.json()
@@ -674,18 +706,18 @@ async def test_sanitizacion_estricta_respuestas_error(
 
         # Comprobación de no-fuga en el texto del error
         texto_error = str(body)
-        assert not PATRON_SQL_SNIPPET.search(texto_error), (
-            f"Fuga de sentencia SQL detectada en error: {texto_error}"
-        )
-        assert not PATRON_EXCEPCIONES.search(texto_error), (
-            f"Fuga de nombre de excepción o traza detectada en error: {texto_error}"
-        )
-        assert not PATRON_TABLAS_PROHIBIDAS.search(texto_error), (
-            f"Fuga de tabla interna detectada en error: {texto_error}"
-        )
-        assert not PATRON_RUTA_INTERNA.search(texto_error), (
-            f"Fuga de ruta del servidor detectada en error: {texto_error}"
-        )
+        assert not PATRON_SQL_SNIPPET.search(
+            texto_error
+        ), f"Fuga de sentencia SQL detectada en error: {texto_error}"
+        assert not PATRON_EXCEPCIONES.search(
+            texto_error
+        ), f"Fuga de nombre de excepción o traza detectada en error: {texto_error}"
+        assert not PATRON_TABLAS_PROHIBIDAS.search(
+            texto_error
+        ), f"Fuga de tabla interna detectada en error: {texto_error}"
+        assert not PATRON_RUTA_INTERNA.search(
+            texto_error
+        ), f"Fuga de ruta del servidor detectada en error: {texto_error}"
 
 
 # ==============================================================================

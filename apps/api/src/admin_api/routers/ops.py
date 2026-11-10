@@ -28,7 +28,7 @@ from .. import telemetry
 from ..db import read_session, todos, uno
 from ..deps import OPS, OPS_NEGOCIO, Staff, exigir, limite_vivo
 from ..errors import agregado_no_disponible, sla_sin_definicion
-from ..masking import enmascarar_filas
+from ..masking import enmascarar_filas, enmascarar_texto
 from ..pagination import Pagina, paginacion, sobre
 from ..settings import get_admin_settings
 
@@ -131,7 +131,7 @@ async def queues(
         elif umbral and antiguedad > umbral:
             c["estado"] = "atencion"
         else:
-            c["estado"] = "normal"
+            c["estado"] = "ok"
 
     criticas = [c["nombre"] for c in colas if c["estado"] == "critico"]
     if criticas:
@@ -205,6 +205,7 @@ async def models(
     salida: dict[str, Any] = {
         "ventana": datos.get("ventana", ventana),
         "proveedores": datos.get("proveedores") or [],
+        "modelos": datos.get("modelos") or datos.get("proveedores") or [],
         "escalados": datos.get("escalados") or {},
         "tokens_por_tier": {c["tier"]: int(c["tokens"] or 0) for c in coste},
         "coste_por_tier": {c["tier"]: float(c["coste"] or 0) for c in coste},
@@ -330,6 +331,10 @@ async def sla(
             raise sla_sin_definicion(", ".join(f["plan"] for f in sin_def))
 
     filas, _ = enmascarar_filas(filas, _concesiones(st, [f["tenant_id"] for f in filas]))
+    if st.role == "staff_operaciones":
+        for f in filas:
+            if "tenant_id" in f and isinstance(f["tenant_id"], str):
+                f["tenant_id"] = enmascarar_texto(f["tenant_id"])
 
     salida = sobre(filas, int(total["n"]) if total else 0, p)
     salida["ciclo"] = ciclo or "en_curso"

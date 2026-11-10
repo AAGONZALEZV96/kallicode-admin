@@ -50,7 +50,7 @@ _ERRORES_ADMIN = {
         "descripcion": "Agregado analítico no disponible.",
     },
     "SLA_SIN_DEFINICION": {
-        "http": 409,
+        "http": 422,
         "descripcion": "No hay objetivos de nivel de servicio configurados.",
     },
     "TELEMETRIA_NO_DISPONIBLE": {
@@ -205,7 +205,7 @@ def agregado_no_disponible(vista: str, edad_s: int | None = None) -> AppError:
 
 
 def sla_sin_definicion(plan: str | None = None, etapa: str | None = None) -> AppError:
-    """409 · no hay objetivos de nivel de servicio configurados (§18.27).
+    """422 · no hay objetivos de nivel de servicio configurados (§18.27).
 
     Se prefiere el error a calcular sobre un supuesto: un cumplimiento
     inventado erosiona la confianza en el resto de la consola.
@@ -213,7 +213,7 @@ def sla_sin_definicion(plan: str | None = None, etapa: str | None = None) -> App
     detalle = {k: v for k, v in (("plan", plan), ("etapa", etapa)) if v}
     return AppError(
         "SLA_SIN_DEFINICION",
-        409,
+        422,
         "No hay objetivos de nivel de servicio configurados para ese plan.",
         detalle or None,
     )

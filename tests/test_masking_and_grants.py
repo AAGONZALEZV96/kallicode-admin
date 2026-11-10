@@ -94,13 +94,15 @@ async def test_evaluar_concesion_activa_en_db(
 
     # Insertar concesión de expediente (que cubre datos_negocio y expediente)
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO admin.access_grants
             (id, staff_id, tenant_id, scope, reason, reference, granted_at, expires_at)
         VALUES (
             'gr_eval_1', :s, :t, 'expediente', :r, 'SUP-101', now(), now() + interval '1 hour'
         )
-    """),
+    """
+        ),
         {"s": sid, "t": tid, "r": MOTIVO_VALIDO},
     )
     await db.flush()
@@ -112,11 +114,13 @@ async def test_evaluar_concesion_activa_en_db(
 
     # Simular revocación
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE admin.access_grants
         SET revoked_at = now(), revoked_by = :s, revoked_reason = 'Cierre'
         WHERE id = 'gr_eval_1'
-    """),
+    """
+        ),
         {"s": sid},
     )
     await db.flush()

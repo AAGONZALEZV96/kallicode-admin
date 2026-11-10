@@ -15,6 +15,11 @@ sync:
 # Ejecuta los linters y chequeos de tipos respetando el CI
 lint:
 	uv run ruff check .
+	uv run black --check apps/ tests/
+	uv run mypy apps/api/src apps/workers/src
+
+# Chequeo estricto de tipos con mypy
+types:
 	uv run mypy apps/api/src apps/workers/src
 
 # Aplica formato de código

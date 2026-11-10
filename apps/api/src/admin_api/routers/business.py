@@ -463,6 +463,7 @@ async def subscriptions(
 
     where = """
         WHERE c.eliminado_en IS NULL
+          AND c.suscripcion_estado IS NOT NULL
           AND (CAST(:est AS text) IS NULL OR c.suscripcion_estado = :est)
           AND (CAST(:plan AS text) IS NULL OR c.plan_codigo = :plan)
           AND (CAST(:dias AS integer) IS NULL OR (c.renueva_el IS NOT NULL
@@ -482,7 +483,7 @@ async def subscriptions(
     )
 
     async with read_session() as db:
-        await _frescura(db, "customer_state", "usage_cycle")
+        frescura = await _frescura(db, "customer_state", "usage_cycle")
         total = await uno(
             db, f"SELECT count(*) AS n FROM admin.agg_customer_state c {where}", params
         )
@@ -506,13 +507,29 @@ async def subscriptions(
             params,
         )
 
-    filas, alguna = enmascarar_filas(filas, _concesiones(st, [f["tenant_id"] for f in filas]))
+    tenants = [f["tenant_id"] for f in filas]
+    filas, alguna = enmascarar_filas(filas, _concesiones(st, tenants))
+    await _registrar_lecturas(st, "GET /admin/v1/business/subscriptions", set(tenants))
+    frescura_iso = frescura.isoformat() if hasattr(frescura, "isoformat") else str(frescura)
     salida = sobre(filas, int(total["n"]) if total else 0, p)
+    salida["frescura"] = frescura_iso
     salida["alguna_enmascarada"] = alguna
     return salida
 
 
 # ------------------------------------------------------------------ §18.20
+ALLOWLIST_UPGRADE_REQUESTS: dict[str, str] = {
+    "antiguedad": "r.solicitado_el",
+    "solicitado_el": "r.solicitado_el",
+    "urgente": "r.urgente",
+    "tenant_id": "r.tenant_id",
+    "razon_social": "r.razon_social",
+    "plan_actual": "r.plan_actual",
+    "plan_deseado": "r.plan_deseado",
+    "estado": "r.estado",
+}
+
+
 @router.get("/upgrade-requests", summary="Solicitudes de cambio de plan")
 async def upgrade_requests(
     st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
@@ -530,12 +547,10 @@ async def upgrade_requests(
         "AND (CAST(:pd AS text) IS NULL OR r.plan_deseado = :pd)"
     )
     params = {"est": estado, "pd": plan_deseado, "lim": p.page_size, "off": p.offset}
-    orden = p.clausula_order(
-        {"antiguedad": "r.solicitado_el", "urgente": "r.urgente"}, "r.solicitado_el ASC"
-    )
+    orden = p.clausula_order(ALLOWLIST_UPGRADE_REQUESTS, "r.solicitado_el ASC")
 
     async with read_session() as db:
-        await _frescura(db, "upgrade_requests")
+        frescura = await _frescura(db, "upgrade_requests")
         total = await uno(
             db, f"SELECT count(*) AS n FROM admin.agg_upgrade_requests r {where}", params
         )
@@ -554,8 +569,12 @@ async def upgrade_requests(
             params,
         )
 
-    filas, alguna = enmascarar_filas(filas, _concesiones(st, [f["tenant_id"] for f in filas]))
+    tenants = [f["tenant_id"] for f in filas]
+    filas, alguna = enmascarar_filas(filas, _concesiones(st, tenants))
+    await _registrar_lecturas(st, "GET /admin/v1/business/upgrade-requests", set(tenants))
+    frescura_iso = frescura.isoformat() if hasattr(frescura, "isoformat") else str(frescura)
     salida = sobre(filas, int(total["n"]) if total else 0, p)
+    salida["frescura"] = frescura_iso
     salida["alguna_enmascarada"] = alguna
     return salida
 
@@ -682,6 +701,7 @@ async def usage_tokens(
         "moneda": (totales or {}).get("moneda") or "EUR",
     }
     salida["descuadres"] = descuadres or None
+    salida["cuadra_con_facturacion"] = len(descuadres) == 0
     return salida
 
 

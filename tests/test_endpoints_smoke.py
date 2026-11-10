@@ -215,9 +215,12 @@ async def test_suscripciones_usa_los_estados_reales_del_esquema(
     r = await cliente.get("/admin/v1/business/subscriptions", headers=admin)
     assert r.status_code == 200, r.text
     estados = {f["suscripcion_estado"] for f in r.json()["items"]}
-    assert estados <= {"activa", "periodo_gracia", "suspendida", "finalizada"}, (
-        f"estados desconocidos en la respuesta: {estados}"
-    )
+    assert estados <= {
+        "activa",
+        "periodo_gracia",
+        "suspendida",
+        "finalizada",
+    }, f"estados desconocidos en la respuesta: {estados}"
 
 
 async def test_solicitudes_de_cambio_de_plan(
@@ -326,9 +329,9 @@ async def test_sla_no_publica_porcentajes_con_muestra_insuficiente(
     assert r.status_code == 200, r.text
     for fila in r.json()["items"]:
         if fila["casos"] < 5:
-            assert fila["cumplimiento_pct"] is None, (
-                f"se publicó un porcentaje sobre {fila['casos']} casos: {fila}"
-            )
+            assert (
+                fila["cumplimiento_pct"] is None
+            ), f"se publicó un porcentaje sobre {fila['casos']} casos: {fila}"
 
 
 async def test_desglose_del_reloj_de_un_caso(
@@ -341,9 +344,11 @@ async def test_desglose_del_reloj_de_un_caso(
     """
     caso = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT job_id FROM admin.sla_cases LIMIT 1
-    """)
+    """
+            )
         )
     ).fetchone()
     if caso is None:
@@ -444,13 +449,15 @@ async def test_el_informe_se_sube_antes_de_marcarse_listo(
     solicitante = await staff_factory("staff_negocio")
     rid = nuevo("rp")
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO admin.reports (id, kind, format, params, requested_by,
                                    status, includes_pii)
         VALUES (:i, 'consumo', 'csv',
                 '{"desde":"2026-01-01","hasta":"2026-01-31"}'::jsonb,
                 :by, 'en_cola', false)
-    """),
+    """
+        ),
         {"i": rid, "by": solicitante["id"]},
     )
     await db.commit()
@@ -459,9 +466,11 @@ async def test_el_informe_se_sube_antes_de_marcarse_listo(
 
     fila = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT status, blob_ref FROM admin.reports WHERE id = :i
-    """),
+    """
+            ),
             {"i": rid},
         )
     ).fetchone()
@@ -516,10 +525,12 @@ async def test_un_agregado_viejo_produce_503_y_no_un_dato_antiguo(
     confianza en una consola: los números son plausibles y nadie los cuestiona.
     """
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE admin.aggregate_state
         SET refreshed_at = now() - interval '48 hours'
-    """)
+    """
+        )
     )
     await db.commit()
 
@@ -529,16 +540,22 @@ async def test_un_agregado_viejo_produce_503_y_no_un_dato_antiguo(
     detalle = r.json()["error"].get("detail", {})
     assert detalle, "el error no dice qué agregado está viejo ni de cuándo es"
 
+    await db.execute(text("SELECT admin.refresh_all()"))
+    await db.execute(text("SELECT admin.refresh_sla(95, true)"))
+    await db.commit()
+
 
 async def test_un_agregado_fallido_no_se_sirve_como_actual(
     cliente: Any, db: Any, admin: dict[str, str], agregados: None
 ) -> None:
     """Un refresco que falló deja el agregado marcado, no aparentemente al día."""
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE admin.aggregate_state
         SET status = 'fallido', error = 'fallo simulado'
-    """)
+    """
+        )
     )
     await db.commit()
 
@@ -608,9 +625,9 @@ async def test_las_cabeceras_de_seguridad_estan_presentes(cliente: Any) -> None:
         "cache-control",
     ):
         assert cabecera in r.headers, f"falta la cabecera «{cabecera}»"
-    assert "no-store" in r.headers["cache-control"], (
-        "las respuestas de la consola no deben quedar en caché"
-    )
+    assert (
+        "no-store" in r.headers["cache-control"]
+    ), "las respuestas de la consola no deben quedar en caché"
 
 
 async def test_el_cuerpo_de_la_peticion_esta_acotado(
@@ -639,6 +656,6 @@ async def test_el_esquema_openapi_se_publica_completo(cliente: Any) -> None:
     )
     assert operaciones == 31, f"el esquema publica {operaciones} operaciones"
     for camino in esquema["paths"]:
-        assert camino.startswith("/admin/v1"), (
-            f"«{camino}» está fuera del espacio de la consola"
-        )
+        assert camino.startswith(
+            "/admin/v1"
+        ), f"«{camino}» está fuera del espacio de la consola"
