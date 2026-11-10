@@ -89,6 +89,27 @@ export const AdminLayout: React.FC = () => {
                   Panel Negocio
                 </Link>
                 <Link
+                  to="/business/subscriptions"
+                  style={{
+                    fontSize: "0.875rem",
+                    padding: "0.375rem 0.75rem",
+                    borderRadius: "0.375rem",
+                    textDecoration: "none",
+                    color:
+                      isActive("/business/subscriptions") || isActive("/subscriptions")
+                        ? "var(--text, #f8fafc)"
+                        : "var(--muted, #94a3b8)",
+                    backgroundColor:
+                      isActive("/business/subscriptions") || isActive("/subscriptions")
+                        ? "var(--surface2, #334155)"
+                        : "transparent",
+                    fontWeight:
+                      isActive("/business/subscriptions") || isActive("/subscriptions") ? 600 : 400,
+                  }}
+                >
+                  Suscripciones
+                </Link>
+                <Link
                   to="/business/tokens"
                   style={{
                     fontSize: "0.875rem",

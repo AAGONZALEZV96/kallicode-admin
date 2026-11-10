@@ -143,6 +143,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
 
         {exito && (
           <div
+            data-testid="exito-concesion"
             role="status"
             aria-live="polite"
             style={{
@@ -161,6 +162,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
 
         {error && (
           <div
+            data-testid="error-concesion"
             role="alert"
             style={{
               padding: "0.75rem",
