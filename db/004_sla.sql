@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS admin.sla_cases (
 CREATE INDEX IF NOT EXISTS slac_tenant_ix ON admin.sla_cases (tenant_id, iniciado_en DESC);
 CREATE INDEX IF NOT EXISTS slac_result_ix ON admin.sla_cases (resultado, iniciado_en DESC);
 CREATE INDEX IF NOT EXISTS slac_ciclo_ix
-    ON admin.sla_cases (to_char(iniciado_en, 'YYYY-MM'), tenant_id);
+    ON admin.sla_cases (iniciado_en, tenant_id);
 
 COMMENT ON COLUMN admin.sla_cases.tramos IS
   'Desglose del reloj: [{inicio, fin, etapa, computa, causa_pausa}]. Es lo que '
@@ -112,6 +112,8 @@ GRANT SELECT ON admin.sla_targets, admin.sla_pause_states, admin.sla_cases
     TO kallicode_admin_ro;
 GRANT SELECT, INSERT, UPDATE, DELETE ON admin.sla_cases TO kallicode_admin_agg;
 GRANT SELECT ON admin.sla_targets, admin.sla_pause_states TO kallicode_admin_agg;
+GRANT SELECT, INSERT, UPDATE, DELETE ON admin.sla_targets, admin.sla_pause_states, admin.sla_cases
+    TO kallicode_admin_app;
 
 -- -----------------------------------------------------------------------------
 -- Cálculo del reloj de un caso
@@ -263,6 +265,9 @@ END $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = admin, core, pg_temp;
 
 ALTER FUNCTION admin.refresh_sla(int, boolean) OWNER TO kallicode_admin_agg;
 GRANT EXECUTE ON FUNCTION admin.refresh_sla(int, boolean) TO kallicode_admin_app;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA admin FROM PUBLIC, kallicode_admin_ro;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA admin TO kallicode_admin_app;
+GRANT EXECUTE ON FUNCTION admin.validate_read_role() TO kallicode_admin_ro;
 
 -- -----------------------------------------------------------------------------
 -- Semilla provisional de objetivos: pendiente de ratificación del PO (ADR 003)

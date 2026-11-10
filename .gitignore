@@ -9,6 +9,9 @@
 .secrets/gh_token.txt
 backlog_kallicode_admin_e6.md
 auditoria-proyecto.md
+.geminiignore
+CONTEX/*
+AGENTS.md
 # ==========================================
 # 2. Backend / Workers (Python)
 # ==========================================
@@ -35,6 +38,9 @@ build/
 apps/web/node_modules/
 apps/web/dist/
 apps/web/build/
+apps/web/coverage/
+*.tsbuildinfo
+coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -96,6 +102,9 @@ build/
 apps/web/node_modules/
 apps/web/dist/
 apps/web/build/
+apps/web/coverage/
+*.tsbuildinfo
+coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

@@ -1,4 +1,4 @@
-.PHONY: up down sync lint format test test-int
+.PHONY: up down sync lint format test test-int no-fuga
 
 # Levanta la infraestructura de datos local
 up:
@@ -15,6 +15,11 @@ sync:
 # Ejecuta los linters y chequeos de tipos respetando el CI
 lint:
 	uv run ruff check .
+	uv run black --check apps/ tests/
+	uv run mypy apps/api/src apps/workers/src
+
+# Chequeo estricto de tipos con mypy
+types:
 	uv run mypy apps/api/src apps/workers/src
 
 # Aplica formato de código
@@ -24,10 +29,18 @@ format:
 
 # Pruebas unitarias (Rápidas, sin BD)
 test:
-	uv run pytest -m "not integracion" -q
+	KC_ADMIN_TEST_DSN="postgresql://postgres:postgres@localhost:5433/kallicode_test" \
+	KC_ADMIN_REDIS_URL="redis://localhost:6380/1" \
+	uv run pytest -m "not integracion" -q --no-cov
 
 # Pruebas de integración usando la BD aislada en el puerto 5433
 test-int:
 	KC_ADMIN_TEST_DSN="postgresql://postgres:postgres@localhost:5433/kallicode_test" \
 	KC_ADMIN_REDIS_URL="redis://localhost:6380/1" \
 	uv run pytest --cov-report=term-missing
+
+# Verificación de no-fuga y permisos del rol de lectura (Ticket KC-ADM-B2-01)
+no-fuga:
+	KC_ADMIN_TEST_DSN="postgresql://postgres:postgres@localhost:5433/kallicode_test" \
+	KC_ADMIN_REDIS_URL="redis://localhost:6380/1" \
+	uv run pytest tests/test_no_leak.py -v --no-cov

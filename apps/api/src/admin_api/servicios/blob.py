@@ -30,7 +30,8 @@ def _credencial() -> tuple[str, str]:
     if a.env not in ("local", "test") and "devstoreaccount1" in cuenta:
         raise RuntimeError(
             "KC_BLOB_ACCOUNT_URL apunta al emulador local en un entorno que no "
-            "es local: la firma de descarga no funcionaría")
+            "es local: la firma de descarga no funcionaría"
+        )
     return cuenta, a.report_container
 
 
@@ -45,8 +46,7 @@ def hash_contenido(datos: bytes) -> str:
     return hashlib.sha256(datos).hexdigest()
 
 
-async def subir_informe(blob_ref: str, datos: bytes,
-                        content_type: str) -> str:
+async def subir_informe(blob_ref: str, datos: bytes, content_type: str) -> str:
     """Sube el informe y devuelve su hash. Falla si la subida no se confirma.
 
     El worker no marca el informe como listo hasta que esta función retorna: el
@@ -63,22 +63,22 @@ async def subir_informe(blob_ref: str, datos: bytes,
             async with BlobServiceClient(cuenta, credential=cred) as svc:
                 blob = svc.get_blob_client(contenedor, blob_ref)
                 await blob.upload_blob(
-                    datos, overwrite=False,
+                    datos,
+                    overwrite=False,
                     # Ajusta 'mime_type' a la variable que estés usando
-                    content_settings={"content_type": content_type}, # type: ignore
-                    metadata={"retencion_dias": str(s.report_retention_days)})
+                    content_settings={"content_type": content_type},  # type: ignore
+                    metadata={"retencion_dias": str(s.report_retention_days)},
+                )
     except ImportError:
         # En local sin SDK se escribe en Azurite por el emulador del compose; si
         # tampoco está, se declara la dependencia caída en lugar de fingir.
         raise dependencia_no_disponible("almacenamiento de objetos") from None
     except Exception as exc:
-        log.error("admin.blob.subida_fallida", blob_ref=blob_ref,
-                  excepcion=type(exc).__name__)
+        log.error("admin.blob.subida_fallida", blob_ref=blob_ref, excepcion=type(exc).__name__)
         raise dependencia_no_disponible("almacenamiento de objetos") from exc
 
     digest = hash_contenido(datos)
-    log.info("admin.blob.subido", blob_ref=blob_ref, bytes=len(datos),
-             sha256=digest[:12])
+    log.info("admin.blob.subido", blob_ref=blob_ref, bytes=len(datos), sha256=digest[:12])
     return digest
 
 
@@ -92,10 +92,12 @@ def url_descarga(blob_ref: str) -> str:
 
         token = generate_blob_sas(
             account_name=cuenta.split("//")[-1].split(".")[0],
-            container_name=contenedor, blob_name=blob_ref,
-            permission=BlobSasPermissions(read=True), expiry=vence)
+            container_name=contenedor,
+            blob_name=blob_ref,
+            permission=BlobSasPermissions(read=True),
+            expiry=vence,
+        )
         return f"{cuenta}/{contenedor}/{blob_ref}?{token}"
     except Exception as exc:
-        log.error("admin.blob.firma_fallida", blob_ref=blob_ref,
-                  excepcion=type(exc).__name__)
+        log.error("admin.blob.firma_fallida", blob_ref=blob_ref, excepcion=type(exc).__name__)
         raise dependencia_no_disponible("almacenamiento de objetos") from exc

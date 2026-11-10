@@ -31,18 +31,19 @@ async def _pedir(ruta: str, params: dict[str, Any] | None = None) -> dict[str, A
     token = emitir_svc_token("admin-console", tenant_id="plataforma")
     try:
         async with httpx.AsyncClient(timeout=s.telemetry_timeout_s) as c:
-            r = await c.get(f"{s.telemetry_base_url}{ruta}", params=params or {},
-                            headers={"Authorization": f"Bearer {token}"})
+            r = await c.get(
+                f"{s.telemetry_base_url}{ruta}",
+                params=params or {},
+                headers={"Authorization": f"Bearer {token}"},
+            )
     except httpx.HTTPError as exc:
-        log.warning("admin.telemetria.inalcanzable", ruta=ruta,
-                    excepcion=type(exc).__name__)
+        log.warning("admin.telemetria.inalcanzable", ruta=ruta, excepcion=type(exc).__name__)
         raise telemetria_no_disponible() from exc
 
     if r.status_code >= 500:
         raise telemetria_no_disponible()
     if r.status_code >= 400:
-        log.warning("admin.telemetria.rechazada", ruta=ruta,
-                    status=r.status_code)
+        log.warning("admin.telemetria.rechazada", ruta=ruta, status=r.status_code)
         raise telemetria_no_disponible()
     datos: dict[str, Any] = r.json()
     return datos
@@ -70,11 +71,11 @@ def _comprobar_frescura(datos: dict[str, Any], campo: str) -> int | None:
     return edad
 
 
-async def agentes(ventana: str = "1h",
-                  etapa: str | None = None) -> dict[str, Any]:
+async def agentes(ventana: str = "1h", etapa: str | None = None) -> dict[str, Any]:
     """§17.14 · estado agregado de agentes y líneas."""
-    datos = await _pedir("/telemetry/agents",
-                         {"ventana": ventana, **({"etapa": etapa} if etapa else {})})
+    datos = await _pedir(
+        "/telemetry/agents", {"ventana": ventana, **({"etapa": etapa} if etapa else {})}
+    )
     edad = _comprobar_frescura(datos, "telemetria_desde")
     datos["_antiguedad_s"] = edad
     # Sin latidos en la ventana: es ausencia de telemetría, no ausencia de trabajo.
@@ -87,9 +88,9 @@ async def colas(incluir_dlq: bool = True) -> dict[str, Any]:
     return await _pedir("/telemetry/queues", {"incluir_dlq": incluir_dlq})
 
 
-async def proveedores(ventana: str = "24h",
-                      proveedor: str | None = None) -> dict[str, Any]:
+async def proveedores(ventana: str = "24h", proveedor: str | None = None) -> dict[str, Any]:
     """§17.16 · agregados de disponibilidad, latencia y error por proveedor."""
     return await _pedir(
         "/telemetry/providers",
-        {"ventana": ventana, **({"proveedor": proveedor} if proveedor else {})})
+        {"ventana": ventana, **({"proveedor": proveedor} if proveedor else {})},
+    )

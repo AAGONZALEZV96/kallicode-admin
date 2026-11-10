@@ -20,6 +20,7 @@ import hmac
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 import jwt
 import pyotp
@@ -37,6 +38,7 @@ from .settings import get_admin_settings
 # Se reexportan para que los routers no importen del núcleo directamente y la
 # frontera quede en un solo módulo.
 __all__ = [
+    "PERMISOS_ROL",
     "STAFF_ROLES",
     "comparar_hash",
     "emitir_tokens_staff",
@@ -49,14 +51,75 @@ __all__ = [
     "nuevo_secreto_totp",
     "url_otpauth",
     "validar_politica_password",
+    "validar_token_staff",
     "verificar_password",
+    "verificar_token_portal",
     "verificar_token_staff",
     "verificar_totp",
 ]
 
 STAFF_ROLES: tuple[str, ...] = (
-    "staff_soporte", "staff_operaciones", "staff_negocio", "staff_admin",
+    "staff_soporte",
+    "staff_operaciones",
+    "staff_negocio",
+    "staff_admin",
 )
+
+PERMISOS_ROL: dict[str, tuple[str, ...]] = {
+    "staff_soporte": (
+        "auditoria.propias",
+        "concesiones.propias",
+        "concesiones.solicitar",
+        "expediente.leer",
+        "informes.descargar",
+        "negocio.clientes.leer",
+    ),
+    "staff_operaciones": (
+        "auditoria.propias",
+        "concesiones.propias",
+        "concesiones.solicitar",
+        "informes.descargar",
+        "ops.colas.leer",
+        "ops.modelos.leer",
+        "ops.sla.leer",
+        "ops.telemetria.leer",
+    ),
+    "staff_negocio": (
+        "auditoria.propias",
+        "concesiones.propias",
+        "concesiones.solicitar",
+        "informes.crear",
+        "informes.descargar",
+        "negocio.clientes.leer",
+        "negocio.overview.leer",
+        "negocio.suscripciones.leer",
+        "negocio.tokens.leer",
+        "ops.modelos.leer",
+        "ops.sla.leer",
+    ),
+    "staff_admin": (
+        "auditoria.exportar",
+        "auditoria.propias",
+        "auditoria.total.leer",
+        "concesiones.propias",
+        "concesiones.revocar_ajenas",
+        "concesiones.solicitar",
+        "concesiones.todas",
+        "expediente.leer",
+        "informes.crear",
+        "informes.descargar",
+        "negocio.clientes.leer",
+        "negocio.overview.leer",
+        "negocio.suscripciones.leer",
+        "negocio.tokens.leer",
+        "ops.colas.leer",
+        "ops.modelos.leer",
+        "ops.sla.leer",
+        "ops.telemetria.leer",
+        "personal.gestionar",
+        "personal.leer",
+    ),
+}
 
 
 def _claves() -> tuple[str, str]:
@@ -69,7 +132,7 @@ def _claves() -> tuple[str, str]:
     """
     from kallicode_core.seguridad import _claves as _core_claves
 
-    return _core_claves()
+    return cast(tuple[str, str], _core_claves())
 
 
 # --------------------------------------------------------------------- tokens
@@ -86,18 +149,21 @@ def emitir_tokens_staff(staff_id: str, rol: str, mfa_at: datetime) -> str:
     s = get_admin_settings()
     priv, _ = _claves()
     ahora = datetime.now(UTC)
-    return jwt.encode({
-        "sub": staff_id,
-        "rol": rol,
-        "typ": "staff",
-        "mfa": int(mfa_at.timestamp()),
-        "iss": s.jwt_issuer,
-        "aud": s.jwt_audience,
-        "jti": uuid.uuid4().hex,
-        "iat": int(ahora.timestamp()),
-        "exp": int((ahora + timedelta(
-            minutes=s.staff_access_token_ttl_min)).timestamp()),
-    }, priv, algorithm="RS256")
+    return jwt.encode(
+        {
+            "sub": staff_id,
+            "rol": rol,
+            "typ": "staff",
+            "mfa": int(mfa_at.timestamp()),
+            "iss": s.jwt_issuer,
+            "aud": s.jwt_audience,
+            "jti": uuid.uuid4().hex,
+            "iat": int(ahora.timestamp()),
+            "exp": int((ahora + timedelta(minutes=s.staff_access_token_ttl_min)).timestamp()),
+        },
+        priv,
+        algorithm="RS256",
+    )
 
 
 def verificar_token_staff(token: str) -> dict[str, object]:
@@ -112,10 +178,14 @@ def verificar_token_staff(token: str) -> dict[str, object]:
     _, pub = _claves()
     try:
         claims = jwt.decode(
-            token, pub, algorithms=["RS256"],
-            issuer=s.jwt_issuer, audience=s.jwt_audience,
-            options={"require": ["sub", "rol", "typ", "mfa", "iss", "aud",
-                                 "exp", "iat", "jti"]},
+            token,
+            pub,
+            algorithms=["RS256"],
+            issuer=s.jwt_issuer,
+            audience=s.jwt_audience,
+            options={
+                "require": ["sub", "rol", "typ", "mfa", "iss", "aud", "exp", "iat", "jti"]
+            },
         )
     except jwt.ExpiredSignatureError as exc:
         raise no_autenticado("El token ha expirado.") from exc
@@ -126,7 +196,60 @@ def verificar_token_staff(token: str) -> dict[str, object]:
         raise no_autenticado("Tipo de token incorrecto para esta API.")
     if claims.get("rol") not in STAFF_ROLES:
         raise no_autenticado("Rol de personal no reconocido.")
+
+    sub = claims.get("sub")
+    if not isinstance(sub, str) or not sub.startswith("st_"):
+        raise no_autenticado("Identificador de personal no reconocido.")
+
+    mfa_marca = claims.get("mfa")
+    if not isinstance(mfa_marca, int):
+        raise no_autenticado("Marca de segundo factor no válida.")
+
+    jti = claims.get("jti")
+    if not isinstance(jti, str) or not jti:
+        raise no_autenticado("Identificador de token no válido.")
+
     return claims
+
+
+validar_token_staff = verificar_token_staff
+
+
+def verificar_token_portal(token: str) -> dict[str, object]:
+    """Valida firma, expiración, tipo y claims de un token del portal de clientes.
+
+    Acepta typ='user' o 'portal' y rechaza categóricamente tokens de personal (typ='staff').
+    """
+    from kallicode_core.errors import no_autenticado
+
+    _, pub = _claves()
+    try:
+        claims = jwt.decode(
+            token,
+            pub,
+            algorithms=["RS256"],
+            options={"verify_aud": False, "require": ["sub", "typ", "iat", "exp"]},
+        )
+    except jwt.ExpiredSignatureError as exc:
+        raise no_autenticado("El token ha expirado.") from exc
+    except jwt.InvalidTokenError as exc:
+        raise no_autenticado() from exc
+
+    if claims.get("typ") not in ("user", "portal"):
+        raise no_autenticado("Tipo de token incorrecto para esta API.")
+
+    iss = claims.get("iss")
+    if iss not in ("kc-portal", "kallicode-portal"):
+        raise no_autenticado("Emisor no reconocido.")
+
+    aud = claims.get("aud")
+    if aud not in ("kc-portal-api", "portal-v1"):
+        raise no_autenticado("Audiencia no reconocida.")
+
+    return cast(dict[str, object], claims)
+
+
+validar_token_portal = verificar_token_portal
 
 
 def exigir_rol_staff(rol_actual: str, permitidos: tuple[str, ...]) -> None:

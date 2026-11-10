@@ -67,8 +67,9 @@ async def _telemetria() -> bool:
     s = get_admin_settings()
     try:
         async with httpx.AsyncClient(timeout=s.telemetry_timeout_s) as c:
-            r = await c.get(f"{s.telemetry_base_url}/telemetry/agents",
-                            params={"ventana": "5m"})
+            r = await c.get(
+                f"{s.telemetry_base_url}/telemetry/agents", params={"ventana": "5m"}
+            )
         return r.status_code < 500
     except Exception:
         return False
@@ -78,11 +79,14 @@ async def _frescura_agregados() -> int | None:
     """Antigüedad en segundos del refresco más viejo entre las vistas."""
     try:
         async with admin_session() as db:
-            fila = await uno(db, """
+            fila = await uno(
+                db,
+                """
                 SELECT coalesce(max(extract(epoch FROM now() - refreshed_at)), 0)
                        AS edad
                 FROM admin.aggregate_state
-            """)
+            """,
+            )
         return int(fila["edad"]) if fila else None
     except Exception:
         # La tabla de estado de agregados llega con las vistas materializadas.
@@ -114,9 +118,15 @@ async def health(response: Response) -> dict[str, Any]:
 
     if estado != _ultimo_estado:
         nivel = log.warning if estado != "ok" else log.info
-        nivel("admin.health.cambio_de_estado", desde=_ultimo_estado, hacia=estado,
-              postgres=postgres, lectura=lectura, cache=cache,
-              telemetria=telemetria)
+        nivel(
+            "admin.health.cambio_de_estado",
+            desde=_ultimo_estado,
+            hacia=estado,
+            postgres=postgres,
+            lectura=lectura,
+            cache=cache,
+            telemetria=telemetria,
+        )
         _ultimo_estado = estado
 
     return {

@@ -25,28 +25,64 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Traer dependencias core de la plataforma
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/kallicode-backend
+          path: kallicode-backend
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e ".[dev]"
+      - name: Instalar dependencias
+        run: |
+          pip install -e kallicode-backend/packages/core
+          pip install -e ".[dev]"
       - name: ruff
-        run: ruff check .
+        run: ruff check apps/ tests/
       - name: black
-        run: black --check .
+        run: black --check apps/ tests/
       - name: mypy
         run: mypy apps/api/src apps/workers/src
 
   unitarias:
     name: Pruebas unitarias
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: kallicode_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      KC_ADMIN_TEST_DSN: postgresql://postgres:postgres@localhost:5432/kallicode_test
+      KC_ADMIN_REDIS_URL: redis://localhost:6379/1
     steps:
       - uses: actions/checkout@v4
+      - name: Traer dependencias core de la plataforma
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/kallicode-backend
+          path: kallicode-backend
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Instalar dependencias
+        run: |
+          pip install -e kallicode-backend/packages/core
+          pip install -e ".[dev]"
       - name: pytest sin base de datos
         run: pytest -m "not integracion" --cov-fail-under=0 -q
 
@@ -75,18 +111,20 @@ jobs:
       KC_ADMIN_REDIS_URL: redis://localhost:6379/1
     steps:
       - uses: actions/checkout@v4
-      - name: Traer el esquema de la plataforma
+      - name: Traer el esquema y core de la plataforma
         uses: actions/checkout@v4
         with:
-          repository: kallicode/kallicode-backend
+          repository: ${{ github.repository_owner }}/kallicode-backend
           path: kallicode-backend
-          token: ${{ secrets.PLATFORM_REPO_TOKEN }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - run: pip install -e ".[dev]"
+      - name: Instalar dependencias
+        run: |
+          pip install -e kallicode-backend/packages/core
+          pip install -e ".[dev]"
       - name: pytest con base de datos
         run: pytest --cov-report=xml -q
       - uses: actions/upload-artifact@v4
@@ -113,17 +151,20 @@ jobs:
       KC_ADMIN_TEST_DSN: postgresql://postgres:postgres@localhost:5432/kallicode_test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - name: Traer el esquema y core de la plataforma
+        uses: actions/checkout@v4
         with:
-          repository: kallicode/kallicode-backend
+          repository: ${{ github.repository_owner }}/kallicode-backend
           path: kallicode-backend
-          token: ${{ secrets.PLATFORM_REPO_TOKEN }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - run: pip install -e ".[dev]"
+      - name: Instalar dependencias
+        run: |
+          pip install -e kallicode-backend/packages/core
+          pip install -e ".[dev]"
       - name: Inventario de acceso y privilegios reales
         run: pytest tests/test_no_leak.py -v --cov-fail-under=0
       - name: Validación empaquetada en la base
@@ -134,15 +175,40 @@ jobs:
   autorizacion:
     name: Matriz de autorización
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: kallicode_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      KC_ADMIN_TEST_DSN: postgresql://postgres:postgres@localhost:5432/kallicode_test
+      KC_ADMIN_REDIS_URL: redis://localhost:6379/1
     steps:
       - uses: actions/checkout@v4
+      - name: Traer dependencias core de la plataforma
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/kallicode-backend
+          path: kallicode-backend
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -e ".[dev]"
-      # No necesita base de datos: la identidad se sustituye por una fija. Corre
-      # en cada empujón y en menos de un minuto, que es lo que hace que nadie la
-      # desactive.
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Instalar dependencias
+        run: |
+          pip install -e kallicode-backend/packages/core
+          pip install -e ".[dev]"
       - name: 31 endpoints × 4 roles
         run: pytest tests/test_authorization_matrix.py -m "not integracion" -v --cov-fail-under=0

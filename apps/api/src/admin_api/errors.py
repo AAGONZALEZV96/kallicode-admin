@@ -13,13 +13,59 @@ tiene acceso a varios clientes.
 
 from __future__ import annotations
 
-from kallicode_core.errors import AppError
+from kallicode_core.errors import CATALOGO_ERRORES, AppError
+
+_ERRORES_ADMIN = {
+    "CREDENCIALES_INVALIDAS": {
+        "http": 401,
+        "descripcion": "Correo o contraseña incorrectos.",
+    },
+    "TOKEN_INVALIDO": {
+        "http": 401,
+        "descripcion": "Token de acceso de personal inválido o no reconocido.",
+    },
+    "MFA_REQUERIDO": {"http": 403, "descripcion": "Verificación de segundo factor requerida."},
+    "MFA_INVALIDO": {"http": 401, "descripcion": "El código de verificación no es correcto."},
+    "MFA_NO_INSCRITO": {
+        "http": 403,
+        "descripcion": "Debes inscribir tu segundo factor antes de continuar.",
+    },
+    "STAFF_DESACTIVADO": {"http": 403, "descripcion": "Tu cuenta está desactivada."},
+    "ROL_STAFF_INSUFICIENTE": {
+        "http": 403,
+        "descripcion": "Tu rol no permite esta operación.",
+    },
+    "ACCESO_NO_JUSTIFICADO": {"http": 403, "descripcion": "Acceso a datos no justificado."},
+    "CONCESION_CADUCADA": {
+        "http": 403,
+        "descripcion": "La concesión de acceso ha caducado.",
+    },
+    "CONCESION_DUPLICADA": {"http": 409, "descripcion": "Ya existe una concesión activa."},
+    "MOTIVO_INSUFICIENTE": {
+        "http": 422,
+        "descripcion": "El motivo proporcionado es insuficiente.",
+    },
+    "AGREGADO_NO_DISPONIBLE": {
+        "http": 503,
+        "descripcion": "Agregado analítico no disponible.",
+    },
+    "SLA_SIN_DEFINICION": {
+        "http": 422,
+        "descripcion": "No hay objetivos de nivel de servicio configurados.",
+    },
+    "TELEMETRIA_NO_DISPONIBLE": {
+        "http": 503,
+        "descripcion": "La telemetría del pipeline no está disponible.",
+    },
+}
+CATALOGO_ERRORES.update(_ERRORES_ADMIN)
 
 __all__ = [
     "acceso_no_justificado",
     "agregado_no_disponible",
     "concesion_caducada",
     "concesion_duplicada",
+    "credenciales_invalidas",
     "mfa_invalido",
     "mfa_no_inscrito",
     "mfa_requerido",
@@ -28,15 +74,30 @@ __all__ = [
     "sla_sin_definicion",
     "staff_desactivado",
     "telemetria_no_disponible",
+    "token_invalido",
 ]
 
 
 # --------------------------------------------------------------- identidad
+def token_invalido(
+    msj: str = "Token de acceso de personal inválido.",
+) -> AppError:
+    """401 · token de acceso ausente, alterado, caducado o con claims incorrectos."""
+    return AppError("TOKEN_INVALIDO", 401, msj)
+
+
+def credenciales_invalidas(
+    msj: str = "Correo o contraseña incorrectos.",
+) -> AppError:
+    """401 · credenciales incorrectas o cuenta en estado no autenticable."""
+    return AppError("CREDENCIALES_INVALIDAS", 401, msj)
+
+
 def mfa_requerido(
     msj: str = "Verificación de segundo factor requerida.",
 ) -> AppError:
-    """401 · el token no acredita segundo factor vigente en esta sesión."""
-    return AppError("MFA_REQUERIDO", 401, msj)
+    """403 · el token no acredita segundo factor vigente en esta sesión."""
+    return AppError("MFA_REQUERIDO", 403, msj)
 
 
 def mfa_invalido(
@@ -82,10 +143,12 @@ def acceso_no_justificado(
     if alcance:
         detalle["alcance_requerido"] = alcance
     return AppError(
-        "ACCESO_NO_JUSTIFICADO", 403,
+        "ACCESO_NO_JUSTIFICADO",
+        403,
         "Necesitas una concesión de acceso vigente para ver los datos "
         "identificables de este cliente.",
-        detalle or None)
+        detalle or None,
+    )
 
 
 def concesion_caducada(
@@ -102,9 +165,11 @@ def concesion_duplicada(grant_id: str) -> AppError:
     reutilizarla en lugar de pedir al empleado que repita el motivo.
     """
     return AppError(
-        "CONCESION_DUPLICADA", 409,
+        "CONCESION_DUPLICADA",
+        409,
         "Ya tienes una concesión vigente equivalente.",
-        {"grant_id": grant_id})
+        {"grant_id": grant_id},
+    )
 
 
 def motivo_insuficiente(razon: str) -> AppError:
@@ -114,9 +179,11 @@ def motivo_insuficiente(razon: str) -> AppError:
     registro de accesos en un trámite sin valor probatorio.
     """
     return AppError(
-        "MOTIVO_INSUFICIENTE", 422,
+        "MOTIVO_INSUFICIENTE",
+        422,
         "El motivo debe describir el caso concreto que justifica el acceso.",
-        {"razon": razon})
+        {"razon": razon},
+    )
 
 
 # ------------------------------------------------------- datos y agregados
@@ -130,24 +197,26 @@ def agregado_no_disponible(vista: str, edad_s: int | None = None) -> AppError:
     if edad_s is not None:
         detalle["antiguedad_s"] = edad_s
     return AppError(
-        "AGREGADO_NO_DISPONIBLE", 503,
-        "Los datos agregados se están recalculando. Vuelve a intentarlo en unos "
-        "minutos.",
-        detalle)
+        "AGREGADO_NO_DISPONIBLE",
+        503,
+        "Los datos agregados se están recalculando. Vuelve a intentarlo en unos minutos.",
+        detalle,
+    )
 
 
-def sla_sin_definicion(plan: str | None = None,
-                       etapa: str | None = None) -> AppError:
-    """409 · no hay objetivos de nivel de servicio configurados (§18.27).
+def sla_sin_definicion(plan: str | None = None, etapa: str | None = None) -> AppError:
+    """422 · no hay objetivos de nivel de servicio configurados (§18.27).
 
     Se prefiere el error a calcular sobre un supuesto: un cumplimiento
     inventado erosiona la confianza en el resto de la consola.
     """
     detalle = {k: v for k, v in (("plan", plan), ("etapa", etapa)) if v}
     return AppError(
-        "SLA_SIN_DEFINICION", 409,
+        "SLA_SIN_DEFINICION",
+        422,
         "No hay objetivos de nivel de servicio configurados para ese plan.",
-        detalle or None)
+        detalle or None,
+    )
 
 
 def telemetria_no_disponible(edad_s: int | None = None) -> AppError:
@@ -158,6 +227,8 @@ def telemetria_no_disponible(edad_s: int | None = None) -> AppError:
     tipo de panel (§18.24).
     """
     return AppError(
-        "TELEMETRIA_NO_DISPONIBLE", 503,
+        "TELEMETRIA_NO_DISPONIBLE",
+        503,
         "La telemetría del pipeline no está disponible.",
-        {"antiguedad_s": edad_s} if edad_s is not None else None)
+        {"antiguedad_s": edad_s} if edad_s is not None else None,
+    )

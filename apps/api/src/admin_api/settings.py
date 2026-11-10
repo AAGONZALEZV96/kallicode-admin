@@ -23,31 +23,32 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AdminSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="KC_ADMIN_", env_file=".env",
-                                      extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="KC_ADMIN_", env_file=".env", extra="ignore")
 
     # --- entorno ---
-    env: str = "local"                       # local | dev | staging | prod
+    env: str = "local"  # local | dev | staging | prod
     app_version: str = "0.1.0"
 
     # --- base de datos: dos roles, dos pools (§18) ---
     database_url_app: str = (
-        "postgresql+asyncpg://kallicode_admin_app:dev@localhost:5432/kallicode")
+        "postgresql+asyncpg://kallicode_admin_app:dev@localhost:5432/kallicode"
+    )
     database_url_ro: str = (
-        "postgresql+asyncpg://kallicode_admin_ro:dev@localhost:5432/kallicode")
+        "postgresql+asyncpg://kallicode_admin_ro:dev@localhost:5432/kallicode"
+    )
     pool_size_app: int = 5
-    pool_size_ro: int = 10                   # pool analítico: consultas de agregación
+    pool_size_ro: int = 10  # pool analítico: consultas de agregación
     statement_timeout_ms_app: int = 5_000
-    statement_timeout_ms_ro: int = 30_000    # los agregados tardan más y no bloquean al portal
+    statement_timeout_ms_ro: int = 30_000  # los agregados tardan más y no bloquean al portal
 
     # --- identidad del personal (§18.1 – §18.8) ---
-    staff_email_domains: str = "kallicode.com"     # lista separada por comas
-    staff_access_token_ttl_min: int = 15           # más corto que el de cliente (30)
-    staff_refresh_token_ttl_h: int = 8             # más corto que el de cliente (30 días)
-    staff_idle_timeout_min: int = 30               # inactividad: obliga a repetir el 2FA
+    staff_email_domains: str = "kallicode.com"  # lista separada por comas
+    staff_access_token_ttl_min: int = 15  # más corto que el de cliente (30)
+    staff_refresh_token_ttl_h: int = 8  # más corto que el de cliente (30 días)
+    staff_idle_timeout_min: int = 30  # inactividad: obliga a repetir el 2FA
     mfa_challenge_ttl_s: int = 300
     mfa_max_attempts: int = 3
-    mfa_totp_window: int = 1                       # un intervalo antes y después, no más
+    mfa_totp_window: int = 1  # un intervalo antes y después, no más
     mfa_recovery_codes: int = 8
     login_max_attempts: int = 5
     login_lock_window_s: int = 900
@@ -64,25 +65,25 @@ class AdminSettings(BaseSettings):
     grant_default_minutes: int = 240
     grant_min_minutes: int = 15
     grant_max_minutes: int = 480
-    grant_code_max_minutes: int = 60               # alcance contenido_codigo
+    grant_code_max_minutes: int = 60  # alcance contenido_codigo
     grant_max_concurrent: int = 3
     grant_reason_min_len: int = 20
     grant_reason_max_len: int = 500
 
     # --- límite RL-4 propio (§3.7.1) ---
-    rate_limit_staff: int = 300                    # req/min por empleado
-    rate_limit_global: int = 3_000                 # req/min para todo el personal
-    rate_limit_live: int = 60                      # refresco en vivo de operaciones
+    rate_limit_staff: int = 300  # req/min por empleado
+    rate_limit_global: int = 3_000  # req/min para todo el personal
+    rate_limit_live: int = 60  # refresco en vivo de operaciones
 
     # --- agregados de negocio (§18.16) ---
-    aggregate_max_age_s: int = 21_600              # 6 h: por encima se avisa
-    aggregate_stale_s: int = 86_400                # 24 h: se considera no disponible
+    aggregate_max_age_s: int = 21_600  # 6 h: por encima se avisa
+    aggregate_stale_s: int = 86_400  # 24 h: se considera no disponible
     refresh_interval_s: int = 900
 
     # --- contrato de telemetría del pipeline (§17.14 – §17.16) ---
     telemetry_base_url: str = "http://localhost:8001/internal/v1"
     telemetry_timeout_s: int = 5
-    telemetry_max_age_s: int = 900                 # 15 min: por encima, no disponible
+    telemetry_max_age_s: int = 900  # 15 min: por encima, no disponible
 
     # --- informes (§18.22, §18.23) ---
     report_container: str = "informes-admin"
@@ -92,7 +93,7 @@ class AdminSettings(BaseSettings):
     export_chunk_events: int = 500_000
 
     # --- niveles de servicio (§18.27) ---
-    sla_min_cases: int = 5                         # por debajo no se publica porcentaje
+    sla_min_cases: int = 5  # por debajo no se publica porcentaje
 
     # --- red: la consola no se publica nunca (§18.31, ADM-G10) ---
     allowed_hosts: str = "localhost,admin.internal.kallicode.com"
@@ -106,13 +107,15 @@ class AdminSettings(BaseSettings):
         if "://postgres:" in v or "://postgres@" in v:
             raise ValueError(
                 "la consola no puede conectarse como superusuario: usa "
-                "kallicode_admin_app o kallicode_admin_ro")
+                "kallicode_admin_app o kallicode_admin_ro"
+            )
         return v
 
     @property
     def dominios_permitidos(self) -> tuple[str, ...]:
-        return tuple(d.strip().lower() for d in self.staff_email_domains.split(",")
-                     if d.strip())
+        return tuple(
+            d.strip().lower() for d in self.staff_email_domains.split(",") if d.strip()
+        )
 
     @property
     def hosts_permitidos(self) -> list[str]:

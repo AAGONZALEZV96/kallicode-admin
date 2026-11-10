@@ -21,6 +21,7 @@
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS admin;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 COMMENT ON SCHEMA admin IS
   'Dominio propio de la consola de administración: personal de KalliCode, '
@@ -49,7 +50,7 @@ CREATE TABLE IF NOT EXISTS admin.staff (
     CONSTRAINT staff_email_uq     UNIQUE (email),
     CONSTRAINT staff_role_chk     CHECK (role IN ('staff_soporte', 'staff_operaciones',
                                                   'staff_negocio', 'staff_admin')),
-    CONSTRAINT staff_status_chk   CHECK (status IN ('invited', 'active', 'deactivated')),
+    CONSTRAINT staff_status_chk   CHECK (status IN ('invited', 'active', 'deactivated', 'suspended', 'disabled')),
     CONSTRAINT staff_email_len    CHECK (char_length(email) BETWEEN 6 AND 320),
     CONSTRAINT staff_name_len     CHECK (char_length(full_name) BETWEEN 2 AND 120),
     -- una cuenta activa exige contraseña y segundo factor inscrito (§18.2, §18.3)
@@ -211,6 +212,7 @@ CREATE TABLE IF NOT EXISTS admin.staff_actions (
     id            bigint GENERATED ALWAYS AS IDENTITY,
     occurred_at   timestamptz NOT NULL DEFAULT now(),
     staff_id      text        NOT NULL REFERENCES admin.staff(id),
+    staff_email   text,
     staff_role    text        NOT NULL,
     action        text        NOT NULL,
     tenant_id     text        REFERENCES core.organizations(id),
@@ -229,7 +231,10 @@ CREATE TABLE IF NOT EXISTS admin.staff_actions (
     PRIMARY KEY (occurred_at, id),
     CONSTRAINT sa_action_chk CHECK (action IN ('grant_created', 'grant_revoked',
                                                'read', 'reveal', 'report',
-                                               'staff_managed', 'admin_query')),
+                                               'staff_managed', 'admin_query',
+                                               'grant_creado', 'grant_revocado',
+                                               'lectura', 'revelacion', 'informe',
+                                               'login', 'logout')),
     CONSTRAINT sa_seal_chk      CHECK (seal ~ '^[0-9a-f]{64}$'),
     CONSTRAINT sa_prev_seal_chk CHECK (prev_seal = '' OR prev_seal ~ '^[0-9a-f]{64}$')
 ) PARTITION BY RANGE (occurred_at);
@@ -283,6 +288,9 @@ CREATE OR REPLACE FUNCTION admin.seal_staff_action() RETURNS trigger AS $$
 DECLARE
     prev text;
 BEGIN
+    IF NEW.staff_email IS NULL AND NEW.staff_id IS NOT NULL THEN
+        SELECT email INTO NEW.staff_email FROM admin.staff WHERE id = NEW.staff_id;
+    END IF;
     SELECT last_seal INTO prev FROM admin.staff_action_head
         WHERE lock_id = 1 FOR UPDATE;
     NEW.prev_seal := coalesce(prev, '');
@@ -300,7 +308,8 @@ BEGIN
 END $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_seal_staff_action ON admin.staff_actions;
-CREATE TRIGGER trg_seal_staff_action
+DROP TRIGGER IF EXISTS trg_staff_actions_seal ON admin.staff_actions;
+CREATE TRIGGER trg_staff_actions_seal
     BEFORE INSERT ON admin.staff_actions
     FOR EACH ROW EXECUTE FUNCTION admin.seal_staff_action();
 
@@ -316,6 +325,17 @@ DROP TRIGGER IF EXISTS trg_staff_actions_immutable ON admin.staff_actions;
 CREATE TRIGGER trg_staff_actions_immutable
     BEFORE UPDATE OR DELETE ON admin.staff_actions
     FOR EACH ROW EXECUTE FUNCTION admin.forbid_staff_action_mutation();
+
+REVOKE UPDATE, DELETE, TRUNCATE ON admin.staff_actions FROM PUBLIC;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kallicode_admin_app') THEN
+        EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON admin.staff_actions FROM kallicode_admin_app';
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kallicode_admin_ro') THEN
+        EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON admin.staff_actions FROM kallicode_admin_ro';
+    END IF;
+END $$;
 
 -- Verificación del encadenamiento completo. Devuelve la primera posición rota,
 -- o ninguna fila si la cadena es íntegra.
