@@ -174,18 +174,22 @@ def entorno(esquema: str) -> Iterator[None]:
             "KC_ADMIN_REDIS_URL": redis_test,
             "KC_REDIS_URL": redis_test,
             "KC_ENV": "test",
+            "KC_BLOB_ACCOUNT_URL": "https://kallicodeblobtest.blob.core.windows.net",
             "KC_DATABASE_URL": _dsn_como(esquema, "kallicode_app"),
             "KC_DATABASE_URL_ADMIN": _dsn_como(esquema, "kallicode_admin"),
         }
     )
     # La caché de configuración se limpia para que tome el entorno de prueba.
     from admin_api.settings import get_admin_settings
+    from kallicode_core.config import get_settings
 
     get_admin_settings.cache_clear()
+    get_settings.cache_clear()
     yield
     os.environ.clear()
     os.environ.update(previo)
     get_admin_settings.cache_clear()
+    get_settings.cache_clear()
 
 
 @pytest_asyncio.fixture
