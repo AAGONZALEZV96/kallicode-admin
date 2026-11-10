@@ -678,31 +678,253 @@ export const handlers = [
     const errFrescura = verificarFrescuraAgregados(request);
     if (errFrescura) return errFrescura;
 
+    const rol = obtenerRol(request);
+    if (rol === "staff_operaciones" || rol === "staff_soporte") {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "ROL_STAFF_INSUFICIENTE",
+            code: "rol_staff_insuficiente",
+            mensaje: "Acceso exclusivo para roles de negocio o administración.",
+          },
+        },
+        { status: 403 }
+      );
+    }
+
     const url = new URL(request.url);
     const conConcesion = tieneConcesion(request, url);
 
-    const items = CLIENTES_MOCK.map((c) => ({
+    const planParam = url.searchParams.get("plan");
+    const estadoParam = url.searchParams.get("estado");
+    const renuevaParam = url.searchParams.get("renueva_en_dias");
+    const qParam = url.searchParams.get("q")?.toLowerCase();
+    const orderByParam = url.searchParams.get("order_by");
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+    const pageSize = Math.max(1, parseInt(url.searchParams.get("page_size") || "25", 10));
+
+    // Base mock con diferentes rangos de renovación
+    const suscripcionesBase = [
+      {
+        ...CLIENTES_MOCK[0],
+        dias_para_renovacion: 16,
+        renueva_el: "2026-11-26",
+        inicia_el: "2026-01-15",
+      },
+      {
+        ...CLIENTES_MOCK[1],
+        dias_para_renovacion: 28,
+        renueva_el: "2026-12-08",
+        inicia_el: "2025-11-20",
+      },
+      {
+        ...CLIENTES_MOCK[2],
+        dias_para_renovacion: 55,
+        renueva_el: "2027-01-04",
+        inicia_el: "2026-03-10",
+      },
+      {
+        ...CLIENTES_MOCK[3],
+        dias_para_renovacion: 85,
+        renueva_el: "2027-02-03",
+        inicia_el: "2025-08-01",
+      },
+      {
+        ...CLIENTES_MOCK[4],
+        dias_para_renovacion: 8,
+        renueva_el: "2026-11-18",
+        inicia_el: "2026-02-14",
+      },
+    ];
+
+    let filtrados = suscripcionesBase.map((c) => ({
       tenant_id: c.tenant_id,
       razon_social: conConcesion ? c.razon_social : "A•••• S.L.",
       plan: c.plan,
       estado: c.estado,
       suscripcion_estado: c.estado,
-      inicia_el: "2026-01-15",
-      renueva_el: "2026-11-15",
+      inicia_el: c.inicia_el,
+      renueva_el: c.renueva_el,
       finaliza_el: null,
-      dias_para_renovacion: 16,
+      dias_para_renovacion: c.dias_para_renovacion,
       importe_mes: c.mrr_eur,
       moneda: "EUR",
       cuota_uso_pct: c.consumo_ciclo.cuota_pct,
       enmascarado: !conConcesion,
     }));
 
+    if (planParam && planParam !== "todos") {
+      filtrados = filtrados.filter((s) => s.plan === planParam);
+    }
+    if (estadoParam && estadoParam !== "todos") {
+      filtrados = filtrados.filter((s) => s.estado === estadoParam);
+    }
+    if (renuevaParam && renuevaParam !== "todos") {
+      const diasMax = parseInt(renuevaParam, 10);
+      if (!isNaN(diasMax)) {
+        filtrados = filtrados.filter((s) => s.dias_para_renovacion <= diasMax && s.dias_para_renovacion >= 0);
+      }
+    }
+    if (qParam) {
+      filtrados = filtrados.filter(
+        (s) =>
+          s.tenant_id.toLowerCase().includes(qParam) ||
+          s.razon_social.toLowerCase().includes(qParam)
+      );
+    }
+
+    if (orderByParam) {
+      const descendente = orderByParam.endsWith("-desc");
+      const campo = orderByParam.replace(/-(asc|desc)$/, "");
+      filtrados.sort((a, b) => {
+        let valA: string | number = "";
+        let valB: string | number = "";
+        if (campo === "renovacion" || campo === "renueva_el") {
+          valA = a.dias_para_renovacion;
+          valB = b.dias_para_renovacion;
+        } else if (campo === "importe" || campo === "importe_mes") {
+          valA = a.importe_mes;
+          valB = b.importe_mes;
+        } else if (campo === "nombre" || campo === "razon_social") {
+          valA = a.razon_social;
+          valB = b.razon_social;
+        } else if (campo === "tenant_id") {
+          valA = a.tenant_id;
+          valB = b.tenant_id;
+        }
+        if (valA < valB) return descendente ? 1 : -1;
+        if (valA > valB) return descendente ? -1 : 1;
+        return 0;
+      });
+    }
+
+    const total = filtrados.length;
+    const offset = (page - 1) * pageSize;
+    const paginados = filtrados.slice(offset, offset + pageSize);
+
     return HttpResponse.json({
-      items,
-      total: items.length,
-      page: 1,
-      page_size: 25,
-      pages: 1,
+      items: paginados,
+      total,
+      page,
+      page_size: pageSize,
+      pages: Math.ceil(total / pageSize) || 1,
+      frescura: "2026-10-30T14:00:00.000Z",
+      alguna_enmascarada: !conConcesion,
+    });
+  }),
+
+  // 5b. GET /admin/v1/business/upgrade-requests
+  http.get("*/admin/v1/business/upgrade-requests", ({ request }) => {
+    const errAuth = verificarAutenticacion(request);
+    if (errAuth) return errAuth;
+
+    const errFrescura = verificarFrescuraAgregados(request);
+    if (errFrescura) return errFrescura;
+
+    const rol = obtenerRol(request);
+    if (rol === "staff_operaciones" || rol === "staff_soporte") {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "ROL_STAFF_INSUFICIENTE",
+            code: "rol_staff_insuficiente",
+            mensaje: "Acceso exclusivo para roles de negocio o administración.",
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    const url = new URL(request.url);
+    const conConcesion = tieneConcesion(request, url);
+
+    const estadoParam = url.searchParams.get("estado") ?? "pendiente";
+    const planDeseadoParam = url.searchParams.get("plan_deseado");
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+    const pageSize = Math.max(1, parseInt(url.searchParams.get("page_size") || "25", 10));
+
+    const upgradeRequestsMock = [
+      {
+        solicitud_id: "req_001",
+        tenant_id: "org_initech",
+        razon_social: conConcesion ? "Initech Software Corporation" : "A•••• S.L.",
+        plan_actual: "starter",
+        plan_deseado: "growth",
+        urgente: true,
+        estado: "pendiente",
+        comentario: "Consumo al 94% de cuota. Requerimos ampliar concurrencia urgente.",
+        solicitado_el: "2026-11-08T09:30:00Z",
+        cuota_uso_pct: 94.0,
+        antiguedad_h: 56,
+        enmascarado: !conConcesion,
+      },
+      {
+        solicitud_id: "req_002",
+        tenant_id: "org_acme",
+        razon_social: conConcesion ? "Acme Logística S.L." : "A•••• S.L.",
+        plan_actual: "growth",
+        plan_deseado: "enterprise",
+        urgente: false,
+        estado: "pendiente",
+        comentario: "Planificación comercial anual para migrar a despliegue enterprise.",
+        solicitado_el: "2026-11-09T14:15:00Z",
+        cuota_uso_pct: 85.0,
+        antiguedad_h: 27,
+        enmascarado: !conConcesion,
+      },
+      {
+        solicitud_id: "req_003",
+        tenant_id: "org_globex",
+        razon_social: conConcesion ? "Globex Industrial S.A." : "A•••• S.L.",
+        plan_actual: "starter",
+        plan_deseado: "enterprise",
+        urgente: true,
+        estado: "atendida",
+        comentario: "Upgrade aprobado por dirección comercial.",
+        solicitado_el: "2026-11-01T10:00:00Z",
+        cuota_uso_pct: 92.5,
+        antiguedad_h: 220,
+        enmascarado: !conConcesion,
+      },
+      {
+        solicitud_id: "req_004",
+        tenant_id: "org_umbrella",
+        razon_social: conConcesion ? "Umbrella BioTech SL" : "A•••• S.L.",
+        plan_actual: "starter",
+        plan_deseado: "growth",
+        urgente: false,
+        estado: "rechazada",
+        comentario: "Denegada por incidencias financieras no resueltas.",
+        solicitado_el: "2026-10-25T11:00:00Z",
+        cuota_uso_pct: 12.0,
+        antiguedad_h: 380,
+        enmascarado: !conConcesion,
+      },
+    ];
+
+    let filtrados = [...upgradeRequestsMock];
+
+    if (estadoParam && estadoParam !== "todos") {
+      filtrados = filtrados.filter((r) => r.estado === estadoParam);
+    }
+    if (planDeseadoParam && planDeseadoParam !== "todos") {
+      filtrados = filtrados.filter((r) => r.plan_deseado === planDeseadoParam);
+    }
+
+    // Por defecto orden por antigüedad: más antiguas primero (solicitado_el ASC)
+    filtrados.sort((a, b) => new Date(a.solicitado_el).getTime() - new Date(b.solicitado_el).getTime());
+
+    const total = filtrados.length;
+    const offset = (page - 1) * pageSize;
+    const paginados = filtrados.slice(offset, offset + pageSize);
+
+    return HttpResponse.json({
+      items: paginados,
+      total,
+      page,
+      page_size: pageSize,
+      pages: Math.ceil(total / pageSize) || 1,
+      frescura: "2026-10-30T14:00:00.000Z",
       alguna_enmascarada: !conConcesion,
     });
   }),
