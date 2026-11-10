@@ -310,9 +310,9 @@ async def test_los_agregados_no_amplian_el_alcance(db: Any) -> None:
     assert f, "no hay funciones de refresco de agregados"
     for nombre, dueno, secdef in f:
         assert secdef is True, f"{nombre} no es SECURITY DEFINER"
-        assert dueno == "kallicode_admin_agg", (
-            f"{nombre} pertenece a {dueno}; debe pertenecer al rol de agregación"
-        )
+        assert (
+            dueno == "kallicode_admin_agg"
+        ), f"{nombre} pertenece a {dueno}; debe pertenecer al rol de agregación"
 
     login = await _filas(
         db,
@@ -333,4 +333,3 @@ async def test_los_agregados_no_amplian_el_alcance(db: Any) -> None:
     """,
     )
     assert ejecutables == [], f"el rol de lectura puede ejecutar refrescos: {ejecutables}"
-

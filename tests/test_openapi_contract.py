@@ -387,14 +387,14 @@ def test_cobertura_exacta_31_endpoints(app: Any) -> None:
     for metodo, ruta, tags in operaciones:
         assert len(tags) > 0, f"Endpoint {metodo} {ruta} no tiene tags asignados"
         for t in tags:
-            assert t in TAGS_OFICIALES, (
-                f"Tag '{t}' en {metodo} {ruta} no pertenece a los 7 tags oficiales"
-            )
+            assert (
+                t in TAGS_OFICIALES
+            ), f"Tag '{t}' en {metodo} {ruta} no pertenece a los 7 tags oficiales"
             tags_encontrados.add(t)
 
-    assert tags_encontrados == TAGS_OFICIALES, (
-        f"Tags faltantes: {TAGS_OFICIALES - tags_encontrados}"
-    )
+    assert (
+        tags_encontrados == TAGS_OFICIALES
+    ), f"Tags faltantes: {TAGS_OFICIALES - tags_encontrados}"
 
 
 def test_seguridad_y_esquemas_estandar(app: Any) -> None:
@@ -422,9 +422,9 @@ def test_seguridad_y_esquemas_estandar(app: Any) -> None:
     campos_requeridos = ["codigo", "mensaje", "detalle", "trace_id", "timestamp"]
     for campo in campos_requeridos:
         assert campo in props, f"Propiedad '{campo}' falta en ErrorStandard"
-        assert campo in err.get("required", []), (
-            f"'{campo}' debe ser requerida en ErrorStandard"
-        )
+        assert campo in err.get(
+            "required", []
+        ), f"'{campo}' debe ser requerida en ErrorStandard"
 
     assert props["timestamp"]["format"] == "date-time"
     assert props["detalle"]["nullable"] is True
@@ -444,14 +444,14 @@ def test_enmascarado_declarado_en_clientes(app: Any) -> None:
     campos_requeridos = ["tenant_id", "name", "plan", "status"]
     for campo in campos_requeridos:
         assert campo in props, f"Propiedad '{campo}' falta en CustomerSummary"
-        assert campo in customer.get("required", []), (
-            f"'{campo}' debe ser requerida en CustomerSummary"
-        )
+        assert campo in customer.get(
+            "required", []
+        ), f"'{campo}' debe ser requerida en CustomerSummary"
 
     descripcion_name = props["name"].get("description", "").lower()
-    assert "enmascarada" in descripcion_name or "enmascarado" in descripcion_name, (
-        f"La descripción de 'name' debe explicitar el enmascarado: {props['name']}"
-    )
+    assert (
+        "enmascarada" in descripcion_name or "enmascarado" in descripcion_name
+    ), f"La descripción de 'name' debe explicitar el enmascarado: {props['name']}"
 
 
 def test_archivo_yaml_congelado_coincide_con_api() -> None:
@@ -477,9 +477,9 @@ def test_schemathesis_valida_31_operaciones_y_propiedades() -> None:
     schema = schemathesis.openapi.from_path(YAML_PATH)
     operaciones = list(schema.get_all_operations())
 
-    assert len(operaciones) == 31, (
-        f"Schemathesis debe descubrir exactamente 31 operaciones, encontró {len(operaciones)}"
-    )
+    assert (
+        len(operaciones) == 31
+    ), f"Schemathesis debe descubrir exactamente 31 operaciones, encontró {len(operaciones)}"
 
     tags_vistos: set[str] = set()
     for op_res in operaciones:
@@ -492,9 +492,9 @@ def test_schemathesis_valida_31_operaciones_y_propiedades() -> None:
         estrategia = op.as_strategy()
         assert estrategia is not None, f"No se pudo generar estrategia para {op.label}"
 
-    assert tags_vistos == TAGS_OFICIALES, (
-        f"Discrepancia en tags oficiales descubiertos por Schemathesis: {tags_vistos}"
-    )
+    assert (
+        tags_vistos == TAGS_OFICIALES
+    ), f"Discrepancia en tags oficiales descubiertos por Schemathesis: {tags_vistos}"
 
 
 # ==============================================================================
@@ -837,9 +837,9 @@ async def test_contrato_31_operaciones_sembradas(
     case.validate_response(r, checks=CHECKS_CONTRATO)
 
     # 3. Comprobación obligatoria de cabeceras de trazabilidad y seguridad
-    assert "x-trace-id" in r.headers, (
-        f"Cabecera 'X-Trace-Id' falta en la respuesta de {metodo} {ruta_real}"
-    )
+    assert (
+        "x-trace-id" in r.headers
+    ), f"Cabecera 'X-Trace-Id' falta en la respuesta de {metodo} {ruta_real}"
     assert r.headers.get("x-content-type-options") == "nosniff"
     assert r.headers.get("x-frame-options") == "DENY"
     assert "no-store" in r.headers.get("cache-control", "")
@@ -970,9 +970,9 @@ async def test_modelos_pydantic_rechazan_campos_extra(
     como("staff_admin")
     r = await cliente.request(metodo, ruta, json=cuerpo)
 
-    assert r.status_code == 422, (
-        f"Se esperaba HTTP 422 por campo extra en {metodo} {ruta}, se obtuvo {r.status_code}"
-    )
+    assert (
+        r.status_code == 422
+    ), f"Se esperaba HTTP 422 por campo extra en {metodo} {ruta}, se obtuvo {r.status_code}"
 
     cuerpo_resp = r.json()
     assert "error" in cuerpo_resp, f"Respuesta no tiene sobre de error: {cuerpo_resp}"

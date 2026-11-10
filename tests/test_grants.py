@@ -303,9 +303,9 @@ async def test_una_concesion_vencida_no_revela_nada(
 
     r = await cliente.get("/admin/v1/business/customers/org_acme", headers=cab)
     assert r.status_code == 200, r.text
-    assert r.json()["razon_social"] != "Acme Logística S.L.", (
-        "una concesión vencida siguió revelando datos"
-    )
+    assert (
+        r.json()["razon_social"] != "Acme Logística S.L."
+    ), "una concesión vencida siguió revelando datos"
 
 
 async def test_el_worker_registra_la_caducidad_una_sola_vez(
@@ -540,8 +540,8 @@ async def test_la_concesion_es_visible_para_el_cliente(
     )
     registro = fila.fetchone()
     assert registro is not None, "la concesión no se registró"
-    assert registro[0] == "org_acme", (
-        "el registro no está asociado al cliente afectado, así que su portal no lo mostrará"
-    )
+    assert (
+        registro[0] == "org_acme"
+    ), "el registro no está asociado al cliente afectado, así que su portal no lo mostrará"
     assert registro[2] == MOTIVO_BUENO, "el motivo no se guardó literal"
     assert registro[4], "el registro no lleva sello"

@@ -329,9 +329,9 @@ async def test_sla_no_publica_porcentajes_con_muestra_insuficiente(
     assert r.status_code == 200, r.text
     for fila in r.json()["items"]:
         if fila["casos"] < 5:
-            assert fila["cumplimiento_pct"] is None, (
-                f"se publicó un porcentaje sobre {fila['casos']} casos: {fila}"
-            )
+            assert (
+                fila["cumplimiento_pct"] is None
+            ), f"se publicó un porcentaje sobre {fila['casos']} casos: {fila}"
 
 
 async def test_desglose_del_reloj_de_un_caso(
@@ -625,9 +625,9 @@ async def test_las_cabeceras_de_seguridad_estan_presentes(cliente: Any) -> None:
         "cache-control",
     ):
         assert cabecera in r.headers, f"falta la cabecera «{cabecera}»"
-    assert "no-store" in r.headers["cache-control"], (
-        "las respuestas de la consola no deben quedar en caché"
-    )
+    assert (
+        "no-store" in r.headers["cache-control"]
+    ), "las respuestas de la consola no deben quedar en caché"
 
 
 async def test_el_cuerpo_de_la_peticion_esta_acotado(
@@ -656,6 +656,6 @@ async def test_el_esquema_openapi_se_publica_completo(cliente: Any) -> None:
     )
     assert operaciones == 31, f"el esquema publica {operaciones} operaciones"
     for camino in esquema["paths"]:
-        assert camino.startswith("/admin/v1"), (
-            f"«{camino}» está fuera del espacio de la consola"
-        )
+        assert camino.startswith(
+            "/admin/v1"
+        ), f"«{camino}» está fuera del espacio de la consola"

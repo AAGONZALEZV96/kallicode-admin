@@ -271,5 +271,3 @@ async def test_cerrar_pools_db() -> None:
     from admin_api.db import cerrar
 
     await cerrar()
-
-

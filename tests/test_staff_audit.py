@@ -209,12 +209,10 @@ async def test_se_detecta_la_supresion_de_un_tramo_intermedio(
         poolclass=NullPool,
     )
     disable_trigger = (
-        "ALTER TABLE admin.staff_actions "
-        "DISABLE TRIGGER trg_staff_actions_immutable"
+        "ALTER TABLE admin.staff_actions " "DISABLE TRIGGER trg_staff_actions_immutable"
     )
     enable_trigger = (
-        "ALTER TABLE admin.staff_actions "
-        "ENABLE TRIGGER trg_staff_actions_immutable"
+        "ALTER TABLE admin.staff_actions " "ENABLE TRIGGER trg_staff_actions_immutable"
     )
     try:
         async with engine_su.begin() as conn:
@@ -234,9 +232,9 @@ async def test_se_detecta_la_supresion_de_un_tramo_intermedio(
             )
         ).fetchall()
         assert roturas, "se borró una fila intermedia y la verificación no lo detectó"
-        assert ids[3] in [r[0] for r in roturas], (
-            f"la rotura debía señalar la fila {ids[3]}, siguiente a la borrada: {roturas}"
-        )
+        assert ids[3] in [
+            r[0] for r in roturas
+        ], f"la rotura debía señalar la fila {ids[3]}, siguiente a la borrada: {roturas}"
     finally:
         async with engine_su.begin() as conn:
             await conn.execute(text(disable_trigger))
@@ -283,12 +281,10 @@ async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
         poolclass=NullPool,
     )
     disable_trigger = (
-        "ALTER TABLE admin.staff_actions "
-        "DISABLE TRIGGER trg_staff_actions_immutable"
+        "ALTER TABLE admin.staff_actions " "DISABLE TRIGGER trg_staff_actions_immutable"
     )
     enable_trigger = (
-        "ALTER TABLE admin.staff_actions "
-        "ENABLE TRIGGER trg_staff_actions_immutable"
+        "ALTER TABLE admin.staff_actions " "ENABLE TRIGGER trg_staff_actions_immutable"
     )
     try:
         async with engine_su.begin() as conn:
@@ -486,9 +482,9 @@ async def test_el_registro_no_guarda_el_dato_leido(db: Any, staff_factory: Any) 
     ).fetchone()
     assert fila is not None
     texto = fila[0] or ""
-    assert "Acme" not in texto, (
-        "el registro contiene el valor revelado, no solo el campo consultado"
-    )
+    assert (
+        "Acme" not in texto
+    ), "el registro contiene el valor revelado, no solo el campo consultado"
     assert "razon_social" in texto, "el registro no dice qué campos se revelaron"
 
 

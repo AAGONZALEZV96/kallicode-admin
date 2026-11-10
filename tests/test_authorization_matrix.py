@@ -267,9 +267,9 @@ def test_matriz_cubre_todos_los_endpoints(app: Any) -> None:
     cubiertos |= {patron(m, r) for m, r in PUBLICOS}
 
     sin_cubrir = publicados - cubiertos
-    assert not sin_cubrir, (
-        f"endpoints publicados sin fila en MATRIZ ni en PUBLICOS: {sorted(sin_cubrir)}"
-    )
+    assert (
+        not sin_cubrir
+    ), f"endpoints publicados sin fila en MATRIZ ni en PUBLICOS: {sorted(sin_cubrir)}"
 
     assert len(publicados) == 31, (
         f"la consola declara 31 endpoints en §18; se publican {len(publicados)}: "
@@ -348,9 +348,9 @@ def test_todos_los_endpoints_protegidos_tienen_guardas_rbac(app: Any) -> None:
             if dependant is None or staff_actual not in _dependencias_recursivas(dependant):
                 vulnerables.append(f"{m} {camino}")
 
-    assert not vulnerables, (
-        f"Se encontraron endpoints sin guarda de staff_actual / RBAC: {vulnerables}"
-    )
+    assert (
+        not vulnerables
+    ), f"Se encontraron endpoints sin guarda de staff_actual / RBAC: {vulnerables}"
 
 
 def test_validador_de_guardas_falla_si_se_agrega_endpoint_desprotegido() -> None:
@@ -759,9 +759,9 @@ async def test_ambito_todas_solo_para_administracion(
         for rol in ("staff_soporte", "staff_operaciones", "staff_negocio"):
             como(rol)
             r = await cliente.get(ruta, params={"ambito": "todas"})
-            assert r.status_code == 403, (
-                f"{rol} pudo pedir ambito=todas en {ruta}: {r.status_code}"
-            )
+            assert (
+                r.status_code == 403
+            ), f"{rol} pudo pedir ambito=todas en {ruta}: {r.status_code}"
             assert r.json()["error"]["code"] == "rol_staff_insuficiente"
 
         como("staff_admin")
