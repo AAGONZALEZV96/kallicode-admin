@@ -58,9 +58,9 @@ async def test_login_con_segundo_factor_emite_sesion(cliente: Any, staff_factory
     assert r.status_code == 200, r.text
     cuerpo = r.json()
     assert "mfa_token" in cuerpo
-    assert (
-        "access_token" not in cuerpo
-    ), "el primer factor emitió una sesión: el segundo factor es opcional de hecho"
+    assert "access_token" not in cuerpo, (
+        "el primer factor emitió una sesión: el segundo factor es opcional de hecho"
+    )
 
     tokens = await _sesion_completa(cliente, empleado)
     assert tokens["access_token"] and tokens["refresh_token"]
@@ -339,9 +339,9 @@ async def test_los_intentos_fallidos_se_limitan_por_correo_e_ip(
     # Otro correo desde la misma IP no queda bloqueado por el anterior.
     otro = await staff_factory("staff_soporte")
     r = await _login(cliente, otro["email"])
-    assert (
-        r.status_code == 200
-    ), "el bloqueo de un correo alcanzó a otro empleado de la misma IP"
+    assert r.status_code == 200, (
+        "el bloqueo de un correo alcanzó a otro empleado de la misma IP"
+    )
 
 
 async def test_un_login_correcto_limpia_el_contador(cliente: Any, staff_factory: Any) -> None:

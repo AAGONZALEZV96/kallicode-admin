@@ -463,6 +463,7 @@ async def subscriptions(
 
     where = """
         WHERE c.eliminado_en IS NULL
+          AND c.suscripcion_estado IS NOT NULL
           AND (CAST(:est AS text) IS NULL OR c.suscripcion_estado = :est)
           AND (CAST(:plan AS text) IS NULL OR c.plan_codigo = :plan)
           AND (CAST(:dias AS integer) IS NULL OR (c.renueva_el IS NOT NULL
@@ -700,6 +701,7 @@ async def usage_tokens(
         "moneda": (totales or {}).get("moneda") or "EUR",
     }
     salida["descuadres"] = descuadres or None
+    salida["cuadra_con_facturacion"] = len(descuadres) == 0
     return salida
 
 

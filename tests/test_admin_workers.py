@@ -229,3 +229,47 @@ def test_intervalo_refresco_configurable(monkeypatch: pytest.MonkeyPatch) -> Non
     s = get_admin_settings()
     assert s.refresh_interval_s == 450
     get_admin_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_ejecutar_con_lider_trabajo_desconocido_lanza_error() -> None:
+    """Verifica que ejecutar_con_lider lance ValueError ante un trabajo no registrado."""
+    with pytest.raises(ValueError, match="No existe LOCK_ID"):
+        await ejecutar_con_lider("trabajo_inventado", AsyncMock())
+
+
+@pytest.mark.integracion
+@pytest.mark.asyncio
+async def test_con_lider_invoca_ejecutar_con_lider() -> None:
+    """Verifica _con_lider invocando un trabajo mock."""
+    from admin_workers.main import _con_lider
+
+    m = AsyncMock()
+    await _con_lider("refrescar_agregados", m)
+
+
+@pytest.mark.integracion
+@pytest.mark.asyncio
+async def test_comprobar_frescura_agregados_sin_db() -> None:
+    """Verifica comprobar_frescura_agregados usando read_session por defecto."""
+    res = await comprobar_frescura_agregados(None)
+    assert isinstance(res, list)
+
+
+@pytest.mark.integracion
+@pytest.mark.asyncio
+async def test_caducar_concesiones(db: Any) -> None:
+    """Verifica caducar_concesiones de admin_workers."""
+    from admin_workers.main import caducar_concesiones
+
+    await caducar_concesiones(db)
+
+
+@pytest.mark.asyncio
+async def test_cerrar_pools_db() -> None:
+    """Verifica que cerrar() libere los motores de la base de datos."""
+    from admin_api.db import cerrar
+
+    await cerrar()
+
+

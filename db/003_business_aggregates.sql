@@ -283,6 +283,13 @@ GRANT SELECT ON
     admin.agg_monthly_business, admin.agg_token_usage_by_tier
     TO kallicode_admin_ro;
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+    admin.agg_customer_state, admin.agg_usage_cycle, admin.agg_tokens_daily,
+    admin.agg_pipeline_daily, admin.agg_upgrade_requests, admin.aggregate_state,
+    admin.plan_prices, admin.token_rates,
+    admin.agg_monthly_business, admin.agg_token_usage_by_tier
+    TO kallicode_admin_app;
+
 -- -----------------------------------------------------------------------------
 -- Funciones de refresco (SECURITY DEFINER, propiedad del rol de agregación)
 -- -----------------------------------------------------------------------------

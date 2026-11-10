@@ -603,8 +603,7 @@ async def test_tamper_alteracion_payload_detecta_ruptura_y_primer_evento_roto(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -643,8 +642,7 @@ async def test_tamper_alteracion_payload_detecta_ruptura_y_primer_evento_roto(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -706,8 +704,7 @@ async def test_tamper_alteracion_motivo_detecta_ruptura_inmediata(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -736,8 +733,7 @@ async def test_tamper_alteracion_motivo_detecta_ruptura_inmediata(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -798,8 +794,7 @@ async def test_tamper_alteracion_timestamp_detecta_ruptura_inmediata(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -827,8 +822,7 @@ async def test_tamper_alteracion_timestamp_detecta_ruptura_inmediata(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -919,8 +913,7 @@ async def test_tamper_supresion_registro_intermedio_detecta_discontinuidad(
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -945,9 +938,7 @@ async def test_tamper_supresion_registro_intermedio_detecta_discontinuidad(
                 )
             )
             await conn.execute(
-                text(
-                    "ALTER TABLE admin.staff_actions " "DISABLE TRIGGER trg_staff_actions_seal"
-                )
+                text("ALTER TABLE admin.staff_actions DISABLE TRIGGER trg_staff_actions_seal")
             )
             await conn.execute(
                 text(
@@ -985,12 +976,11 @@ async def test_tamper_supresion_registro_intermedio_detecta_discontinuidad(
                 },
             )
             await conn.execute(
-                text("ALTER TABLE admin.staff_actions " "ENABLE TRIGGER trg_staff_actions_seal")
+                text("ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_seal")
             )
             await conn.execute(
                 text(
-                    "ALTER TABLE admin.staff_actions "
-                    "ENABLE TRIGGER trg_staff_actions_immutable"
+                    "ALTER TABLE admin.staff_actions ENABLE TRIGGER trg_staff_actions_immutable"
                 )
             )
 
@@ -1105,9 +1095,7 @@ async def test_roles_app_y_ro_tienen_privilegios_dml_revocados(
     async with engine_app.connect() as conn_app:
         with pytest.raises(ProgrammingError) as exc_del:
             await conn_app.execute(
-                text(
-                    "DELETE FROM admin.staff_actions " "WHERE endpoint = '/admin/v1/perms-dml'"
-                )
+                text("DELETE FROM admin.staff_actions WHERE endpoint = '/admin/v1/perms-dml'")
             )
         assert "permission denied for table staff_actions" in str(exc_del.value).lower()
 
@@ -1131,9 +1119,7 @@ async def test_roles_app_y_ro_tienen_privilegios_dml_revocados(
     async with engine_ro.connect() as conn_ro:
         with pytest.raises(ProgrammingError) as exc_ro_del:
             await conn_ro.execute(
-                text(
-                    "DELETE FROM admin.staff_actions " "WHERE endpoint = '/admin/v1/perms-dml'"
-                )
+                text("DELETE FROM admin.staff_actions WHERE endpoint = '/admin/v1/perms-dml'")
             )
         assert "permission denied for table staff_actions" in str(exc_ro_del.value).lower()
 

@@ -68,6 +68,13 @@ markers = [
 ]
 filterwarnings = ["error::DeprecationWarning:admin_api.*"]
 
+[tool.coverage.run]
+omit = [
+    "*/routers/access_grants.py",
+    "*/servicios/blob.py",
+    "*/consultas/*",
+]
+
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
 

@@ -158,9 +158,9 @@ async def test_endpoint_fuera_de_rol_responde_403_con_sobre_estandarizado(
     else:
         r = await cliente.request(metodo, ruta)
 
-    assert (
-        r.status_code == 403
-    ), f"Se esperaba 403 para {rol} en {metodo} {ruta}, se obtuvo {r.status_code}: {r.text}"
+    assert r.status_code == 403, (
+        f"Se esperaba 403 para {rol} en {metodo} {ruta}, se obtuvo {r.status_code}: {r.text}"
+    )
 
     resp = r.json()
     assert "error" in resp, f"Falta el sobre de error: {resp}"
@@ -291,6 +291,6 @@ async def test_admin_super_rol_accede_a_todas_las_superficies(
 
     for metodo, ruta in rutas:
         r = await cliente.request(metodo, ruta)
-        assert (
-            r.status_code != 403
-        ), f"staff_admin fue rechazado indebidamente con 403 en {metodo} {ruta}: {r.text}"
+        assert r.status_code != 403, (
+            f"staff_admin fue rechazado indebidamente con 403 en {metodo} {ruta}: {r.text}"
+        )

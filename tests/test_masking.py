@@ -40,9 +40,9 @@ def test_la_jerarquia_es_transitiva_hacia_abajo() -> None:
     for i, concedido in enumerate(JERARQUIA):
         for j, requerido in enumerate(JERARQUIA):
             esperado = i >= j
-            assert (
-                alcance_suficiente([concedido], requerido) is esperado
-            ), f"«{concedido}» {'debería' if esperado else 'no debería'} cubrir «{requerido}»"
+            assert alcance_suficiente([concedido], requerido) is esperado, (
+                f"«{concedido}» {'debería' if esperado else 'no debería'} cubrir «{requerido}»"
+            )
 
 
 def test_sin_concesiones_no_se_cubre_ningun_alcance() -> None:
