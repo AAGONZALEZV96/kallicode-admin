@@ -264,9 +264,7 @@ async def consultar_ficha_cliente(
             "inicia_el": c["inicia_el"],
             "renueva_el": c["renueva_el"],
             "finaliza_el": c["finaliza_el"],
-            "importe_mes": (
-                float(c["importe_mes"]) if c["importe_mes"] is not None else None
-            ),
+            "importe_mes": (float(c["importe_mes"]) if c["importe_mes"] is not None else None),
         },
         "lineas": {
             "contratadas": c["lineas_contratadas"],

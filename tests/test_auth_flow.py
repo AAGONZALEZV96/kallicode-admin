@@ -58,9 +58,9 @@ async def test_login_con_segundo_factor_emite_sesion(cliente: Any, staff_factory
     assert r.status_code == 200, r.text
     cuerpo = r.json()
     assert "mfa_token" in cuerpo
-    assert "access_token" not in cuerpo, (
-        "el primer factor emitió una sesión: el segundo factor es opcional de hecho"
-    )
+    assert (
+        "access_token" not in cuerpo
+    ), "el primer factor emitió una sesión: el segundo factor es opcional de hecho"
 
     tokens = await _sesion_completa(cliente, empleado)
     assert tokens["access_token"] and tokens["refresh_token"]
@@ -170,10 +170,12 @@ async def test_un_desafio_de_segundo_factor_no_se_reutiliza(
 
     vivas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT count(*) FROM admin.staff_refresh_tokens
         WHERE staff_id = :i AND NOT revoked
-    """),
+    """
+            ),
             {"i": empleado["id"]},
         )
     ).scalar()
@@ -207,10 +209,12 @@ async def test_un_codigo_de_recuperacion_se_gasta_al_usarlo(
     pares = generar_codigos_recuperacion()
     for _claro, hashed in pares:
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff_recovery_codes (staff_id, code_hash)
             VALUES (:i, :h)
-        """),
+        """
+            ),
             {"i": empleado["id"], "h": hashed},
         )
     await db.commit()
@@ -335,9 +339,9 @@ async def test_los_intentos_fallidos_se_limitan_por_correo_e_ip(
     # Otro correo desde la misma IP no queda bloqueado por el anterior.
     otro = await staff_factory("staff_soporte")
     r = await _login(cliente, otro["email"])
-    assert r.status_code == 200, (
-        "el bloqueo de un correo alcanzó a otro empleado de la misma IP"
-    )
+    assert (
+        r.status_code == 200
+    ), "el bloqueo de un correo alcanzó a otro empleado de la misma IP"
 
 
 async def test_un_login_correcto_limpia_el_contador(cliente: Any, staff_factory: Any) -> None:
@@ -367,12 +371,14 @@ async def test_la_invitacion_fija_el_rol_y_el_correo(
     invitador = await staff_factory("staff_admin")
     token = "inv_" + nuevo("tk")
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO admin.staff_invitations (id, email, role, token_hash,
                                              invited_by, expires_at)
         VALUES (:i, 'nuevo@kallicode.com', 'staff_soporte', :h, :by,
                 now() + interval '48 hours')
-    """),
+    """
+        ),
         {"i": nuevo("iv"), "h": hash_token(token), "by": invitador["id"]},
     )
     await db.commit()
@@ -390,9 +396,11 @@ async def test_la_invitacion_fija_el_rol_y_el_correo(
 
     fila = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT email, role FROM admin.staff WHERE email = 'nuevo@kallicode.com'
-    """)
+    """
+            )
         )
     ).fetchone()
     assert fila is not None
@@ -431,11 +439,13 @@ async def test_no_se_reutiliza_una_contrasena_anterior(
     empleado = await staff_factory("staff_soporte")
     token = "rs_" + nuevo("tk")
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO admin.staff_password_resets (id, staff_id, token_hash,
                                                  expires_at)
         VALUES (:i, :s, :h, now() + interval '1 hour')
-    """),
+    """
+        ),
         {"i": nuevo("pr"), "s": empleado["id"], "h": hash_token(token)},
     )
     await db.commit()
@@ -465,11 +475,13 @@ async def test_cambiar_la_contrasena_cierra_las_sesiones_abiertas(
 
     token = "rs_" + nuevo("tk")
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO admin.staff_password_resets (id, staff_id, token_hash,
                                                  expires_at)
         VALUES (:i, :s, :h, now() + interval '1 hour')
-    """),
+    """
+        ),
         {"i": nuevo("pr"), "s": empleado["id"], "h": hash_token(token)},
     )
     await db.commit()

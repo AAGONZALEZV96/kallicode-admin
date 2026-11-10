@@ -17,6 +17,10 @@ lint:
 	uv run ruff check .
 	uv run mypy apps/api/src apps/workers/src
 
+# Chequeo estricto de tipos con mypy
+types:
+	uv run mypy apps/api/src apps/workers/src
+
 # Aplica formato de código
 format:
 	uv run ruff format .

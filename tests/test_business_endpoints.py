@@ -33,20 +33,52 @@ async def agregados_frescos(db: Any, dos_clientes: list[str]) -> None:
 
 
 @pytest_asyncio.fixture
-async def concesion_acme(db: Any) -> None:
+async def concesion_acme(db: Any) -> Any:
     """Registra una concesión activa en admin.access_grants para org_acme."""
     await db.execute(
-        text("""
+        text(
+            """
+        UPDATE admin.access_grants
+        SET revoked_at = now(),
+            revoked_by = 'st_prueba',
+            revoked_reason = 'Limpieza previa'
+        WHERE staff_id = 'st_prueba' AND tenant_id = 'org_acme'
+          AND revoked_at IS NULL;
+        """
+        )
+    )
+    await db.execute(
+        text(
+            """
         INSERT INTO admin.access_grants (
-            id, staff_id, tenant_id, scope, reason, expires_at
+            id, staff_id, tenant_id, scope, reason, expires_at, revoked_at, revoked_by
         )
         VALUES (
             'gr_org_acme', 'st_prueba', 'org_acme', 'expediente',
             'Incidencia de soporte SUP-1234 justificada',
-            now() + interval '1 hour'
+            now() + interval '1 hour',
+            NULL, NULL
         )
-        ON CONFLICT (id) DO NOTHING;
-        """)
+        ON CONFLICT (id) DO UPDATE
+        SET scope = 'expediente',
+            expires_at = now() + interval '1 hour',
+            revoked_at = NULL,
+            revoked_by = NULL;
+        """
+        )
+    )
+    await db.commit()
+    yield
+    await db.execute(
+        text(
+            """
+        UPDATE admin.access_grants
+        SET revoked_at = now(),
+            revoked_by = 'st_prueba',
+            revoked_reason = 'Fin de prueba'
+        WHERE id = 'gr_org_acme';
+        """
+        )
     )
     await db.commit()
 

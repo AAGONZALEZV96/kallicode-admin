@@ -45,29 +45,34 @@ async def datos_suscripciones_y_upgrades(dsn: str, dos_clientes: list[str]) -> N
     async with AsyncSession(engine) as session:
         # Asegurar estado comercial y fechas de renovación en suscripciones
         await session.execute(
-            text("""
+            text(
+                """
             UPDATE core.subscriptions
             SET plan_codigo = 'growth',
                 estado = 'activa',
                 inicia_el = current_date - 90,
                 renueva_el = current_date + 30
             WHERE tenant_id = 'org_acme'
-        """)
+        """
+            )
         )
         await session.execute(
-            text("""
+            text(
+                """
             UPDATE core.subscriptions
             SET plan_codigo = 'enterprise',
                 estado = 'periodo_gracia',
                 inicia_el = current_date - 300,
                 renueva_el = current_date + 65
             WHERE tenant_id = 'org_globex'
-        """)
+        """
+            )
         )
 
         # Sembrar solicitudes de upgrade directamente en la tabla agregada
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.agg_upgrade_requests
                 (solicitud_id, tenant_id, razon_social, plan_actual, plan_deseado,
                  urgente, estado, comentario, solicitado_el, cuota_uso_pct)
@@ -85,34 +90,41 @@ async def datos_suscripciones_y_upgrades(dsn: str, dos_clientes: list[str]) -> N
                 estado = EXCLUDED.estado,
                 solicitado_el = EXCLUDED.solicitado_el,
                 urgente = EXCLUDED.urgente
-        """)
+        """
+            )
         )
 
         # Refrescar agregados y marcar frescura 'ok'
         await session.execute(text("SELECT admin.refresh_customer_state();"))
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.aggregate_state
                 (agregado, status, refreshed_at, rows_total, duration_ms)
             VALUES ('customer_state', 'ok', now(), 2, 10)
             ON CONFLICT (agregado) DO UPDATE SET status = 'ok', refreshed_at = now();
-        """)
+        """
+            )
         )
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.aggregate_state
                 (agregado, status, refreshed_at, rows_total, duration_ms)
             VALUES ('usage_cycle', 'ok', now(), 2, 10)
             ON CONFLICT (agregado) DO UPDATE SET status = 'ok', refreshed_at = now();
-        """)
+        """
+            )
         )
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.aggregate_state
                 (agregado, status, refreshed_at, rows_total, duration_ms)
             VALUES ('upgrade_requests', 'ok', now(), 3, 10)
             ON CONFLICT (agregado) DO UPDATE SET status = 'ok', refreshed_at = now();
-        """)
+        """
+            )
         )
         await session.commit()
     await engine.dispose()
@@ -122,7 +134,20 @@ async def datos_suscripciones_y_upgrades(dsn: str, dos_clientes: list[str]) -> N
 async def concesion_acme(db: Any) -> Any:
     """Registra una concesión activa en admin.access_grants para org_acme."""
     await db.execute(
-        text("""
+        text(
+            """
+        UPDATE admin.access_grants
+        SET revoked_at = now(),
+            revoked_by = 'st_prueba',
+            revoked_reason = 'Limpieza previa'
+        WHERE staff_id = 'st_prueba' AND tenant_id = 'org_acme'
+          AND revoked_at IS NULL;
+        """
+        )
+    )
+    await db.execute(
+        text(
+            """
         INSERT INTO admin.access_grants (
             id, staff_id, tenant_id, scope, reason, expires_at, revoked_at, revoked_by
         )
@@ -137,18 +162,21 @@ async def concesion_acme(db: Any) -> Any:
             expires_at = now() + interval '1 hour',
             revoked_at = NULL,
             revoked_by = NULL;
-        """)
+        """
+        )
     )
     await db.commit()
     yield
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE admin.access_grants
         SET revoked_at = now(),
             revoked_by = 'st_prueba',
             revoked_reason = 'Fin de prueba'
         WHERE id = 'gr_org_acme';
-        """)
+        """
+        )
     )
     await db.commit()
 
@@ -372,11 +400,13 @@ async def test_subscriptions_enmascaramiento_por_defecto_y_concesion(
 
     # 3. Verificar que se haya registrado la lectura en auditoría
     res_audit = await db.execute(
-        text("""
+        text(
+            """
         SELECT action, tenant_id, endpoint FROM admin.staff_actions
         WHERE endpoint = 'GET /admin/v1/business/subscriptions'
         ORDER BY occurred_at DESC LIMIT 5
-    """)
+    """
+        )
     )
     rows_audit = res_audit.fetchall()
     assert len(rows_audit) >= 1
@@ -538,11 +568,13 @@ async def test_upgrade_requests_enmascaramiento_por_defecto_y_concesion(
 
     # 3. Auditoría de lecturas
     res_audit = await db.execute(
-        text("""
+        text(
+            """
         SELECT action, tenant_id, endpoint FROM admin.staff_actions
         WHERE endpoint = 'GET /admin/v1/business/upgrade-requests'
         ORDER BY occurred_at DESC LIMIT 5
-    """)
+    """
+        )
     )
     rows_audit = res_audit.fetchall()
     assert len(rows_audit) >= 1

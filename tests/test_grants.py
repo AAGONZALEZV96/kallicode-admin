@@ -86,9 +86,11 @@ async def test_ciclo_completo_conceder_leer_revocar(
 
     # 4. Cada lectura queda registrada y cuenta contra la concesión.
     lecturas = await db.execute(
-        text("""
+        text(
+            """
         SELECT reads FROM admin.access_grants WHERE id = :g
-    """),
+    """
+        ),
         {"g": concesion["grant_id"]},
     )
     assert (lecturas.scalar() or 0) >= 1, "la lectura no incrementó el contador de la concesión"
@@ -235,10 +237,12 @@ async def test_el_contenido_de_codigo_tiene_techo_de_una_hora(
     assert r.status_code == 201, r.text
 
     minutos = await db.execute(
-        text("""
+        text(
+            """
         SELECT extract(epoch FROM (expires_at - granted_at)) / 60
         FROM admin.access_grants WHERE id = :g
-    """),
+    """
+        ),
         {"g": r.json()["grant_id"]},
     )
     assert round(minutos.scalar() or 0) <= 60
@@ -258,13 +262,15 @@ async def test_el_esquema_rechaza_una_concesion_de_codigo_larga(
     empleado = await staff_factory("staff_soporte")
     with pytest.raises(IntegrityError):
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.access_grants
                 (id, staff_id, tenant_id, scope, reason, reference,
                  granted_at, expires_at)
             VALUES ('gr_ilegal', :s, 'org_acme', 'contenido_codigo', :m,
                     'SUP-1', now(), now() + interval '8 hours')
-        """),
+        """
+            ),
             {"s": empleado["id"], "m": MOTIVO_BUENO},
         )
     await db.rollback()
@@ -284,20 +290,22 @@ async def test_una_concesion_vencida_no_revela_nada(
     grant_id = r.json()["grant_id"]
 
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE admin.access_grants
         SET granted_at = now() - interval '2 minutes', expires_at = now() - interval '1 minute'
         WHERE id = :g
-    """),
+    """
+        ),
         {"g": grant_id},
     )
     await db.commit()
 
     r = await cliente.get("/admin/v1/business/customers/org_acme", headers=cab)
     assert r.status_code == 200, r.text
-    assert r.json()["razon_social"] != "Acme Logística S.L.", (
-        "una concesión vencida siguió revelando datos"
-    )
+    assert (
+        r.json()["razon_social"] != "Acme Logística S.L."
+    ), "una concesión vencida siguió revelando datos"
 
 
 async def test_el_worker_registra_la_caducidad_una_sola_vez(
@@ -313,12 +321,14 @@ async def test_el_worker_registra_la_caducidad_una_sola_vez(
 
     empleado = await staff_factory("staff_soporte")
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO admin.access_grants
             (id, staff_id, tenant_id, scope, reason, granted_at, expires_at)
         VALUES ('gr_vencida', :s, 'org_acme', 'expediente', :m,
                 now() - interval '2 hours', now() - interval '1 hour')
-    """),
+    """
+        ),
         {"s": empleado["id"], "m": MOTIVO_BUENO},
     )
     await db.commit()
@@ -327,10 +337,12 @@ async def test_el_worker_registra_la_caducidad_una_sola_vez(
     await caducar_concesiones(db)
 
     n = await db.execute(
-        text("""
+        text(
+            """
         SELECT count(*) FROM admin.staff_actions
         WHERE grant_id = 'gr_vencida' AND action = 'grant_revoked'
-    """)
+    """
+        )
     )
     assert n.scalar() == 1, "la caducidad se registró más de una vez"
 
@@ -365,12 +377,14 @@ async def test_el_esquema_impide_dos_concesiones_activas_iguales(
 
     empleado = await staff_factory("staff_soporte")
     for i in (1, 2):
-        sql = text("""
+        sql = text(
+            """
             INSERT INTO admin.access_grants
                 (id, staff_id, tenant_id, scope, reason, granted_at, expires_at)
             VALUES (:id, :s, 'org_acme', 'expediente', :m, now(),
                     now() + interval '30 minutes')
-        """)
+        """
+        )
         params = {"id": f"gr_carrera_{i}", "s": empleado["id"], "m": MOTIVO_BUENO}
         if i == 1:
             await db.execute(sql, params)
@@ -402,12 +416,14 @@ async def test_hay_techo_de_concesiones_simultaneas(
         for i in range(4):
             tid = f"org_lote_{i}"
             await session.execute(
-                t("""
+                t(
+                    """
                 INSERT INTO core.organizations (id, nombre, idioma, timezone,
                                                 despliegue, fabrica_activa)
                 VALUES (:i, :n, 'es', 'Europe/Madrid', 'cloud', true)
                 ON CONFLICT (id) DO NOTHING
-            """),
+            """
+                ),
                 {"i": tid, "n": f"Cliente Lote {i} S.L."},
             )
         await session.commit()
@@ -447,12 +463,14 @@ async def test_no_se_revoca_la_concesion_de_otro_empleado(
     """Solo el titular —o administración— cierra una concesión."""
     otro = await staff_factory("staff_soporte")
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO admin.access_grants
             (id, staff_id, tenant_id, scope, reason, granted_at, expires_at)
         VALUES ('gr_ajena', :s, 'org_acme', 'expediente', :m, now(),
                 now() + interval '30 minutes')
-    """),
+    """
+        ),
         {"s": otro["id"], "m": MOTIVO_BUENO},
     )
     await db.commit()
@@ -487,9 +505,11 @@ async def test_desactivar_a_un_empleado_cierra_sus_concesiones(
     assert r.status_code == 200, r.text
 
     fila = await db.execute(
-        text("""
+        text(
+            """
         SELECT revoked_at FROM admin.access_grants WHERE id = :g
-    """),
+    """
+        ),
         {"g": grant_id},
     )
     assert fila.scalar() is not None, "la concesión siguió vigente tras desactivar al empleado"
@@ -510,16 +530,18 @@ async def test_la_concesion_es_visible_para_el_cliente(
     grant_id = (await _crear(cliente, cab)).json()["grant_id"]
 
     fila = await db.execute(
-        text("""
+        text(
+            """
         SELECT tenant_id, action, reason, scope, seal
         FROM admin.staff_actions WHERE grant_id = :g AND action = 'grant_created'
-    """),
+    """
+        ),
         {"g": grant_id},
     )
     registro = fila.fetchone()
     assert registro is not None, "la concesión no se registró"
-    assert registro[0] == "org_acme", (
-        "el registro no está asociado al cliente afectado, así que su portal no lo mostrará"
-    )
+    assert (
+        registro[0] == "org_acme"
+    ), "el registro no está asociado al cliente afectado, así que su portal no lo mostrará"
     assert registro[2] == MOTIVO_BUENO, "el motivo no se guardó literal"
     assert registro[4], "el registro no lleva sello"

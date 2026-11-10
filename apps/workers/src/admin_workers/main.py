@@ -240,13 +240,15 @@ async def _generar_uno(r: dict[str, Any]) -> None:
     except Exception as exc:
         async with admin_session() as db:
             await db.execute(
-                text("""
+                text(
+                    """
                 UPDATE admin.reports
                 SET status = 'fallido', blob_ref = NULL,
                     error = jsonb_build_object('tipo', :t, 'cuando', now()::text),
                     completed_at = now()
                 WHERE id = :i
-            """),
+            """
+                ),
                 {"t": type(exc).__name__, "i": r["id"]},
             )
         log.error("admin.informe.fallido", report_id=r["id"], excepcion=type(exc).__name__)

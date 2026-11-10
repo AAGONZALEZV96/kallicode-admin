@@ -46,9 +46,11 @@ async def _registrar(db: Any, staff_id: str, n: int = 3, tenant: str = "org_acme
             resource=f"customer:{tenant}",
         )
     filas = await db.execute(
-        text("""
+        text(
+            """
         SELECT id FROM admin.staff_actions WHERE staff_id = :s ORDER BY id
-    """),
+    """
+        ),
         {"s": staff_id},
     )
     return [f[0] for f in filas.fetchall()]
@@ -61,9 +63,11 @@ async def test_cada_accion_se_sella_con_la_anterior(db: Any, staff_factory: Any)
     await _registrar(db, empleado["id"], n=5)
 
     filas = await db.execute(
-        text("""
+        text(
+            """
         SELECT id, prev_seal, seal FROM admin.staff_actions ORDER BY id
-    """)
+    """
+        )
     )
     anterior = None
     for _id, prev, seal in filas.fetchall():
@@ -80,9 +84,11 @@ async def test_la_cadena_intacta_no_reporta_roturas(db: Any, staff_factory: Any)
     await db.commit()
 
     roturas = await db.execute(
-        text("""
+        text(
+            """
         SELECT * FROM admin.verify_staff_action_chain(NULL, NULL)
-    """)
+    """
+        )
     )
     assert roturas.fetchall() == []
 
@@ -115,9 +121,11 @@ async def test_no_se_puede_modificar_una_accion_registrada(db: Any, staff_factor
 
     with pytest.raises((InternalError, DBAPIError)) as exc:
         await db.execute(
-            text("""
+            text(
+                """
             UPDATE admin.staff_actions SET reason = 'motivo reescrito' WHERE id = :i
-        """),
+        """
+            ),
             {"i": ids[0]},
         )
     assert "append" in str(exc.value).lower() or "inmutable" in str(exc.value).lower()
@@ -147,11 +155,13 @@ async def test_el_rol_de_lectura_no_puede_escribir_en_el_registro(db_ro: Any) ->
 
     with pytest.raises((ProgrammingError, InternalError, DBAPIError)):
         await db_ro.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff_actions (staff_id, staff_role, action,
                                              endpoint)
             VALUES ('st_x', 'staff_admin', 'read', 'falso')
-        """)
+        """
+            )
         )
 
 
@@ -177,15 +187,17 @@ async def test_se_detecta_la_supresion_de_un_tramo_intermedio(
 
     roturas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT broken_id, motivo FROM admin.verify_staff_action_chain(NULL, NULL)
-    """)
+    """
+            )
         )
     ).fetchall()
     assert roturas, "se borró una fila intermedia y la verificación no lo detectó"
-    assert ids[3] in [r[0] for r in roturas], (
-        f"la rotura debía señalar la fila {ids[3]}, siguiente a la borrada: {roturas}"
-    )
+    assert ids[3] in [
+        r[0] for r in roturas
+    ], f"la rotura debía señalar la fila {ids[3]}, siguiente a la borrada: {roturas}"
 
 
 async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
@@ -206,9 +218,11 @@ async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
     sellos = dict(
         (
             await db.execute(
-                text("""
+                text(
+                    """
         SELECT id, seal FROM admin.staff_actions ORDER BY id
-    """)
+    """
+                )
             )
         ).fetchall()
     )
@@ -217,9 +231,11 @@ async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
     await db.execute(text("DELETE FROM admin.staff_actions WHERE id = :i"), {"i": ids[2]})
     # Se recompone el eslabón para que apunte a la fila que ahora la precede.
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE admin.staff_actions SET prev_seal = :p WHERE id = :i
-    """),
+    """
+        ),
         {"p": sellos[ids[1]], "i": ids[3]},
     )
     await db.execute(text("ALTER TABLE admin.staff_actions ENABLE TRIGGER USER"))
@@ -227,9 +243,11 @@ async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
 
     roturas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT broken_id, motivo FROM admin.verify_staff_action_chain(NULL, NULL)
-    """)
+    """
+            )
         )
     ).fetchall()
     assert roturas, (
@@ -255,18 +273,22 @@ async def test_la_verificacion_por_tramos_no_denuncia_su_propio_corte(
 
     fechas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT min(occurred_at), max(occurred_at) FROM admin.staff_actions
-    """)
+    """
+            )
         )
     ).fetchone()
     assert fechas is not None
 
     roturas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT * FROM admin.verify_staff_action_chain(:d, :h)
-    """),
+    """
+            ),
             {"d": fechas[0], "h": fechas[1]},
         )
     ).fetchall()
@@ -326,11 +348,13 @@ async def test_el_registro_guarda_quien_desde_donde_y_por_que(
 
     fila = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT staff_id, staff_role, action, tenant_id, scope, reason, resource,
                endpoint, ip, user_agent, request_id, occurred_at
         FROM admin.staff_actions ORDER BY id DESC LIMIT 1
-    """)
+    """
+            )
         )
     ).fetchone()
     assert fila is not None
@@ -378,16 +402,18 @@ async def test_el_registro_no_guarda_el_dato_leido(db: Any, staff_factory: Any) 
 
     fila = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT payload::text FROM admin.staff_actions ORDER BY id DESC LIMIT 1
-    """)
+    """
+            )
         )
     ).fetchone()
     assert fila is not None
     texto = fila[0] or ""
-    assert "Acme" not in texto, (
-        "el registro contiene el valor revelado, no solo el campo consultado"
-    )
+    assert (
+        "Acme" not in texto
+    ), "el registro contiene el valor revelado, no solo el campo consultado"
     assert "razon_social" in texto, "el registro no dice qué campos se revelaron"
 
 
@@ -405,12 +431,14 @@ async def test_hay_particiones_creadas_por_delante(db: Any) -> None:
     hoy = datetime.now(UTC)
     filas = (
         await db.execute(
-            text("""
+            text(
+                """
         SELECT c.relname FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'admin' AND c.relname LIKE 'staff_actions_%'
         ORDER BY c.relname
-    """)
+    """
+            )
         )
     ).fetchall()
     nombres = [f[0] for f in filas]

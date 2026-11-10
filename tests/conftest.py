@@ -200,10 +200,25 @@ def entorno(esquema: str) -> Iterator[None]:
 async def db(entorno: None) -> AsyncIterator[Any]:
     """Sesión de escritura sobre el esquema admin, con rollback al terminar."""
     from admin_api.db import admin_session
+    from sqlalchemy import text
 
     async with admin_session() as sesion:
         yield sesion
-        await sesion.rollback()
+        try:
+            await sesion.execute(
+                text(
+                    """
+                UPDATE admin.access_grants
+                SET revoked_at = now(),
+                    revoked_by = 'st_prueba',
+                    revoked_reason = 'Limpieza fixture db'
+                WHERE revoked_at IS NULL;
+                """
+                )
+            )
+            await sesion.commit()
+        except Exception:
+            await sesion.rollback()
 
 
 @pytest_asyncio.fixture
@@ -233,22 +248,26 @@ async def dos_clientes(dsn: str, esquema: str) -> list[str]:
             (TENANT_B, "Globex Industrial S.A."),
         ):
             await session.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO core.organizations (id, nombre, idioma, timezone,
                                                 despliegue, fabrica_activa)
                 VALUES (:i, :n, 'es', 'Europe/Madrid', 'cloud', true)
                 ON CONFLICT (id) DO NOTHING
-            """),
+            """
+                ),
                 {"i": tid, "n": nombre},
             )
             await session.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO core.subscriptions (id, tenant_id, plan_codigo, estado,
                                                 inicia_el, renueva_el)
                 VALUES (:s, :i, 'growth', 'activa', current_date - 90,
                         current_date + 30)
                 ON CONFLICT DO NOTHING
-            """),
+            """
+                ),
                 {"s": f"sub_{tid}", "i": tid},
             )
         await session.execute(text("SELECT admin.refresh_all_business_aggregates();"))
@@ -271,13 +290,15 @@ async def staff_factory(db: Any):
         email = f"{sid.lower()}@kallicode.com"
         secreto = nuevo_secreto_totp()
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff (id, email, full_name, role, status,
                                      password_hash, totp_secret,
                                      totp_enrolled_at)
             VALUES (:i, :e, :n, :r, :s, :p, :t,
                     CASE WHEN :s = 'active' THEN now() END)
-        """),
+        """
+            ),
             {
                 "i": sid,
                 "e": email,

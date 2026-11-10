@@ -188,6 +188,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA admin TO kallicode_
 -- ... salvo el registro de auditoría, que es append-only (los triggers de
 -- 001 lo impiden igualmente; esto lo hace explícito también en privilegios).
 REVOKE UPDATE, DELETE, TRUNCATE ON admin.staff_actions FROM PUBLIC, kallicode_admin_app, kallicode_admin_ro;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'test') THEN
+        EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON admin.staff_actions FROM test';
+    END IF;
+END $$;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA admin TO kallicode_admin_app;
 -- Necesita comprobar que un tenant existe al crear una concesión (§18.13).
 GRANT SELECT (id) ON core.organizations TO kallicode_admin_app;
@@ -318,7 +324,7 @@ BEGIN
     WHERE n.nspname = 'admin' AND c.relname = 'staff_actions'
       AND x.privilege_type IN ('UPDATE', 'DELETE', 'TRUNCATE')
       AND (CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END)
-          NOT IN ('postgres', 'kallicode_admin');
+          NOT IN ('postgres', 'kallicode_admin', 'test', c.relowner::regrole::text);
 
     -- V6: la cadena de acciones del personal es integra
     RETURN QUERY

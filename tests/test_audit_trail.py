@@ -22,17 +22,20 @@ async def test_staff_actions_immutability(dsn: str, esquema: str) -> None:
     async with AsyncSession(engine) as session:
         # 1. Crear un empleado para satisfacer la FK
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff (id, email, full_name, role, status)
             VALUES ('st_test_immut', 'immut@kallicode.com', 'Test Immut',
                     'staff_admin', 'invited')
             ON CONFLICT (id) DO NOTHING
-        """)
+        """
+            )
         )
 
         # 2. Insertar un registro de auditoría.
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff_actions (
                 staff_id, staff_role, action, endpoint, ip, user_agent, prev_seal, seal
             ) VALUES (
@@ -40,15 +43,18 @@ async def test_staff_actions_immutability(dsn: str, esquema: str) -> None:
                 '127.0.0.1', 'pytest', '',
                 '0000000000000000000000000000000000000000000000000000000000000000'
             )
-        """)
+        """
+            )
         )
         await session.flush()
 
         res = await session.execute(
-            text("""
+            text(
+                """
             SELECT id, occurred_at FROM admin.staff_actions
             WHERE staff_id = 'st_test_immut' LIMIT 1
-        """)
+        """
+            )
         )
         row = res.fetchone()
         assert row is not None
@@ -58,10 +64,12 @@ async def test_staff_actions_immutability(dsn: str, esquema: str) -> None:
         # 3. Intentar UPDATE debe fallar por el trigger trg_staff_actions_immutable
         with pytest.raises((InternalError, DBAPIError)) as excinfo:
             await session.execute(
-                text("""
+                text(
+                    """
                 UPDATE admin.staff_actions SET action = 'read'
                 WHERE id = :id AND occurred_at = :ts
-            """),
+            """
+                ),
                 {"id": aid, "ts": ts},
             )
         assert "append-only" in str(excinfo.value)
@@ -69,15 +77,18 @@ async def test_staff_actions_immutability(dsn: str, esquema: str) -> None:
 
         # Re-insertar registro para verificar DELETE en una transacción limpia
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff (id, email, full_name, role, status)
             VALUES ('st_test_immut', 'immut@kallicode.com', 'Test Immut',
                     'staff_admin', 'invited')
             ON CONFLICT (id) DO NOTHING
-        """)
+        """
+            )
         )
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff_actions (
                 staff_id, staff_role, action, endpoint, ip, user_agent, prev_seal, seal
             ) VALUES (
@@ -85,15 +96,18 @@ async def test_staff_actions_immutability(dsn: str, esquema: str) -> None:
                 '127.0.0.1', 'pytest', '',
                 '0000000000000000000000000000000000000000000000000000000000000000'
             )
-        """)
+        """
+            )
         )
         await session.flush()
 
         res = await session.execute(
-            text("""
+            text(
+                """
             SELECT id, occurred_at FROM admin.staff_actions
             WHERE staff_id = 'st_test_immut' LIMIT 1
-        """)
+        """
+            )
         )
         row = res.fetchone()
         assert row is not None
@@ -103,10 +117,12 @@ async def test_staff_actions_immutability(dsn: str, esquema: str) -> None:
         # 4. Intentar DELETE debe fallar por el mismo trigger
         with pytest.raises((InternalError, DBAPIError)) as excinfo:
             await session.execute(
-                text("""
+                text(
+                    """
                 DELETE FROM admin.staff_actions
                 WHERE id = :id AND occurred_at = :ts
-            """),
+            """
+                ),
                 {"id": aid, "ts": ts},
             )
         assert "append-only" in str(excinfo.value)
@@ -123,14 +139,16 @@ async def test_staff_actions_chain_verification(db, staff_factory):
 
     for i in range(5):
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff_actions (
                 staff_id, staff_role, action, endpoint, ip, user_agent, prev_seal, seal
             ) VALUES (
                 :sid, 'staff_admin', 'admin_query', :ep, '127.0.0.1', 'pytest', '',
                 '0000000000000000000000000000000000000000000000000000000000000000'
             )
-        """),
+        """
+            ),
             {"sid": sid, "ep": f"/api/v1/test-{i}"},
         )
 
@@ -168,22 +186,26 @@ async def test_schema_and_partitions_structure(dsn: str, esquema: str) -> None:
             "reports",
         }
         res = await session.execute(
-            text("""
+            text(
+                """
             SELECT table_name FROM information_schema.tables
             WHERE table_schema = 'admin'
-        """)
+        """
+            )
         )
         tablas_encontradas = {r[0] for r in res.fetchall()}
         assert tablas_esperadas.issubset(tablas_encontradas)
 
         # Verificar particiones de admin.staff_actions
         res = await session.execute(
-            text("""
+            text(
+                """
             SELECT count(*) FROM pg_inherits
             JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
             JOIN pg_namespace n ON parent.relnamespace = n.oid
             WHERE n.nspname = 'admin' AND parent.relname = 'staff_actions'
-        """)
+        """
+            )
         )
         num_particiones = res.scalar()
         assert num_particiones is not None and num_particiones >= 12
@@ -205,12 +227,14 @@ async def test_registrar_accion_staff(db: AsyncSession, staff_factory, dsn: str)
     )
     async with AsyncSession(engine_su) as session_su:
         await session_su.execute(
-            text("""
+            text(
+                """
             INSERT INTO core.organizations (id, nombre, idioma, timezone,
                                             despliegue, fabrica_activa)
             VALUES ('org_audit_unit', 'Audit Unit S.L.', 'es', 'Europe/Madrid', 'cloud', true)
             ON CONFLICT (id) DO NOTHING;
-        """)
+        """
+            )
         )
         await session_su.commit()
     await engine_su.dispose()
@@ -285,12 +309,14 @@ async def test_verificar_cadena_detecta_manipulacion(dsn: str, esquema: str) -> 
     )
     async with AsyncSession(engine) as session:
         await session.execute(
-            text("""
+            text(
+                """
             INSERT INTO admin.staff (id, email, full_name, role, status)
             VALUES ('st_tamper_test', 'tamper@kallicode.com', 'Tamper Staff',
                     'staff_admin', 'invited')
             ON CONFLICT (id) DO NOTHING;
-        """)
+        """
+            )
         )
         for i in range(3):
             await registrar_accion_staff(
@@ -316,11 +342,13 @@ async def test_verificar_cadena_detecta_manipulacion(dsn: str, esquema: str) -> 
                 )
             )
             await session.execute(
-                text("""
+                text(
+                    """
                 UPDATE admin.staff_actions
                 SET seal = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
                 WHERE id = (SELECT max(id) FROM admin.staff_actions);
-            """)
+            """
+                )
             )
             await session.execute(
                 text(
@@ -358,7 +386,8 @@ async def test_verificar_cadena_detecta_manipulacion(dsn: str, esquema: str) -> 
                 )
             )
             await session.execute(
-                text("""
+                text(
+                    """
                 UPDATE admin.staff_action_head
                 SET last_seal = coalesce(
                     (SELECT seal FROM admin.staff_actions ORDER BY id DESC LIMIT 1),
@@ -366,7 +395,8 @@ async def test_verificar_cadena_detecta_manipulacion(dsn: str, esquema: str) -> 
                 ),
                 events = (SELECT count(*) FROM admin.staff_actions)
                 WHERE lock_id = 1;
-            """)
+            """
+                )
             )
             await session.commit()
 
@@ -377,13 +407,15 @@ async def test_verificar_cadena_detecta_manipulacion(dsn: str, esquema: str) -> 
 async def test_staff_actions_dml_privileges_revoked(db: AsyncSession) -> None:
     """Verifica que UPDATE, DELETE y TRUNCATE estén revocados sobre staff_actions."""
     res = await db.execute(
-        text("""
+        text(
+            """
         SELECT privilege_type, grantee
         FROM information_schema.table_privileges
         WHERE table_schema = 'admin' AND table_name = 'staff_actions'
           AND grantee IN ('PUBLIC', 'kallicode_admin_app', 'kallicode_admin_ro')
           AND privilege_type IN ('UPDATE', 'DELETE', 'TRUNCATE');
-    """)
+    """
+        )
     )
     rows = res.fetchall()
     assert len(rows) == 0, f"Se encontraron privilegios DML mutacionales no revocados: {rows}"

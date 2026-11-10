@@ -122,7 +122,8 @@ async def datos_contrato_sembrados(
             {"sid": sid},
         )
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.staff
                     (id, email, full_name, role, status, password_hash,
                      totp_secret, totp_enrolled_at)
@@ -131,12 +132,14 @@ async def datos_contrato_sembrados(
                 ON CONFLICT (id) DO UPDATE
                 SET password_hash = :pw, status = 'active', totp_secret = :totp,
                     totp_enrolled_at = now()
-            """),
+            """
+            ),
             {"sid": sid, "email": email, "pw": pw_hash, "totp": TOTP_SECRET},
         )
 
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.staff
                     (id, email, full_name, role, status, password_hash,
                      totp_secret, totp_enrolled_at)
@@ -144,80 +147,94 @@ async def datos_contrato_sembrados(
                         'staff_soporte', 'active', :pw, :totp, now())
                 ON CONFLICT (id) DO UPDATE
                 SET role = 'staff_soporte', status = 'active'
-            """),
+            """
+            ),
             {"pw": pw_hash, "totp": TOTP_SECRET},
         )
 
         # 2. Desafíos MFA (uno para verificar y otro para enrolar)
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.staff_mfa_challenges (id, staff_id, token_hash, expires_at)
                 VALUES ('mfa_verify_1', :sid, :h, now() + interval '10 minutes')
                 ON CONFLICT (id) DO UPDATE
                 SET token_hash = :h, expires_at = now() + interval '10 minutes',
                     consumed_at = NULL
-            """),
+            """
+            ),
             {"sid": sid, "h": hash_token(MFA_RAW)},
         )
 
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.staff (id, email, full_name, role, status, totp_secret)
                 VALUES ('st_enroll', 'st_enroll@kallicode.com', 'Staff Enroll',
                         'staff_soporte', 'invited', NULL)
                 ON CONFLICT (id) DO UPDATE SET totp_secret = NULL
-            """)
+            """
+            )
         )
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.staff_mfa_challenges (id, staff_id, token_hash, expires_at)
                 VALUES ('mfa_enroll_1', 'st_enroll', :h, now() + interval '10 minutes')
                 ON CONFLICT (id) DO UPDATE
                 SET staff_id = 'st_enroll', token_hash = :h, consumed_at = NULL,
                     expires_at = now() + interval '10 minutes'
-            """),
+            """
+            ),
             {"h": hash_token("mfa_raw_token_for_enroll")},
         )
 
         # 3. Refresh token activo
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.staff_refresh_tokens
                     (id, staff_id, token_hash, mfa_at, expires_at)
                 VALUES ('rt_contract_1', :sid, :h, now(), now() + interval '1 day')
                 ON CONFLICT (id) DO UPDATE
                 SET token_hash = :h, expires_at = now() + interval '1 day',
                     revoked = false, used_at = NULL, mfa_at = now()
-            """),
+            """
+            ),
             {"sid": sid, "h": hash_token(RT_RAW)},
         )
 
         # 4. Solicitud de restablecimiento de contraseña
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.staff_password_resets (id, staff_id, token_hash, expires_at)
                 VALUES ('prt_contract_1', :sid, :h, now() + interval '15 minutes')
                 ON CONFLICT (id) DO UPDATE
                 SET token_hash = :h, expires_at = now() + interval '15 minutes',
                     used_at = NULL
-            """),
+            """
+            ),
             {"sid": sid, "h": hash_token(PRT_RAW)},
         )
 
         # 5. Invitación pendiente
         await session.execute(
-            text("""
+            text(
+                """
                 DELETE FROM admin.staff_password_history
                 WHERE staff_id IN (
                     SELECT id FROM admin.staff WHERE email = 'invitado@kallicode.com'
                 )
-            """)
+            """
+            )
         )
         await session.execute(
             text("DELETE FROM admin.staff WHERE email = 'invitado@kallicode.com'")
         )
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.staff_invitations
                     (id, email, role, token_hash, invited_by, expires_at)
                 VALUES ('inv_contract_1', 'invitado@kallicode.com', 'staff_soporte',
@@ -225,21 +242,25 @@ async def datos_contrato_sembrados(
                 ON CONFLICT (id) DO UPDATE
                 SET token_hash = :h, expires_at = now() + interval '7 days',
                     accepted_at = NULL, revoked_at = NULL
-            """),
+            """
+            ),
             {"h": hash_token(INV_RAW), "sid": sid},
         )
 
         # 6. Concesión de acceso para probar DELETE sin violar restricciones de auditoría
         await session.execute(
-            text("""
+            text(
+                """
                 UPDATE admin.access_grants
                 SET revoked_at = now(), revoked_by = :sid
                 WHERE staff_id = :sid AND revoked_at IS NULL
-            """),
+            """
+            ),
             {"sid": sid},
         )
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.access_grants
                     (id, staff_id, tenant_id, scope, reason, expires_at)
                 VALUES ('gr_contract_del', :sid, 'org_acme', 'expediente',
@@ -247,13 +268,15 @@ async def datos_contrato_sembrados(
                         now() + interval '1 hour')
                 ON CONFLICT (id) DO UPDATE
                 SET revoked_at = NULL, expires_at = now() + interval '1 hour'
-            """),
+            """
+            ),
             {"sid": sid},
         )
 
         # 7. Caso de SLA
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.sla_cases
                     (job_id, tenant_id, ticket_numero, plan_codigo, objetivo_h,
                      transcurrido_h, bruto_h, resultado, tramos, reglas, iniciado_en)
@@ -261,19 +284,22 @@ async def datos_contrato_sembrados(
                         4.0, 1.5, 1.5, 'dentro', '[]'::jsonb,
                         ARRAY['regla_std']::text[], now())
                 ON CONFLICT (job_id) DO UPDATE SET resultado = 'dentro'
-            """)
+            """
+            )
         )
 
         # 8. Informe de negocio
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO admin.reports
                     (id, kind, format, params, requested_by, status)
                 VALUES ('rp_contract_1', 'consumo', 'csv',
                         '{"desde": "2026-01-01"}'::jsonb, 'st_prueba', 'en_cola')
                 ON CONFLICT (id) DO UPDATE
                 SET requested_by = 'st_prueba', status = 'en_cola'
-            """)
+            """
+            )
         )
 
         # 9. Refresco de vistas materializadas y limpieza de Redis
@@ -293,6 +319,26 @@ async def datos_contrato_sembrados(
         "prt_raw": PRT_RAW,
         "inv_raw": INV_RAW,
     }
+
+    engine_clean = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    async with AsyncSession(engine_clean) as session:
+        await session.execute(
+            text(
+                """
+                UPDATE admin.access_grants
+                SET revoked_at = now(),
+                    revoked_by = :sid,
+                    revoked_reason = 'Fin de prueba contrato'
+                WHERE staff_id = :sid AND revoked_at IS NULL
+            """
+            ),
+            {"sid": sid},
+        )
+        await session.commit()
+    await engine_clean.dispose()
 
 
 # ==============================================================================
@@ -340,14 +386,14 @@ def test_cobertura_exacta_31_endpoints(app: Any) -> None:
     for metodo, ruta, tags in operaciones:
         assert len(tags) > 0, f"Endpoint {metodo} {ruta} no tiene tags asignados"
         for t in tags:
-            assert t in TAGS_OFICIALES, (
-                f"Tag '{t}' en {metodo} {ruta} no pertenece a los 7 tags oficiales"
-            )
+            assert (
+                t in TAGS_OFICIALES
+            ), f"Tag '{t}' en {metodo} {ruta} no pertenece a los 7 tags oficiales"
             tags_encontrados.add(t)
 
-    assert tags_encontrados == TAGS_OFICIALES, (
-        f"Tags faltantes: {TAGS_OFICIALES - tags_encontrados}"
-    )
+    assert (
+        tags_encontrados == TAGS_OFICIALES
+    ), f"Tags faltantes: {TAGS_OFICIALES - tags_encontrados}"
 
 
 def test_seguridad_y_esquemas_estandar(app: Any) -> None:
@@ -375,9 +421,9 @@ def test_seguridad_y_esquemas_estandar(app: Any) -> None:
     campos_requeridos = ["codigo", "mensaje", "detalle", "trace_id", "timestamp"]
     for campo in campos_requeridos:
         assert campo in props, f"Propiedad '{campo}' falta en ErrorStandard"
-        assert campo in err.get("required", []), (
-            f"'{campo}' debe ser requerida en ErrorStandard"
-        )
+        assert campo in err.get(
+            "required", []
+        ), f"'{campo}' debe ser requerida en ErrorStandard"
 
     assert props["timestamp"]["format"] == "date-time"
     assert props["detalle"]["nullable"] is True
@@ -397,14 +443,14 @@ def test_enmascarado_declarado_en_clientes(app: Any) -> None:
     campos_requeridos = ["tenant_id", "name", "plan", "status"]
     for campo in campos_requeridos:
         assert campo in props, f"Propiedad '{campo}' falta en CustomerSummary"
-        assert campo in customer.get("required", []), (
-            f"'{campo}' debe ser requerida en CustomerSummary"
-        )
+        assert campo in customer.get(
+            "required", []
+        ), f"'{campo}' debe ser requerida en CustomerSummary"
 
     descripcion_name = props["name"].get("description", "").lower()
-    assert "enmascarada" in descripcion_name or "enmascarado" in descripcion_name, (
-        f"La descripción de 'name' debe explicitar el enmascarado: {props['name']}"
-    )
+    assert (
+        "enmascarada" in descripcion_name or "enmascarado" in descripcion_name
+    ), f"La descripción de 'name' debe explicitar el enmascarado: {props['name']}"
 
 
 def test_archivo_yaml_congelado_coincide_con_api() -> None:
@@ -430,9 +476,9 @@ def test_schemathesis_valida_31_operaciones_y_propiedades() -> None:
     schema = schemathesis.openapi.from_path(YAML_PATH)
     operaciones = list(schema.get_all_operations())
 
-    assert len(operaciones) == 31, (
-        f"Schemathesis debe descubrir exactamente 31 operaciones, encontró {len(operaciones)}"
-    )
+    assert (
+        len(operaciones) == 31
+    ), f"Schemathesis debe descubrir exactamente 31 operaciones, encontró {len(operaciones)}"
 
     tags_vistos: set[str] = set()
     for op_res in operaciones:
@@ -445,9 +491,9 @@ def test_schemathesis_valida_31_operaciones_y_propiedades() -> None:
         estrategia = op.as_strategy()
         assert estrategia is not None, f"No se pudo generar estrategia para {op.label}"
 
-    assert tags_vistos == TAGS_OFICIALES, (
-        f"Discrepancia en tags oficiales descubiertos por Schemathesis: {tags_vistos}"
-    )
+    assert (
+        tags_vistos == TAGS_OFICIALES
+    ), f"Discrepancia en tags oficiales descubiertos por Schemathesis: {tags_vistos}"
 
 
 # ==============================================================================
@@ -790,9 +836,9 @@ async def test_contrato_31_operaciones_sembradas(
     case.validate_response(r, checks=CHECKS_CONTRATO)
 
     # 3. Comprobación obligatoria de cabeceras de trazabilidad y seguridad
-    assert "x-trace-id" in r.headers, (
-        f"Cabecera 'X-Trace-Id' falta en la respuesta de {metodo} {ruta_real}"
-    )
+    assert (
+        "x-trace-id" in r.headers
+    ), f"Cabecera 'X-Trace-Id' falta en la respuesta de {metodo} {ruta_real}"
     assert r.headers.get("x-content-type-options") == "nosniff"
     assert r.headers.get("x-frame-options") == "DENY"
     assert "no-store" in r.headers.get("cache-control", "")
@@ -923,9 +969,9 @@ async def test_modelos_pydantic_rechazan_campos_extra(
     como("staff_admin")
     r = await cliente.request(metodo, ruta, json=cuerpo)
 
-    assert r.status_code == 422, (
-        f"Se esperaba HTTP 422 por campo extra en {metodo} {ruta}, se obtuvo {r.status_code}"
-    )
+    assert (
+        r.status_code == 422
+    ), f"Se esperaba HTTP 422 por campo extra en {metodo} {ruta}, se obtuvo {r.status_code}"
 
     cuerpo_resp = r.json()
     assert "error" in cuerpo_resp, f"Respuesta no tiene sobre de error: {cuerpo_resp}"
