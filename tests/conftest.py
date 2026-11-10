@@ -32,7 +32,11 @@ import pytest_asyncio
 RAIZ = Path(__file__).resolve().parents[1]
 # El esquema de la plataforma vive en el repositorio del backend; la suite lo
 # aplica en orden antes de las migraciones de la consola.
-BACKEND_DB = RAIZ.parent / "kallicode-backend" / "db"
+BACKEND_DB = (
+    RAIZ.parent / "kallicode-backend" / "db"
+    if (RAIZ.parent / "kallicode-backend" / "db").is_dir()
+    else RAIZ / "kallicode-backend" / "db"
+)
 ADMIN_DB = RAIZ / "db"
 
 TENANT_A = "org_acme"
