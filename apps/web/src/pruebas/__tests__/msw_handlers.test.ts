@@ -11,6 +11,8 @@ import {
   setMockConcesionActiva,
   setMockEstadoAgregados,
   setMockRolStaff,
+  setMockTelemetriaEstado,
+  resetMockState,
 } from "../msw_handlers";
 
 describe("MSW Handlers — Endpoints de Negocio (/admin/v1/business/*)", () => {
@@ -194,5 +196,140 @@ describe("MSW Handlers — Endpoints de Negocio (/admin/v1/business/*)", () => {
     expect(res.items[0].por_tier.pro).toBeGreaterThan(0);
     expect(res.items[0].por_tier.fable).toBeGreaterThan(0);
     expect(res.items[0].cuadra_con_facturacion).toBe(true);
+  });
+});
+
+describe("MSW Handlers — Endpoints de Operaciones y Telemetría (§17.13 – §17.16)", () => {
+  it("GET /admin/v1/ops/agents devuelve estado nominal de agentes y líneas", async () => {
+    resetMockState();
+    const res = await peticionApi<{
+      telemetria: { disponible: boolean; antiguedad_s: number };
+      agentes_total: number;
+      agentes_ocupados: number;
+      etapas: Array<{ etapa: string }>;
+    }>("/admin/v1/ops/agents");
+
+    expect(res.telemetria.disponible).toBe(true);
+    expect(res.agentes_total).toBe(25);
+    expect(res.agentes_ocupados).toBe(18);
+    expect(res.etapas.length).toBeGreaterThan(0);
+  });
+
+  it("GET /admin/v1/ops/agents distingue 'sin-trabajo' (agentes > 0, ocupados = 0)", async () => {
+    setMockTelemetriaEstado("sin-trabajo");
+    const res = await peticionApi<{
+      telemetria: { disponible: boolean };
+      agentes_total: number;
+      agentes_ocupados: number;
+    }>("/admin/v1/ops/agents");
+
+    expect(res.telemetria.disponible).toBe(true);
+    expect(res.agentes_total).toBe(25);
+    expect(res.agentes_ocupados).toBe(0);
+  });
+
+  it("GET /admin/v1/ops/agents distingue 'sin-telemetria' (disponible = false, etapas = null)", async () => {
+    setMockTelemetriaEstado("sin-telemetria");
+    const res = await peticionApi<{
+      telemetria: { disponible: boolean; desde: string | null };
+      agentes_total: number;
+      etapas: unknown;
+    }>("/admin/v1/ops/agents");
+
+    expect(res.telemetria.disponible).toBe(false);
+    expect(res.telemetria.desde).toBeNull();
+    expect(res.agentes_total).toBe(0);
+    expect(res.etapas).toBeNull();
+  });
+
+  it("GET /admin/v1/ops/agents rechaza con 503 TELEMETRIA_NO_DISPONIBLE si la señal supera 15 min", async () => {
+    setMockTelemetriaEstado("desactualizada");
+    await expect(peticionApi("/admin/v1/ops/agents")).rejects.toMatchObject({
+      status: 503,
+      codigo: "TELEMETRIA_NO_DISPONIBLE",
+    });
+  });
+
+  it("GET /admin/v1/ops/queues supervisa colas e incluye la cola crítica kc:dlq", async () => {
+    resetMockState();
+    const res = await peticionApi<{
+      colas: Array<{ nombre: string; dlq: number; estado: string }>;
+      resumen: { criticas: number };
+    }>("/admin/v1/ops/queues");
+
+    expect(res.colas.length).toBeGreaterThanOrEqual(3);
+    const dlq = res.colas.find((c) => c.nombre === "kc:dlq");
+    expect(dlq).toBeDefined();
+    expect(dlq?.dlq).toBe(2);
+    expect(dlq?.estado).toBe("critico");
+    expect(res.resumen.criticas).toBe(1);
+  });
+
+  it("GET /admin/v1/ops/models reporta el tier fable de forma estrictamente separada de pro", async () => {
+    resetMockState();
+    const res = await peticionApi<{
+      modelos: Array<{ modelo: string; tier: string }>;
+      escalados: { flash_a_pro: number; pro_a_fable: number; a_humano: number };
+      tokens_por_tier: { flash: number; pro: number; fable: number };
+    }>("/admin/v1/ops/models");
+
+    const tiers = res.modelos.map((m) => m.tier);
+    expect(tiers).toContain("flash");
+    expect(tiers).toContain("pro");
+    expect(tiers).toContain("fable");
+
+    expect(res.tokens_por_tier.fable).toBe(10000000);
+    expect(res.tokens_por_tier.pro).toBe(35000000);
+    expect(res.escalados.flash_a_pro).toBe(142);
+    expect(res.escalados.pro_a_fable).toBe(18);
+    expect(res.escalados.a_humano).toBe(3);
+  });
+
+  it("POST /internal/v1/telemetry/heartbeat acepta latidos válidos y rechaza inválidos o rate-limited", async () => {
+    // 1. Aceptado 202
+    const resOk = await peticionApi<{ recibido: boolean; agente_id: string }>(
+      "/internal/v1/telemetry/heartbeat",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          agente_id: "ag_test_01",
+          linea: "linea_01",
+          etapa: "build",
+          job_id: "job_01",
+          ventana_s: 5,
+          timestamp: new Date().toISOString(),
+        }),
+      }
+    );
+    expect(resOk.recibido).toBe(true);
+    expect(resOk.agente_id).toBe("ag_test_01");
+
+    // 2. Inválido 422
+    await expect(
+      peticionApi("/internal/v1/telemetry/heartbeat", {
+        method: "POST",
+        body: JSON.stringify({ agente_id: "incompleto" }),
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      codigo: "VALIDACION_ENTRADA",
+    });
+
+    // 3. Rate-limited 429
+    await expect(
+      peticionApi("/internal/v1/telemetry/heartbeat", {
+        method: "POST",
+        headers: { "x-mock-scenario": "rate-limit" },
+        body: JSON.stringify({
+          agente_id: "ag_flood",
+          linea: "linea_01",
+          etapa: "triage",
+          ventana_s: 1,
+        }),
+      })
+    ).rejects.toMatchObject({
+      status: 429,
+      codigo: "RATE_LIMIT_EXCEDIDO",
+    });
   });
 });

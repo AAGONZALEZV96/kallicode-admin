@@ -13,6 +13,7 @@ export interface MockConfig {
   estadoAgregados: "ok" | "obsoleto" | "fallido";
   rolStaff: "staff_admin" | "staff_negocio" | "staff_soporte" | "staff_operaciones";
   frescuraCustom: string | null;
+  telemetriaEstado: "normal" | "sin-trabajo" | "sin-telemetria" | "desactualizada";
 }
 
 const configDefecto: MockConfig = {
@@ -20,6 +21,7 @@ const configDefecto: MockConfig = {
   estadoAgregados: "ok",
   rolStaff: "staff_negocio",
   frescuraCustom: null,
+  telemetriaEstado: "normal",
 };
 
 let estadoGlobal: MockConfig = { ...configDefecto };
@@ -37,6 +39,13 @@ export function setMockEstadoAgregados(estado: "ok" | "obsoleto" | "fallido"): v
 /** Configura una fecha ISO personalizada para simular agregados obsoletos o recientes. */
 export function setMockFrescura(fechaIso: string | null): void {
   estadoGlobal.frescuraCustom = fechaIso;
+}
+
+/** Modifica dinámicamente el estado de la telemetría del pipeline. */
+export function setMockTelemetriaEstado(
+  estado: "normal" | "sin-trabajo" | "sin-telemetria" | "desactualizada"
+): void {
+  estadoGlobal.telemetriaEstado = estado;
 }
 
 /** Modifica dinámicamente el rol del staff simulado. */
@@ -1057,4 +1066,332 @@ export const handlers = [
       }
     );
   }),
+
+  // ------------------------------------------------------------------ Ops & Telemetría §17.13 – §17.16 / §18.24 – §18.26
+  http.get("*/admin/v1/ops/agents", ({ request }) => {
+    return responderAgentes(request);
+  }),
+  http.get("*/internal/v1/telemetry/agents", ({ request }) => {
+    return responderAgentes(request);
+  }),
+
+  http.get("*/admin/v1/ops/queues", ({ request }) => {
+    return responderColas(request);
+  }),
+  http.get("*/internal/v1/telemetry/queues", ({ request }) => {
+    return responderColas(request);
+  }),
+
+  http.get("*/admin/v1/ops/models", ({ request }) => {
+    return responderModelos(request);
+  }),
+  http.get("*/internal/v1/telemetry/providers", ({ request }) => {
+    return responderModelos(request);
+  }),
+
+  http.post("*/internal/v1/telemetry/heartbeat", async ({ request }) => {
+    const traceId = request.headers.get("x-trace-id") || "trc_hb_001";
+    const escenario = request.headers.get("x-mock-scenario") || "";
+
+    if (escenario === "rate-limit") {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "RATE_LIMIT_EXCEDIDO",
+            mensaje: "Máximo 12 latidos por minuto por agente.",
+          },
+        },
+        { status: 429, headers: { "x-trace-id": traceId } }
+      );
+    }
+
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return HttpResponse.json(
+        { error: { codigo: "CUERPO_INVALIDO", mensaje: "JSON inválido." } },
+        { status: 422, headers: { "x-trace-id": traceId } }
+      );
+    }
+
+    if (!body.agente_id || !body.linea || !body.etapa || body.ventana_s === undefined) {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "VALIDACION_ENTRADA",
+            mensaje: "Faltan campos obligatorios en el latido.",
+          },
+        },
+        { status: 422, headers: { "x-trace-id": traceId } }
+      );
+    }
+
+    return HttpResponse.json(
+      {
+        recibido: true,
+        agente_id: body.agente_id,
+        registrado_en: new Date().toISOString(),
+      },
+      { status: 202, headers: { "x-trace-id": traceId } }
+    );
+  }),
 ];
+
+function responderAgentes(request: Request): Response {
+  const traceId = request.headers.get("x-trace-id") || "trc_ops_ag_001";
+  const url = new URL(request.url);
+  const ventana = url.searchParams.get("ventana") || "1h";
+  const escenario =
+    request.headers.get("x-mock-scenario") || estadoGlobal.telemetriaEstado;
+
+  if (escenario === "desactualizada") {
+    return HttpResponse.json(
+      {
+        error: {
+          codigo: "TELEMETRIA_NO_DISPONIBLE",
+          mensaje: "La telemetría del pipeline no está disponible (> 15 min).",
+        },
+      },
+      { status: 503, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  if (escenario === "sin-telemetria") {
+    return HttpResponse.json(
+      {
+        ventana,
+        telemetria: {
+          disponible: false,
+          antiguedad_s: null,
+          desde: null,
+        },
+        agentes_total: 0,
+        agentes_ocupados: 0,
+        agentes_caidos: 0,
+        etapas: null,
+        lineas: { activas: 0, mantenimiento: 0, libres: 0 },
+        alertas: [],
+      },
+      { status: 200, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  if (escenario === "sin-trabajo") {
+    return HttpResponse.json(
+      {
+        ventana,
+        telemetria: {
+          disponible: true,
+          antiguedad_s: 5,
+          desde: new Date().toISOString(),
+        },
+        agentes_total: 25,
+        agentes_ocupados: 0,
+        agentes_caidos: 0,
+        lineas: { activas: 12, mantenimiento: 0, libres: 5 },
+        etapas: [
+          { etapa: "triage", agentes_total: 4, agentes_ocupados: 0, agentes_caidos: 0 },
+          { etapa: "design", agentes_total: 6, agentes_ocupados: 0, agentes_caidos: 0 },
+          { etapa: "build", agentes_total: 10, agentes_ocupados: 0, agentes_caidos: 0 },
+          { etapa: "qa", agentes_total: 5, agentes_ocupados: 0, agentes_caidos: 0 },
+        ],
+        alertas: [],
+      },
+      { status: 200, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  return HttpResponse.json(
+    {
+      ventana,
+      telemetria: {
+        disponible: true,
+        antiguedad_s: 4,
+        desde: new Date().toISOString(),
+      },
+      agentes_total: 25,
+      agentes_ocupados: 18,
+      agentes_caidos: 1,
+      jobs_completados: 142,
+      duracion_p95_s: 38.5,
+      lineas_activas: 12,
+      lineas: { activas: 12, mantenimiento: 1, libres: 5 },
+      etapas: [
+        {
+          etapa: "triage",
+          agentes_total: 4,
+          agentes_ocupados: 2,
+          agentes_caidos: 0,
+          en_cola: 5,
+          latencia_p95_ms: 1200,
+          errores: 0,
+        },
+        {
+          etapa: "design",
+          agentes_total: 6,
+          agentes_ocupados: 5,
+          agentes_caidos: 0,
+          en_cola: 12,
+          latencia_p95_ms: 4800,
+          errores: 0,
+        },
+        {
+          etapa: "build",
+          agentes_total: 10,
+          agentes_ocupados: 8,
+          agentes_caidos: 1,
+          en_cola: 18,
+          latencia_p95_ms: 14200,
+          errores: 1,
+        },
+        {
+          etapa: "qa",
+          agentes_total: 5,
+          agentes_ocupados: 3,
+          agentes_caidos: 0,
+          en_cola: 2,
+          latencia_p95_ms: 6100,
+          errores: 0,
+        },
+      ],
+      alertas: [{ tipo: "agentes_caidos", etapa: "build", valor: 1 }],
+    },
+    { status: 200, headers: { "x-trace-id": traceId } }
+  );
+}
+
+function responderColas(request: Request): Response {
+  const traceId = request.headers.get("x-trace-id") || "trc_ops_q_001";
+
+  return HttpResponse.json(
+    {
+      telemetria_desde: new Date().toISOString(),
+      resumen: {
+        criticas: 1,
+        atencion: 1,
+        pendientes_total: 104,
+        fallidos_total: 2,
+      },
+      colas: [
+        {
+          nombre: "cola_ingesta",
+          profundidad: 24,
+          antiguedad_max_s: 15,
+          no_confirmados: 4,
+          dlq: 0,
+          umbral_atencion_s: 60,
+          estado: "normal",
+        },
+        {
+          nombre: "cola_generacion",
+          profundidad: 78,
+          antiguedad_max_s: 75,
+          no_confirmados: 12,
+          dlq: 0,
+          umbral_atencion_s: 60,
+          estado: "atencion",
+        },
+        {
+          nombre: "kc:dlq",
+          profundidad: 2,
+          antiguedad_max_s: 320,
+          no_confirmados: 0,
+          dlq: 2,
+          umbral_atencion_s: 0,
+          estado: "critico",
+        },
+      ],
+    },
+    { status: 200, headers: { "x-trace-id": traceId } }
+  );
+}
+
+function responderModelos(request: Request): Response {
+  const traceId = request.headers.get("x-trace-id") || "trc_ops_mod_001";
+  const url = new URL(request.url);
+  const ventana = url.searchParams.get("ventana") || "24h";
+
+  return HttpResponse.json(
+    {
+      ventana,
+      telemetria_desde: new Date().toISOString(),
+      proveedores: [
+        {
+          proveedor: "Google",
+          modelo: "gemini-2.5-flash",
+          tier: "flash",
+          disponibilidad_pct: 99.98,
+          latencia_p50_ms: 180,
+          latencia_p95_ms: 420,
+          tasa_error_pct: 0.05,
+        },
+        {
+          proveedor: "Google",
+          modelo: "gemini-2.5-pro",
+          tier: "pro",
+          disponibilidad_pct: 99.85,
+          latencia_p50_ms: 650,
+          latencia_p95_ms: 1250,
+          tasa_error_pct: 0.12,
+        },
+        {
+          proveedor: "Anthropic",
+          modelo: "claude-3-7-sonnet",
+          tier: "fable",
+          disponibilidad_pct: 99.92,
+          latencia_p50_ms: 920,
+          latencia_p95_ms: 1840,
+          tasa_error_pct: 0.08,
+        },
+      ],
+      modelos: [
+        {
+          proveedor: "Google",
+          modelo: "gemini-2.5-flash",
+          tier: "flash",
+          disponibilidad_pct: 99.98,
+          latencia_p50_ms: 180,
+          latencia_p95_ms: 420,
+          tasa_error_pct: 0.05,
+        },
+        {
+          proveedor: "Google",
+          modelo: "gemini-2.5-pro",
+          tier: "pro",
+          disponibilidad_pct: 99.85,
+          latencia_p50_ms: 650,
+          latencia_p95_ms: 1250,
+          tasa_error_pct: 0.12,
+        },
+        {
+          proveedor: "Anthropic",
+          modelo: "claude-3-7-sonnet",
+          tier: "fable",
+          disponibilidad_pct: 99.92,
+          latencia_p50_ms: 920,
+          latencia_p95_ms: 1840,
+          tasa_error_pct: 0.08,
+        },
+      ],
+      escalados: {
+        flash_a_pro: 142,
+        pro_a_fable: 18,
+        a_humano: 3,
+      },
+      tokens_por_tier: {
+        flash: 80000000,
+        pro: 35000000,
+        fable: 10000000,
+      },
+      coste_por_tier: {
+        flash: 120.5,
+        pro: 310.2,
+        fable: 450.0,
+      },
+      degradados: null,
+      comparacion: null,
+    },
+    { status: 200, headers: { "x-trace-id": traceId } }
+  );
+}
