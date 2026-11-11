@@ -12,3 +12,4 @@ export * from "./EstadoCarga";
 export * from "./EstadoError";
 export * from "./EstadoVacio";
 export * from "./ContenedorEstado";
+export * from "./SolicitudConcesionModal";
