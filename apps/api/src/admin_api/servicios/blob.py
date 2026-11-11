@@ -21,6 +21,11 @@ from kallicode_core.logging import log
 
 from ..settings import get_admin_settings
 
+# Clave pública estándar del emulador Azurite para desarrollo y pruebas
+AZURITE_DEV_KEY = (
+    "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+)
+
 
 def _credencial() -> tuple[str, str]:
     """Cuenta y credencial de almacenamiento. Fuera de local son obligatorias."""
@@ -53,25 +58,58 @@ async def subir_informe(blob_ref: str, datos: bytes, content_type: str) -> str:
     defecto BE-F19 del backend fue marcar la exportación como lista tras descartar
     el contenido, de modo que la API entregaba una URL a un fichero inexistente.
     """
+    import tempfile
+    from pathlib import Path
+
     cuenta, contenedor = _credencial()
     s = get_admin_settings()
-    try:
-        from azure.identity.aio import DefaultAzureCredential
-        from azure.storage.blob.aio import BlobServiceClient
+    es_azurite = "devstoreaccount1" in cuenta
+    es_local_o_test = s.env in ("local", "test")
 
-        async with DefaultAzureCredential() as cred:
-            async with BlobServiceClient(cuenta, credential=cred) as svc:
+    try:
+        if es_azurite:
+            from azure.storage.blob import ContentSettings
+            from azure.storage.blob.aio import BlobServiceClient
+
+            # En local conectado a Azurite con versión de API compatible
+            async with BlobServiceClient(
+                cuenta, credential=AZURITE_DEV_KEY, api_version="2023-11-03"
+            ) as svc:
+                container_client = svc.get_container_client(contenedor)
+                try:
+                    await container_client.create_container()
+                except Exception:
+                    pass
                 blob = svc.get_blob_client(contenedor, blob_ref)
                 await blob.upload_blob(
                     datos,
-                    overwrite=False,
-                    # Ajusta 'mime_type' a la variable que estés usando
-                    content_settings={"content_type": content_type},  # type: ignore
+                    overwrite=True,
+                    content_settings=ContentSettings(content_type=content_type),
                     metadata={"retencion_dias": str(s.report_retention_days)},
                 )
+        elif es_local_o_test:
+            # Emulación en almacenamiento local en disco si no hay Azurite configurado
+            ruta_local = (
+                Path(tempfile.gettempdir()) / "kallicode_blob_storage" / contenedor / blob_ref
+            )
+            ruta_local.parent.mkdir(parents=True, exist_ok=True)
+            ruta_local.write_bytes(datos)
+        else:
+            from azure.identity.aio import DefaultAzureCredential
+            from azure.storage.blob import ContentSettings
+            from azure.storage.blob.aio import BlobServiceClient
+
+            async with DefaultAzureCredential() as cred:
+                async with BlobServiceClient(cuenta, credential=cred) as svc:
+                    blob = svc.get_blob_client(contenedor, blob_ref)
+                    await blob.upload_blob(
+                        datos,
+                        overwrite=False,
+                        content_settings=ContentSettings(content_type=content_type),
+                        metadata={"retencion_dias": str(s.report_retention_days)},
+                    )
     except ImportError:
-        # En local sin SDK se escribe en Azurite por el emulador del compose; si
-        # tampoco está, se declara la dependencia caída en lugar de fingir.
+        # En local sin SDK se declara la dependencia caída en lugar de fingir.
         raise dependencia_no_disponible("almacenamiento de objetos") from None
     except Exception as exc:
         log.error("admin.blob.subida_fallida", blob_ref=blob_ref, excepcion=type(exc).__name__)
@@ -87,17 +125,72 @@ def url_descarga(blob_ref: str) -> str:
     cuenta, contenedor = _credencial()
     s = get_admin_settings()
     vence = datetime.now(UTC) + timedelta(minutes=s.report_url_ttl_min)
+    es_emulador = "devstoreaccount1" in cuenta or s.env in ("local", "test")
     try:
         from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 
-        token = generate_blob_sas(
-            account_name=cuenta.split("//")[-1].split(".")[0],
-            container_name=contenedor,
-            blob_name=blob_ref,
-            permission=BlobSasPermissions(read=True),
-            expiry=vence,
-        )
+        if es_emulador:
+            token = generate_blob_sas(
+                account_name="devstoreaccount1",
+                account_key=AZURITE_DEV_KEY,
+                container_name=contenedor,
+                blob_name=blob_ref,
+                permission=BlobSasPermissions(read=True),
+                expiry=vence,
+            )
+        else:
+            token = generate_blob_sas(
+                account_name=cuenta.split("//")[-1].split(".")[0],
+                container_name=contenedor,
+                blob_name=blob_ref,
+                permission=BlobSasPermissions(read=True),
+                expiry=vence,
+            )
         return f"{cuenta}/{contenedor}/{blob_ref}?{token}"
     except Exception as exc:
         log.error("admin.blob.firma_fallida", blob_ref=blob_ref, excepcion=type(exc).__name__)
+        raise dependencia_no_disponible("almacenamiento de objetos") from exc
+
+
+async def descargar_informe(blob_ref: str) -> bytes:
+    """Descarga los bytes del informe directamente desde el almacenamiento."""
+    import tempfile
+    from pathlib import Path
+
+    cuenta, contenedor = _credencial()
+    s = get_admin_settings()
+    es_azurite = "devstoreaccount1" in cuenta
+    es_local_o_test = s.env in ("local", "test")
+    try:
+        if es_azurite:
+            from azure.storage.blob.aio import BlobServiceClient
+
+            async with BlobServiceClient(
+                cuenta, credential=AZURITE_DEV_KEY, api_version="2023-11-03"
+            ) as svc:
+                blob = svc.get_blob_client(contenedor, blob_ref)
+                stream = await blob.download_blob()
+                return await stream.readall()
+        elif es_local_o_test:
+            ruta_local = (
+                Path(tempfile.gettempdir()) / "kallicode_blob_storage" / contenedor / blob_ref
+            )
+            if ruta_local.exists():
+                return ruta_local.read_bytes()
+            raise FileNotFoundError(f"Blob no encontrado en almacenamiento local: {blob_ref}")
+        else:
+            from azure.identity.aio import DefaultAzureCredential
+            from azure.storage.blob.aio import BlobServiceClient
+
+            async with DefaultAzureCredential() as cred:
+                async with BlobServiceClient(cuenta, credential=cred) as svc:
+                    blob = svc.get_blob_client(contenedor, blob_ref)
+                    stream = await blob.download_blob()
+                    return await stream.readall()
+    except Exception as exc:
+        log.error(
+            "admin.blob.descarga_fallida",
+            blob_ref=blob_ref,
+            excepcion=type(exc).__name__,
+        )
         raise dependencia_no_disponible("almacenamiento de objetos") from exc

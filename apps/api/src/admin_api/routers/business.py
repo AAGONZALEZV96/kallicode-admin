@@ -24,7 +24,7 @@ from datetime import date, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, Query, status
-from kallicode_core.errors import no_encontrado, validacion
+from kallicode_core.errors import conflicto, no_encontrado, validacion
 from kallicode_core.ids import nuevo
 from kallicode_core.logging import log
 from pydantic import BaseModel, ConfigDict, Field
@@ -1033,12 +1033,19 @@ async def crear_informe(
 async def informe(
     st: Annotated[Staff, Depends(limite_rl4)],
     report_id: Annotated[str, Path()],
+    descargar: Annotated[
+        bool, Query(description="Indica si se solicita la descarga directa del informe.")
+    ] = False,
+    download: Annotated[
+        bool, Query(description="Indica si se solicita la descarga directa del informe.")
+    ] = False,
 ) -> dict[str, Any]:
     """Estado del informe y, si está listo, URL firmada de vencimiento corto.
 
     No se sirve como descarga directa sin registro: toda salida de datos queda
     trazada. Un empleado solo accede a los informes que ha solicitado; el rol de
-    administración accede a todos.
+    administración accede a todos. Si se intenta descargar antes de finalizar,
+    se rechaza con 409 CONFLICTO_ESTADO.
     """
     from ..servicios.blob import url_descarga
 
@@ -1058,6 +1065,12 @@ async def informe(
         if r is None or (r["requested_by"] != st.id and st.role != "staff_admin"):
             raise no_encontrado("El informe")
 
+        # Comprobación de descarga prematura ante petición explícita
+        if (descargar or download) and r["status"] != "listo":
+            raise conflicto(
+                "CONFLICTO_ESTADO", "El informe aún no ha finalizado su generación."
+            )
+
         url = None
         if r["status"] == "listo" and r["blob_ref"]:
             url = url_descarga(r["blob_ref"])
@@ -1073,6 +1086,18 @@ async def informe(
                 payload={"report_id": report_id, "evento": "descargado", "sha256": r["sha256"]},
             )
             log.info("admin.report.descargado", report_id=report_id, staff_id=st.id)
+        else:
+            await registrar_accion(
+                db,
+                staff_id=st.id,
+                staff_role=st.role,
+                action="report",
+                endpoint=f"GET /admin/v1/business/reports/{report_id}",
+                ip=st.ip,
+                user_agent=st.user_agent,
+                request_id=st.request_id,
+                payload={"report_id": report_id, "evento": "consultado", "estado": r["status"]},
+            )
 
     return {
         "report_id": r["id"],
