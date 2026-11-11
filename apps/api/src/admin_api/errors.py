@@ -41,6 +41,10 @@ _ERRORES_ADMIN = {
         "descripcion": "La concesión de acceso ha caducado.",
     },
     "CONCESION_DUPLICADA": {"http": 409, "descripcion": "Ya existe una concesión activa."},
+    "CONFLICTO_ESTADO": {
+        "http": 409,
+        "descripcion": "Conflicto con el estado actual del recurso.",
+    },
     "MOTIVO_INSUFICIENTE": {
         "http": 422,
         "descripcion": "El motivo proporcionado es insuficiente.",

@@ -128,12 +128,12 @@ _COLUMNAS: dict[str, tuple[str, str]] = {
         "admin.agg_usage_cycle",
     ),
     "suscripciones": (
-        "tenant_id, plan_codigo, suscripcion_estado, inicia_el, "
+        "tenant_id, razon_social, plan_codigo, suscripcion_estado, inicia_el, "
         "renueva_el, finaliza_el, importe_mes, moneda",
         "admin.agg_customer_state",
     ),
     "clientes": (
-        "tenant_id, plan_codigo, suscripcion_estado, alta_el, "
+        "tenant_id, razon_social, plan_codigo, suscripcion_estado, alta_el, "
         "lineas_contratadas, lineas_activas, usuarios_activos, "
         "tickets_abiertos, ultima_actividad",
         "admin.agg_customer_state",
@@ -152,6 +152,80 @@ _COLUMNAS: dict[str, tuple[str, str]] = {
 
 # Columnas identificables: solo se incluyen si el informe las autoriza.
 _PII = {"razon_social", "ticket_numero", "reason", "comentario"}
+
+
+def _construir_xlsx(seleccion: list[str], filas: list[dict[str, Any]]) -> bytes:
+    """Construye un libro de cálculo XLSX estándar en memoria sin dependencias externas."""
+    import xml.sax.saxutils as saxutils
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        content_types = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n'
+            '  <Default Extension="rels" '
+            'ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n'
+            '  <Default Extension="xml" ContentType="application/xml"/>\n'
+            '  <Override PartName="/xl/workbook.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>\n'
+            '  <Override PartName="/xl/worksheets/sheet1.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>\n'
+            "</Types>"
+        )
+        z.writestr("[Content_Types].xml", content_types)
+        rels = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
+            '  <Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+            'relationships/officeDocument" '
+            'Target="xl/workbook.xml"/>\n'
+            "</Relationships>"
+        )
+        z.writestr("_rels/.rels", rels)
+        z.writestr(
+            "xl/workbook.xml",
+            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Reporte" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>""",
+        )
+        wb_rels = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
+            '  <Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+            'relationships/worksheet" '
+            'Target="worksheets/sheet1.xml"/>\n'
+            "</Relationships>"
+        )
+        z.writestr("xl/_rels/workbook.xml.rels", wb_rels)
+        sheet_rows: list[str] = []
+        header_cells = "".join(
+            f"""<c t="inlineStr"><is><t>{saxutils.escape(h)}</t></is></c>""" for h in seleccion
+        )
+        sheet_rows.append(f"""<row r="1">{header_cells}</row>""")
+        for r_idx, row in enumerate(filas, start=2):
+            cells = []
+            for col in seleccion:
+                raw_val = row.get(col)
+                val_str = str(raw_val) if raw_val is not None else ""
+                cells.append(
+                    f"""<c t="inlineStr"><is><t>{saxutils.escape(val_str)}</t></is></c>"""
+                )
+            sheet_rows.append(f"""<row r="{r_idx}">{"".join(cells)}</row>""")
+
+        sheet_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    {"".join(sheet_rows)}
+  </sheetData>
+</worksheet>"""
+        z.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+    return buf.getvalue()
 
 
 async def generar_informes(db: Any) -> None:
@@ -174,6 +248,8 @@ async def generar_informes(db: Any) -> None:
 
 
 async def _generar_uno(r: dict[str, Any], db: Any) -> None:
+    import json
+
     s = get_admin_settings()
     bind_contexto(report_id=r["id"])
     try:
@@ -183,14 +259,24 @@ async def _generar_uno(r: dict[str, Any], db: Any) -> None:
             seleccion = [c for c in seleccion if c not in _PII]
 
         params = r["params"] or {}
+        if isinstance(params, str):
+            params = json.loads(params)
+
+        from datetime import date, timedelta
+
+        d_raw = params.get("desde")
+        h_raw = params.get("hasta")
+        d_val: date | None = date.fromisoformat(str(d_raw)[:10]) if d_raw else None
+        h_val: date | None = date.fromisoformat(str(h_raw)[:10]) if h_raw else None
+        h_next = (h_val + timedelta(days=1)) if h_val else None
+
         campo_fecha = {
             "consumo": "to_date(ciclo || '-01', 'YYYY-MM-DD')",
+            "suscripciones": "coalesce(inicia_el, alta_el::date)",
             "sla": "iniciado_en",
             "staff_actions": "occurred_at",
         }.get(r["kind"], "alta_el")
-        filtro = (
-            f"WHERE {campo_fecha} >= CAST(:d AS date) AND {campo_fecha} < CAST(:h AS date) + 1"
-        )
+        filtro = f"WHERE {campo_fecha} >= :d AND {campo_fecha} < :h_next"
         if params.get("tenant_id"):
             filtro += " AND tenant_id = :t"
 
@@ -202,24 +288,30 @@ async def _generar_uno(r: dict[str, Any], db: Any) -> None:
                 ORDER BY 1 LIMIT :chunk
             """,
                 {
-                    "d": params.get("desde"),
-                    "h": params.get("hasta"),
+                    "d": d_val,
+                    "h_next": h_next,
                     "t": params.get("tenant_id"),
                     "chunk": s.export_chunk_events,
                 },
             )
 
-        buf = io.StringIO()
-        w = csv.DictWriter(buf, fieldnames=seleccion, extrasaction="ignore")
-        w.writeheader()
-        for f in filas:
-            w.writerow({k: f.get(k) for k in seleccion})
-        datos = buf.getvalue().encode("utf-8")
+        formato = (r.get("format") or "csv").lower()
+        if formato == "xlsx":
+            datos = _construir_xlsx(seleccion, filas)
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        else:
+            buf = io.StringIO()
+            w = csv.DictWriter(buf, fieldnames=seleccion, extrasaction="ignore")
+            w.writeheader()
+            for f in filas:
+                w.writerow({k: f.get(k) for k in seleccion})
+            datos = buf.getvalue().encode("utf-8")
+            content_type = "text/csv; charset=utf-8"
 
-        blob_ref = ruta_informe(r["id"], r["format"])
+        blob_ref = ruta_informe(r["id"], formato)
         # La subida va ANTES de marcar como listo: si falla, el informe queda
         # fallido y no se entrega una URL a un fichero inexistente.
-        digest = await subir_informe(blob_ref, datos, "text/csv; charset=utf-8")
+        digest = await subir_informe(blob_ref, datos, content_type)
 
         await uno(
             db,
@@ -247,12 +339,17 @@ async def _generar_uno(r: dict[str, Any], db: Any) -> None:
                 """
             UPDATE admin.reports
             SET status = 'fallido', blob_ref = NULL,
-                error = jsonb_build_object('tipo', CAST(:t AS text), 'cuando', now()::text),
+                error = jsonb_build_object(
+                    'codigo', 'GENERACION_FALLIDA',
+                    'mensaje', CAST(:m AS text),
+                    'tipo', CAST(:t AS text),
+                    'cuando', now()::text
+                ),
                 completed_at = now()
             WHERE id = :i
         """
             ),
-            {"t": type(exc).__name__, "i": r["id"]},
+            {"m": str(exc), "t": type(exc).__name__, "i": r["id"]},
         )
         if hasattr(db, "commit"):
             await db.commit()
