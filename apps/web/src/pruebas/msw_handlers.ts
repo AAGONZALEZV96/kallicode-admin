@@ -712,48 +712,264 @@ export const handlers = [
     const errAuth = verificarAutenticacion(request);
     if (errAuth) return errAuth;
 
+    const rol = obtenerRol(request);
+    if (rol !== "staff_negocio" && rol !== "staff_admin") {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "ROL_STAFF_INSUFICIENTE",
+            mensaje: "Acceso denegado: se requiere rol de negocio o administración.",
+          },
+        },
+        { status: 403 }
+      );
+    }
+
     const errFrescura = verificarFrescuraAgregados(request);
     if (errFrescura) return errFrescura;
 
-    const items = [
+    const url = new URL(request.url);
+    const conConcesion = tieneConcesion(request, url);
+    const agruparPor = url.searchParams.get("agrupar_por") || "cliente";
+    const periodo = url.searchParams.get("periodo") || "mes_actual";
+    const planFiltro = url.searchParams.get("plan") || url.searchParams.get("tier");
+    const tenantFiltro = url.searchParams.get("tenant_id") || url.searchParams.get("q");
+    const forzarDescuadre =
+      request.headers.get("x-mock-descuadre") === "true" ||
+      url.searchParams.get("mock_descuadre") === "true";
+
+    if (agruparPor === "tier") {
+      const itemsTier = [
+        {
+          clave: "flash",
+          tier: "flash",
+          tokens_in: 14500000,
+          tokens_input: 14500000,
+          tokens_out: 7000000,
+          tokens_output: 7000000,
+          tokens_total: 21500000,
+          por_tier: { flash: 21500000 },
+          coste: 43.0,
+          coste_estimado_eur: 43.0,
+          cuadra_con_facturacion: true,
+          enmascarado: false,
+        },
+        {
+          clave: "pro",
+          tier: "pro",
+          tokens_in: 6000000,
+          tokens_input: 6000000,
+          tokens_out: 3500000,
+          tokens_output: 3500000,
+          tokens_total: 9500000,
+          por_tier: { pro: 9500000 },
+          coste: 190.0,
+          coste_estimado_eur: 190.0,
+          cuadra_con_facturacion: true,
+          enmascarado: false,
+        },
+        {
+          clave: "fable",
+          tier: "fable",
+          tokens_in: 500000,
+          tokens_input: 500000,
+          tokens_out: 1000000,
+          tokens_output: 1000000,
+          tokens_total: 1500000,
+          por_tier: { fable: 1500000 },
+          coste: 92.5,
+          coste_estimado_eur: 92.5,
+          cuadra_con_facturacion: true,
+          enmascarado: false,
+        },
+      ];
+
+      return HttpResponse.json({
+        items: itemsTier,
+        total: itemsTier.length,
+        page: 1,
+        page_size: 25,
+        pages: 1,
+        periodo,
+        ciclo: "2026-11",
+        frescura: new Date().toISOString(),
+        totales: {
+          tokens: 32500000,
+          coste: 325.5,
+          moneda: "EUR",
+        },
+        resumen: {
+          total_tokens: 32500000,
+          tokens_total: 32500000,
+          coste_consolidado: 325.5,
+          coste_total_eur: 325.5,
+          porcentaje_medio_cuota: 83.75,
+          cuota_consumo_media_pct: 83.75,
+          moneda: "EUR",
+        },
+        cuadra_con_facturacion: true,
+        descuadres: null,
+      });
+    }
+
+    if (agruparPor === "dia") {
+      const itemsDia = [
+        {
+          clave: "2026-11-10",
+          dia: "2026-11-10",
+          tokens_in: 1200000,
+          tokens_input: 1200000,
+          tokens_out: 600000,
+          tokens_output: 600000,
+          tokens_total: 1800000,
+          por_tier: { flash: 1200000, pro: 500000, fable: 100000 },
+          coste: 18.5,
+          coste_estimado_eur: 18.5,
+          cuadra_con_facturacion: true,
+          enmascarado: false,
+        },
+        {
+          clave: "2026-11-09",
+          dia: "2026-11-09",
+          tokens_in: 1000000,
+          tokens_input: 1000000,
+          tokens_out: 500000,
+          tokens_output: 500000,
+          tokens_total: 1500000,
+          por_tier: { flash: 1000000, pro: 400000, fable: 100000 },
+          coste: 15.0,
+          coste_estimado_eur: 15.0,
+          cuadra_con_facturacion: true,
+          enmascarado: false,
+        },
+      ];
+
+      return HttpResponse.json({
+        items: itemsDia,
+        total: itemsDia.length,
+        page: 1,
+        page_size: 25,
+        pages: 1,
+        periodo,
+        ciclo: "2026-11",
+        frescura: new Date().toISOString(),
+        totales: {
+          tokens: 3300000,
+          coste: 33.5,
+          moneda: "EUR",
+        },
+        resumen: {
+          total_tokens: 3300000,
+          tokens_total: 3300000,
+          coste_consolidado: 33.5,
+          coste_total_eur: 33.5,
+          porcentaje_medio_cuota: 65.0,
+          cuota_consumo_media_pct: 65.0,
+          moneda: "EUR",
+        },
+        cuadra_con_facturacion: true,
+        descuadres: null,
+      });
+    }
+
+    // Modo por cliente (por defecto)
+    let baseItems = [
       {
         clave: "org_acme",
         tenant_id: "org_acme",
+        razon_social: conConcesion ? "Acme Logística S.L." : "A•••• S.L.",
+        plan: "growth",
         tokens_in: 3000000,
+        tokens_input: 3000000,
         tokens_out: 1500000,
+        tokens_output: 1500000,
+        tokens_total: 4500000,
         por_tier: {
           flash: 2500000,
           pro: 1500000,
           fable: 500000,
         },
         coste: 45.5,
+        coste_estimado_eur: 45.5,
         loc_consumidas: 15000,
+        loc_procesadas: 15000,
         cuota_pct: 75.0,
-        cuadra_con_facturacion: true,
+        porcentaje_consumido: 75.0,
+        cuadra_con_facturacion: !forzarDescuadre,
+        enmascarado: !conConcesion,
       },
       {
         clave: "org_globex",
         tenant_id: "org_globex",
+        razon_social: conConcesion ? "Globex Industrial S.A." : "G•••• S.A.",
+        plan: "enterprise",
         tokens_in: 18000000,
+        tokens_input: 18000000,
         tokens_out: 10000000,
+        tokens_output: 10000000,
+        tokens_total: 28000000,
         por_tier: {
           flash: 12000000,
           pro: 12000000,
           fable: 4000000,
         },
         coste: 280.0,
+        coste_estimado_eur: 280.0,
         loc_consumidas: 85000,
+        loc_procesadas: 85000,
         cuota_pct: 92.5,
+        porcentaje_consumido: 92.5,
         cuadra_con_facturacion: true,
+        enmascarado: !conConcesion,
       },
     ];
 
+    if (planFiltro && planFiltro !== "todos") {
+      baseItems = baseItems.filter((i) => i.plan.toLowerCase() === planFiltro.toLowerCase());
+    }
+
+    if (tenantFiltro) {
+      const q = tenantFiltro.toLowerCase().trim();
+      baseItems = baseItems.filter(
+        (i) => i.tenant_id.toLowerCase().includes(q) || i.razon_social.toLowerCase().includes(q)
+      );
+    }
+
+    const totalTokens = baseItems.reduce((acc, i) => acc + i.tokens_total, 0);
+    const costeConsolidado = baseItems.reduce((acc, i) => acc + i.coste_estimado_eur, 0);
+    const mediaCuota =
+      baseItems.length > 0
+        ? baseItems.reduce((acc, i) => acc + (i.cuota_pct || 0), 0) / baseItems.length
+        : 0;
+
+    const descuadres = baseItems.filter((i) => !i.cuadra_con_facturacion).map((i) => i.tenant_id);
+
     return HttpResponse.json({
-      items,
-      total: items.length,
+      items: baseItems,
+      total: baseItems.length,
       page: 1,
       page_size: 25,
       pages: 1,
+      ciclo: "2026-11",
+      periodo,
+      frescura: new Date().toISOString(),
+      totales: {
+        tokens: totalTokens,
+        coste: costeConsolidado,
+        moneda: "EUR",
+      },
+      resumen: {
+        total_tokens: totalTokens,
+        tokens_total: totalTokens,
+        coste_consolidado: Number(costeConsolidado.toFixed(2)),
+        coste_total_eur: Number(costeConsolidado.toFixed(2)),
+        porcentaje_medio_cuota: Number(mediaCuota.toFixed(2)),
+        cuota_consumo_media_pct: Number(mediaCuota.toFixed(2)),
+        moneda: "EUR",
+      },
+      cuadra_con_facturacion: descuadres.length === 0,
+      descuadres: descuadres.length > 0 ? descuadres : null,
+      alguna_enmascarada: !conConcesion,
     });
   }),
 

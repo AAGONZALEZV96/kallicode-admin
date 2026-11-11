@@ -73,20 +73,43 @@ export const AdminLayout: React.FC = () => {
 
           <nav style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             {tienePermisoNegocio && (
-              <Link
-                to="/overview"
-                style={{
-                  fontSize: "0.875rem",
-                  padding: "0.375rem 0.75rem",
-                  borderRadius: "0.375rem",
-                  textDecoration: "none",
-                  color: isActive("/overview") ? "var(--text, #f8fafc)" : "var(--muted, #94a3b8)",
-                  backgroundColor: isActive("/overview") ? "var(--surface2, #334155)" : "transparent",
-                  fontWeight: isActive("/overview") ? 600 : 400,
-                }}
-              >
-                Panel Negocio
-              </Link>
+              <>
+                <Link
+                  to="/overview"
+                  style={{
+                    fontSize: "0.875rem",
+                    padding: "0.375rem 0.75rem",
+                    borderRadius: "0.375rem",
+                    textDecoration: "none",
+                    color: isActive("/overview") ? "var(--text, #f8fafc)" : "var(--muted, #94a3b8)",
+                    backgroundColor: isActive("/overview") ? "var(--surface2, #334155)" : "transparent",
+                    fontWeight: isActive("/overview") ? 600 : 400,
+                  }}
+                >
+                  Panel Negocio
+                </Link>
+                <Link
+                  to="/business/tokens"
+                  style={{
+                    fontSize: "0.875rem",
+                    padding: "0.375rem 0.75rem",
+                    borderRadius: "0.375rem",
+                    textDecoration: "none",
+                    color:
+                      isActive("/business/tokens") || isActive("/tokens")
+                        ? "var(--text, #f8fafc)"
+                        : "var(--muted, #94a3b8)",
+                    backgroundColor:
+                      isActive("/business/tokens") || isActive("/tokens")
+                        ? "var(--surface2, #334155)"
+                        : "transparent",
+                    fontWeight:
+                      isActive("/business/tokens") || isActive("/tokens") ? 600 : 400,
+                  }}
+                >
+                  Consumo Tokens
+                </Link>
+              </>
             )}
 
             {tienePermisoClientes && (

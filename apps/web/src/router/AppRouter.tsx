@@ -20,6 +20,7 @@ import { OpsSLA } from "../vistas/OpsSLA";
 import { BizOverview } from "../vistas/BizOverview";
 import { BizCustomers } from "../vistas/BizCustomers";
 import { CustomerDetail } from "../vistas/CustomerDetail";
+import { BizTokens } from "../vistas/BizTokens";
 
 const InicioRedireccion: React.FC = () => {
   const { usuario } = useAuth();
@@ -59,6 +60,24 @@ export const AppRouter: React.FC = () => {
               element={
                 <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
                   <BizOverview />
+                </RutaProtegidaPorRol>
+              }
+            />
+
+            {/* Rutas de Consumo de Tokens (FinOps): Exclusivo staff_negocio y staff_admin */}
+            <Route
+              path="/business/tokens"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
+                  <BizTokens />
+                </RutaProtegidaPorRol>
+              }
+            />
+            <Route
+              path="/tokens"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
+                  <BizTokens />
                 </RutaProtegidaPorRol>
               }
             />
