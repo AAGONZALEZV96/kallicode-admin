@@ -22,6 +22,8 @@ import { Badge } from "../componentes/Badge";
 import { Select } from "../componentes/Select";
 import { Input } from "../componentes/Input";
 import { Modal } from "../componentes/Modal";
+import { ContenedorEstado } from "../componentes/ContenedorEstado";
+import { SolicitudConcesionModal } from "../componentes/SolicitudConcesionModal";
 import {
   Tabla,
   TablaEncabezado,
@@ -90,8 +92,13 @@ export const BizCustomers: React.FC = () => {
   const { usuario } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Control modal de explicación de enmascaramiento / política E6
+  // Control de modales: explicativo y operativo de concesión
+  const [modalInformativoAbierto, setModalInformativoAbierto] = useState<boolean>(false);
   const [modalConcesionAbierto, setModalConcesionAbierto] = useState<boolean>(false);
+  const [tenantSeleccionado, setTenantSeleccionado] = useState<{
+    tenant_id: string;
+    razon_social: string;
+  } | null>(null);
 
   // Parámetros leídos de la URL
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
@@ -199,136 +206,10 @@ export const BizCustomers: React.FC = () => {
     );
   }
 
-  // 2. Estado de Carga Inicial: Skeleton Loading con estructura de tabla
-  if (isLoading && !data) {
-    return (
-      <main
-        className="biz-customers-loading"
-        data-testid="customers-loading"
-        role="status"
-        aria-busy="true"
-        style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-      >
-        <span className="sr-only">Cargando directorio de organizaciones cliente...</span>
-
-        {/* Cabecera Esqueleto */}
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
-          <div>
-            <div style={{ width: "240px", height: "28px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)", marginBottom: "0.5rem" }} />
-            <div style={{ width: "380px", height: "16px", backgroundColor: "var(--surface)", borderRadius: "var(--radius-sm)" }} />
-          </div>
-        </header>
-
-        {/* Barra de Filtros Esqueleto */}
-        <div style={{ display: "flex", gap: "1rem", padding: "1rem", backgroundColor: "var(--card)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", flexWrap: "wrap" }}>
-          <div style={{ width: "220px", height: "36px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-          <div style={{ width: "180px", height: "36px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-          <div style={{ width: "180px", height: "36px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-        </div>
-
-        {/* Tabla Esqueleto */}
-        <div style={{ backgroundColor: "var(--card)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", padding: "1rem" }}>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              style={{
-                height: "44px",
-                display: "flex",
-                alignItems: "center",
-                gap: "1rem",
-                borderBottom: i < 5 ? "1px solid var(--border)" : "none",
-              }}
-            >
-              <div style={{ width: "120px", height: "16px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-              <div style={{ width: "200px", height: "16px", backgroundColor: "var(--surface)", borderRadius: "var(--radius-sm)" }} />
-              <div style={{ width: "90px", height: "16px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-              <div style={{ width: "100px", height: "16px", backgroundColor: "var(--surface)", borderRadius: "var(--radius-sm)" }} />
-              <div style={{ flex: 1, height: "16px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-            </div>
-          ))}
-        </div>
-      </main>
-    );
-  }
-
-  // 3. Manejo de Errores Accionable (HTTP 503, HTTP 403, Errores de Red)
-  if (error || !data) {
-    const apiErr = error instanceof ApiError ? error : null;
-    const es503 = apiErr?.status === 503 || apiErr?.codigo === "AGREGADO_NO_DISPONIBLE";
-    const es403 = apiErr?.status === 403 || apiErr?.codigo === "ROL_STAFF_INSUFICIENTE";
-    const traceId =
-      apiErr?.traceId ||
-      (apiErr?.detalle as Record<string, unknown>)?.trace_id as string ||
-      "trc_customers_error_001";
-
-    return (
-      <main
-        className="biz-customers-error"
-        data-testid="customers-error"
-        role="alert"
-        style={{
-          padding: "1.5rem",
-          backgroundColor: "var(--bad-bg)",
-          borderRadius: "var(--radius-md)",
-          border: "1px solid var(--bad)",
-          color: "var(--text)",
-          margin: "1rem 0",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Badge variante="error">
-            {es503 ? "AGREGADOS EN REFRESCO" : es403 ? "ACCESO DENEGADO" : "ERROR"}
-          </Badge>
-          <strong style={{ fontSize: "1.1rem" }}>
-            {es503
-              ? "Agregados analíticos en proceso de cálculo"
-              : es403
-              ? "Permisos insuficientes"
-              : "No se pudieron cargar las organizaciones cliente"}
-          </strong>
-        </div>
-
-        <p style={{ color: "var(--muted)", margin: "0.5rem 0", fontSize: "0.875rem" }}>
-          {apiErr?.message || "Ocurrió un error inesperado al consultar el directorio de clientes."}
-        </p>
-
-        {/* Visualización explícita del X-Trace-Id */}
-        <div
-          data-testid="customers-trace-id"
-          style={{
-            margin: "0.75rem 0",
-            fontSize: "0.75rem",
-            color: "var(--muted)",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-          }}
-        >
-          <span>X-Trace-Id:</span>
-          <code
-            style={{
-              padding: "0.15rem 0.4rem",
-              backgroundColor: "var(--surface)",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--border)",
-              color: "var(--text)",
-            }}
-          >
-            {traceId}
-          </code>
-        </div>
-
-        <Boton variante="secondary" tamano="sm" onClick={() => void refetch()}>
-          Reintentar consulta
-        </Boton>
-      </main>
-    );
-  }
-
   // Cálculos de paginación
-  const total = data.total;
-  const items = data.items;
-  const pages = data.pages;
+  const total = data?.total || 0;
+  const items = data?.items || [];
+  const pages = data?.pages || 1;
   const inicioRango = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const finRango = Math.min(page * pageSize, total);
 
@@ -354,84 +235,116 @@ export const BizCustomers: React.FC = () => {
   };
 
   return (
-    <main
-      className="biz-customers"
-      aria-live="polite"
-      style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+    <ContenedorEstado
+      cargando={isLoading && !data}
+      error={error}
+      vacio={!isLoading && !error && items.length === 0}
+      tipoCarga="tabla"
+      filasCarga={5}
+      columnasCarga={6}
+      dataTestIdCarga="customers-loading"
+      dataTestIdError="customers-error"
+      dataTestIdTrace="customers-trace-id"
+      tituloError={
+        (error as ApiError)?.status === 503 || (error as ApiError)?.codigo === "AGREGADO_NO_DISPONIBLE"
+          ? "AGREGADOS EN REFRESCO"
+          : undefined
+      }
+      mensajeError={
+        (error as ApiError)?.status === 503 || (error as ApiError)?.codigo === "AGREGADO_NO_DISPONIBLE"
+          ? "La capa de agregados analíticos está en refresco en PostgreSQL."
+          : undefined
+      }
+      textoBotonReintento="Reintentar consulta"
+      alReintentar={() => void refetch()}
     >
-      {/* Cabecera de la Vista */}
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "1rem",
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
-            Directorio de Clientes y Organizaciones
-          </h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: "0.25rem 0 0 0" }}>
-            Supervisión cross-tenant de suscripciones, consumo y actividad operativa.
-          </p>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          {data.alguna_enmascarada && (
-            <Boton
-              variante="ghost"
-              tamano="sm"
-              onClick={() => setModalConcesionAbierto(true)}
-              aria-label="Ver información sobre política de enmascaramiento"
-            >
-              Política de Privacidad y Enmascaramiento
-            </Boton>
-          )}
-          <Boton
-            variante="secondary"
-            tamano="sm"
-            onClick={() => void refetch()}
-            disabled={isFetching}
-            aria-label="Refrescar listado de clientes"
-          >
-            {isFetching ? "Actualizando..." : "Refrescar"}
-          </Boton>
-        </div>
-      </header>
-
-      {/* Alerta Contextual Informativa ante Datos Enmascarados */}
-      {data.alguna_enmascarada && (
-        <div
-          data-testid="banner-enmascaramiento"
-          style={{
-            padding: "0.75rem 1rem",
-            backgroundColor: "var(--warn-bg)",
-            borderRadius: "var(--radius-md)",
-            border: "1px solid var(--warn)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "0.5rem",
-          }}
+      {data && (
+        <main
+          className="biz-customers"
+          aria-live="polite"
+          style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Badge variante="warn">ENMASCARADO ACTIVO</Badge>
-            <span style={{ fontSize: "0.8125rem", color: "var(--text)" }}>
-              Los datos sensibles de clientes están protegidos por defecto bajo la política de privacidad. Para ver en claro se requiere una solicitud de concesión aprobada.
-            </span>
-          </div>
-          <Boton
-            variante="ghost"
-            tamano="sm"
-            onClick={() => setModalConcesionAbierto(true)}
+          {/* Cabecera de la Vista */}
+          <header
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "1rem",
+            }}
           >
-            Solicitar acceso justificado
-          </Boton>
-        </div>
-      )}
+            <div>
+              <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
+                Directorio de Clientes y Organizaciones
+              </h1>
+              <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: "0.25rem 0 0 0" }}>
+                Supervisión cross-tenant de suscripciones, consumo y actividad operativa.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              {data.alguna_enmascarada && (
+                <Boton
+                  variante="ghost"
+                  tamano="sm"
+                  onClick={() => setModalInformativoAbierto(true)}
+                  aria-label="Ver información sobre política de enmascaramiento"
+                >
+                  Política de Privacidad y Enmascaramiento
+                </Boton>
+              )}
+              <Boton
+                variante="secondary"
+                tamano="sm"
+                onClick={() => void refetch()}
+                disabled={isFetching}
+                aria-label="Refrescar listado de clientes"
+              >
+                {isFetching ? "Actualizando..." : "Refrescar"}
+              </Boton>
+            </div>
+          </header>
+
+          {/* Alerta Contextual Informativa ante Datos Enmascarados */}
+          {data.alguna_enmascarada && (
+            <div
+              data-testid="banner-enmascaramiento"
+              style={{
+                padding: "0.75rem 1rem",
+                backgroundColor: "var(--warn-bg)",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--warn)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Badge variante="warn">ENMASCARADO ACTIVO</Badge>
+                <span style={{ fontSize: "0.8125rem", color: "var(--text)" }}>
+                  Los datos sensibles de clientes están protegidos por defecto bajo la política de privacidad. Para ver en claro se requiere una solicitud de concesión aprobada.
+                </span>
+              </div>
+              <Boton
+                variante="ghost"
+                tamano="sm"
+                onClick={() => {
+                  const primerEnmascarado = items.find((c) => c.enmascarado);
+                  setTenantSeleccionado(
+                    primerEnmascarado
+                      ? { tenant_id: primerEnmascarado.tenant_id, razon_social: primerEnmascarado.razon_social }
+                      : null
+                  );
+                  setModalConcesionAbierto(true);
+                }}
+              >
+                Solicitar acceso justificado
+              </Boton>
+            </div>
+          )}
 
       {/* Barra de Filtros, Búsqueda y Ordenación */}
       <section
@@ -675,9 +588,23 @@ export const BizCustomers: React.FC = () => {
                 {/* 8. Privacidad / Enmascarado */}
                 <TablaCelda>
                   {c.enmascarado ? (
-                    <Badge variante="warn" data-testid={`badge-enmascarado-${c.tenant_id}`} punto>
-                      ENMASCARADO
-                    </Badge>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
+                      <Badge variante="warn" data-testid={`badge-enmascarado-${c.tenant_id}`} punto>
+                        ENMASCARADO
+                      </Badge>
+                      <Boton
+                        variante="ghost"
+                        tamano="sm"
+                        onClick={() => {
+                          setTenantSeleccionado({ tenant_id: c.tenant_id, razon_social: c.razon_social });
+                          setModalConcesionAbierto(true);
+                        }}
+                        data-testid={`btn-solicitar-concesion-${c.tenant_id}`}
+                        style={{ fontSize: "0.6875rem", padding: "2px 6px" }}
+                      >
+                        Solicitar acceso
+                      </Boton>
+                    </div>
                   ) : (
                     <Badge variante="good" data-testid={`badge-claro-${c.tenant_id}`}>
                       EN CLARO
@@ -785,8 +712,8 @@ export const BizCustomers: React.FC = () => {
 
       {/* Modal Informativo de Concesión y Revelación */}
       <Modal
-        abierto={modalConcesionAbierto}
-        alCerrar={() => setModalConcesionAbierto(false)}
+        abierto={modalInformativoAbierto}
+        alCerrar={() => setModalInformativoAbierto(false)}
         titulo="Política de Privacidad y Acceso Justificado"
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -813,12 +740,23 @@ export const BizCustomers: React.FC = () => {
             </ul>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <Boton variante="primary" tamano="sm" onClick={() => setModalConcesionAbierto(false)}>
+            <Boton variante="primary" tamano="sm" onClick={() => setModalInformativoAbierto(false)}>
               Entendido
             </Boton>
           </div>
         </div>
       </Modal>
+
+      {/* Modal Canónico de Solicitud de Concesión E6 */}
+      <SolicitudConcesionModal
+        abierto={modalConcesionAbierto}
+        alCerrar={() => setModalConcesionAbierto(false)}
+        tenantId={tenantSeleccionado?.tenant_id}
+        razonSocial={tenantSeleccionado?.razon_social}
+        onConcesionConcedida={() => void refetch()}
+      />
     </main>
+      )}
+    </ContenedorEstado>
   );
 };

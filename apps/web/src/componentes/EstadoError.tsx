@@ -25,6 +25,7 @@ export interface EstadoErrorProps extends React.HTMLAttributes<HTMLDivElement> {
   reintentando?: boolean;
   accionSecundaria?: React.ReactNode;
   compacto?: boolean;
+  dataTestIdTrace?: string;
   "data-testid"?: string;
 }
 
@@ -42,6 +43,7 @@ export const EstadoError: React.FC<EstadoErrorProps> = ({
   compacto = false,
   className = "",
   style,
+  dataTestIdTrace,
   "data-testid": dataTestId = "estado-error",
   ...props
 }) => {
@@ -181,6 +183,7 @@ export const EstadoError: React.FC<EstadoErrorProps> = ({
       {/* Identificador de traza visible para auditoría y observabilidad */}
       {errorTraceId && (
         <div
+          data-testid={dataTestIdTrace}
           style={{
             display: "inline-flex",
             alignItems: "center",

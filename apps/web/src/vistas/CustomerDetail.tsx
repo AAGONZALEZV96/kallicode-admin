@@ -20,16 +20,15 @@
  *    tarjeta de error con reintento y X-Trace-Id (404, 503, 403), y protección RBAC para staff_operaciones.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { useAuth } from "../estado/auth";
 import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
-import { Select } from "../componentes/Select";
-import { Input } from "../componentes/Input";
-import { Modal } from "../componentes/Modal";
+import { ContenedorEstado } from "../componentes/ContenedorEstado";
+import { SolicitudConcesionModal } from "../componentes/SolicitudConcesionModal";
 import {
   Tabla,
   TablaEncabezado,
@@ -138,8 +137,6 @@ export interface CustomerDetailResponse {
 }
 
 // ------------------------------------------------------------------ Helpers
-const PATRON_TICKET = /(KC|SUP)-\d{3,}/i;
-
 function formatearNumero(num: number | undefined | null): string {
   if (num === undefined || num === null) return "0";
   return num.toLocaleString("es-ES");
@@ -159,7 +156,7 @@ function formatearFecha(fechaIso: string | undefined | null): string {
   }
 }
 
-function obtenerBadgeEstado(estado: string) {
+function obtenerBadgeEstado(estado?: string) {
   switch (estado?.toLowerCase()) {
     case "activa":
       return <Badge variante="good">Activa</Badge>;
@@ -174,7 +171,7 @@ function obtenerBadgeEstado(estado: string) {
   }
 }
 
-function obtenerBadgePlan(plan: string) {
+function obtenerBadgePlan(plan?: string) {
   switch (plan?.toLowerCase()) {
     case "enterprise":
       return <Badge variante="accent">Enterprise</Badge>;
@@ -191,16 +188,9 @@ function obtenerBadgePlan(plan: string) {
 export const CustomerDetail: React.FC = () => {
   const { tenant_id } = useParams<{ tenant_id: string }>();
   const { usuario } = useAuth();
-  const queryClient = useQueryClient();
 
-  // Estados de modal y formulario
+  // Estados de modal y feedback de revelación
   const [modalAbierto, setModalAbierto] = useState(false);
-  const [motivo, setMotivo] = useState("");
-  const [referencia, setReferencia] = useState("");
-  const [alcance, setAlcance] = useState("datos_negocio");
-  const [duracionMin, setDuracionMin] = useState("240");
-  const [enviandoConcesion, setEnviandoConcesion] = useState(false);
-  const [errorConcesion, setErrorConcesion] = useState<string | null>(null);
   const [feedbackConcesion, setFeedbackConcesion] = useState<string | null>(null);
 
   // Validación de RBAC estricta a nivel de vista
@@ -209,10 +199,8 @@ export const CustomerDetail: React.FC = () => {
   const {
     data,
     isLoading,
-    isError,
     error,
     refetch,
-    isFetching,
   } = useQuery<CustomerDetailResponse, ApiError>({
     queryKey: ["business-customer-detail", tenant_id],
     queryFn: async () => {
@@ -223,70 +211,13 @@ export const CustomerDetail: React.FC = () => {
     retry: false,
   });
 
-  // Manejo del formulario de solicitud de concesión
   const handleAbrirModal = () => {
-    setErrorConcesion(null);
-    setMotivo("");
-    setReferencia("");
-    setAlcance("datos_negocio");
-    setDuracionMin("240");
     setModalAbierto(true);
   };
 
   const handleCerrarModal = () => {
     setModalAbierto(false);
-    setErrorConcesion(null);
   };
-
-  const handleEnviarConcesion = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      setErrorConcesion(null);
-
-      const motivoLimpio = motivo.trim();
-      const refEfectiva = referencia.trim() || (PATRON_TICKET.exec(motivoLimpio)?.[0] || "");
-
-      // Validaciones locales
-      if (motivoLimpio.length < 20) {
-        setErrorConcesion("El motivo debe contener al menos 20 caracteres justificando el acceso.");
-        return;
-      }
-
-      if (!PATRON_TICKET.test(refEfectiva) && !PATRON_TICKET.test(motivoLimpio)) {
-        setErrorConcesion("Debe incluir una referencia obligatoria a un ticket válido (ej. KC-1234 o SUP-5678).");
-        return;
-      }
-
-      setEnviandoConcesion(true);
-      try {
-        await peticionApi("/admin/v1/access-grants", {
-          method: "POST",
-          body: JSON.stringify({
-            tenant_id: tenant_id || data?.tenant_id,
-            alcance,
-            motivo: motivoLimpio,
-            duracion_min: Number(duracionMin),
-            referencia: refEfectiva || undefined,
-          }),
-        });
-
-        // Éxito: cerrar modal, invalidar caché y notificar
-        setModalAbierto(false);
-        setFeedbackConcesion("Concesión de acceso autorizada. Los datos sensibles han sido revelados en claro.");
-        await queryClient.invalidateQueries({ queryKey: ["business-customer-detail", tenant_id] });
-        await queryClient.invalidateQueries({ queryKey: ["business-customers"] });
-      } catch (err: unknown) {
-        if (err instanceof ApiError) {
-          setErrorConcesion(err.message || "Error al procesar la solicitud de concesión.");
-        } else {
-          setErrorConcesion("Error inesperado al conectar con el servidor.");
-        }
-      } finally {
-        setEnviandoConcesion(false);
-      }
-    },
-    [motivo, referencia, alcance, duracionMin, tenant_id, data?.tenant_id, queryClient]
-  );
 
   // ------------------------------------------------------------------ 1. RBAC Bloqueado
   if (esRolOperaciones) {
@@ -323,135 +254,16 @@ export const CustomerDetail: React.FC = () => {
     );
   }
 
-  // ------------------------------------------------------------------ 2. Skeleton Loading
-  if (isLoading) {
-    return (
-      <main
-        className="customer-detail-page"
-        data-testid="customer-detail-loading"
-        role="status"
-        aria-busy="true"
-        aria-live="polite"
-        style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ height: "32px", width: "240px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }} />
-          <div style={{ height: "36px", width: "160px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }} />
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: "var(--space-4)",
-          }}
-        >
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="card"
-              style={{
-                height: "220px",
-                backgroundColor: "var(--surface)",
-                borderColor: "var(--border)",
-                opacity: 0.7,
-              }}
-            >
-              <div style={{ height: "20px", width: "50%", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)", marginBottom: "var(--space-4)" }} />
-              <div style={{ height: "14px", width: "80%", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)", marginBottom: "var(--space-2)" }} />
-              <div style={{ height: "14px", width: "60%", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)", marginBottom: "var(--space-2)" }} />
-              <div style={{ height: "14px", width: "90%", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-            </div>
-          ))}
-        </div>
-        <span className="sr-only" style={{ position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0,0,0,0)" }}>
-          Cargando ficha 360 del cliente...
-        </span>
-      </main>
-    );
-  }
-
-  // ------------------------------------------------------------------ 3. Estado de Error
-  if (isError || !data) {
-    const errorTraceId = error?.traceId || (error?.detalle as Record<string, unknown>)?.trace_id as string || undefined;
-    const errorCodigo = error?.codigo || "ERROR_DESCONOCIDO";
-    const es404 = error?.status === 404 || errorCodigo === "NO_ENCONTRADO";
-    const es503 = error?.status === 503 || errorCodigo === "AGREGADO_NO_DISPONIBLE";
-
-    return (
-      <main className="customer-detail-page" style={{ padding: "var(--space-6)" }}>
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <Link to="/business/customers" className="btn btn-secondary" style={{ display: "inline-flex", gap: "var(--space-2)" }}>
-            ← Volver a Directorio de Clientes
-          </Link>
-        </div>
-        <div
-          data-testid="customer-detail-error"
-          className="card"
-          role="alert"
-          style={{
-            borderLeft: "4px solid var(--error)",
-            padding: "var(--space-6)",
-            maxWidth: "680px",
-            margin: "0 auto",
-            backgroundColor: "var(--surface)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
-            <span style={{ fontSize: "1.5rem" }} aria-hidden="true">⚠️</span>
-            <h2 style={{ fontSize: "var(--text-lg)", color: "var(--error)" }}>
-              {es404
-                ? "Organización Cliente No Encontrada (404)"
-                : es503
-                ? "Agregados Analíticos No Disponibles (503)"
-                : "Error al Cargar la Ficha 360°"}
-            </h2>
-          </div>
-          <p style={{ color: "var(--text)", marginBottom: "var(--space-4)" }}>
-            {error?.message || `No fue posible recuperar la información de la organización ${tenant_id}.`}
-          </p>
-
-          {errorTraceId && (
-            <div
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "var(--text-xs)",
-                color: "var(--muted)",
-                backgroundColor: "var(--surface2)",
-                padding: "var(--space-2) var(--space-3)",
-                borderRadius: "var(--radius-md)",
-                marginBottom: "var(--space-4)",
-                display: "inline-block",
-              }}
-            >
-              Trace ID: <strong data-testid="error-trace-id">{errorTraceId}</strong>
-            </div>
-          )}
-
-          <div style={{ display: "flex", gap: "var(--space-3)" }}>
-            <Boton variante="primary" onClick={() => refetch()} disabled={isFetching}>
-              {isFetching ? "Reintentando..." : "Reintentar"}
-            </Boton>
-            <Link to="/business/customers" className="btn btn-secondary">
-              Volver al Listado
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // ------------------------------------------------------------------ 4. Datos cargados
-  const {
-    identificacion,
-    suscripcion,
-    lineas,
-    consumo,
-    usuarios = [],
-    integraciones = [],
-    grafo_actividad,
-    actividad,
-    enmascarado = [],
-  } = data;
+  // ------------------------------------------------------------------ 4. Extracción Segura de Datos Cargados
+  const identificacion = data?.identificacion;
+  const suscripcion = data?.suscripcion;
+  const lineas = data?.lineas;
+  const consumo = data?.consumo;
+  const usuarios = data?.usuarios || [];
+  const integraciones = data?.integraciones || [];
+  const grafo_actividad = data?.grafo_actividad;
+  const actividad = data?.actividad;
+  const enmascarado = data?.enmascarado || [];
 
   const tieneDatosEnmascarados = enmascarado.length > 0;
   const historicoCiclos = consumo?.historico || [];
@@ -461,16 +273,39 @@ export const CustomerDetail: React.FC = () => {
   const aristasTotal = grafo_actividad?.aristas ?? actividad?.aristas ?? 3400;
   const rendimientoHoras = grafo_actividad?.rendimiento_e2e_horas ?? actividad?.rendimiento_e2e_horas ?? 3.5;
 
+  // ------------------------------------------------------------------ 2. Estado Declarativo (ContenedorEstado B3-06)
   return (
-    <main
-      className="customer-detail-page"
-      style={{
-        padding: "var(--space-6)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--space-6)",
-      }}
+    <ContenedorEstado
+      cargando={isLoading}
+      error={error}
+      vacio={!data}
+      tipoCarga="detalle"
+      dataTestIdCarga="customer-detail-loading"
+      dataTestIdError="customer-detail-error"
+      tituloError={
+        error?.status === 404
+          ? "Organización Cliente No Encontrada (404)"
+          : error?.status === 503
+          ? "Agregados Analíticos No Disponibles (503)"
+          : undefined
+      }
+      accionSecundariaError={
+        <Link to="/business/customers" className="btn btn-secondary">
+          Volver al Listado
+        </Link>
+      }
+      alReintentar={() => void refetch()}
     >
+      {data && (
+        <main
+          className="customer-detail-page"
+          style={{
+            padding: "var(--space-6)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-6)",
+          }}
+        >
       {/* Región viva accesible para notificaciones de concesión */}
       <div
         role="region"
@@ -569,7 +404,7 @@ export const CustomerDetail: React.FC = () => {
               data-testid="btn-solicitar-revelacion"
               style={{
                 backgroundColor: "var(--warn)",
-                color: "#0f172a",
+                color: "var(--surface)",
                 fontWeight: "var(--font-semibold)",
               }}
             >
@@ -1028,144 +863,20 @@ export const CustomerDetail: React.FC = () => {
         </article>
       </div>
 
-      {/* ------------------------------------------------------------------ Modal de Concesión */}
-      <Modal
+      {/* ------------------------------------------------------------------ Modal Reutilizable de Concesión */}
+      <SolicitudConcesionModal
         abierto={modalAbierto}
         alCerrar={handleCerrarModal}
+        tenantId={tenant_id}
+        razonSocial={identificacion?.razon_social}
         titulo="Solicitud de Concesión de Acceso a Datos de Cliente"
-        idTitulo="modal-concesion-titulo"
-        anchoMaximo="580px"
-      >
-        <form onSubmit={handleEnviarConcesion} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-            De conformidad con la política de seguridad y privacidad de la administración, cada acceso a PII de clientes queda registrado en la cadena de auditoría inmutable de la plataforma y es auditable por el cliente en su portal.
-          </p>
-
-          {errorConcesion && (
-            <div
-              role="alert"
-              data-testid="error-validacion-modal"
-              style={{
-                backgroundColor: "var(--bad-bg)",
-                border: "1px solid var(--error)",
-                color: "var(--error)",
-                padding: "var(--space-3)",
-                borderRadius: "var(--radius-md)",
-                fontSize: "var(--text-xs)",
-              }}
-            >
-              {errorConcesion}
-            </div>
-          )}
-
-          <div>
-            <label
-              htmlFor="concesion-motivo"
-              style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: "var(--font-medium)", marginBottom: "4px" }}
-            >
-              Motivo Obligatorio (mínimo 20 caracteres y referencia a ticket) *
-            </label>
-            <textarea
-              id="concesion-motivo"
-              data-testid="input-concesion-motivo"
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej: Investigación de incidencia reportada bajo ticket KC-1049 sobre sincronización..."
-              rows={3}
-              style={{
-                width: "100%",
-                padding: "var(--space-2)",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--surface)",
-                color: "var(--text)",
-                fontFamily: "inherit",
-                fontSize: "var(--text-sm)",
-                resize: "vertical",
-                boxSizing: "border-box",
-              }}
-              required
-            />
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block", marginTop: "2px" }}>
-              Caracteres: {motivo.trim().length}/20 mín. Debe referenciar KC-#### o SUP-####.
-            </span>
-          </div>
-
-          <div>
-            <label
-              htmlFor="concesion-referencia"
-              style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: "var(--font-medium)", marginBottom: "4px" }}
-            >
-              Referencia a Ticket (Opcional si se incluye en el motivo)
-            </label>
-            <Input
-              id="concesion-referencia"
-              data-testid="input-concesion-referencia"
-              value={referencia}
-              onChange={(e) => setReferencia(e.target.value)}
-              placeholder="Ej: KC-1049 o SUP-8821"
-            />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
-            <div>
-              <label
-                htmlFor="concesion-alcance"
-                style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: "var(--font-medium)", marginBottom: "4px" }}
-              >
-                Alcance Requerido *
-              </label>
-              <Select
-                id="concesion-alcance"
-                data-testid="select-concesion-alcance"
-                value={alcance}
-                onChange={(e) => setAlcance(e.target.value)}
-                opciones={[
-                  { valor: "datos_negocio", etiqueta: "Datos de Negocio (Recomendado)" },
-                  { valor: "expediente", etiqueta: "Expediente Completo" },
-                  { valor: "contenido_codigo", etiqueta: "Contenido de Código" },
-                ]}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="concesion-duracion"
-                style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: "var(--font-medium)", marginBottom: "4px" }}
-              >
-                Duración de la Concesión *
-              </label>
-              <Select
-                id="concesion-duracion"
-                data-testid="select-concesion-duracion"
-                value={duracionMin}
-                onChange={(e) => setDuracionMin(e.target.value)}
-                opciones={[
-                  { valor: "15", etiqueta: "15 minutos" },
-                  { valor: "30", etiqueta: "30 minutos" },
-                  { valor: "60", etiqueta: "60 minutos (1 hora)" },
-                  { valor: "240", etiqueta: "240 minutos (4 horas)" },
-                  { valor: "480", etiqueta: "480 minutos (8 horas)" },
-                ]}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
-            <Boton type="button" variante="secondary" onClick={handleCerrarModal} disabled={enviandoConcesion}>
-              Cancelar
-            </Boton>
-            <Boton
-              type="submit"
-              variante="primary"
-              data-testid="btn-confirmar-concesion"
-              disabled={enviandoConcesion}
-            >
-              {enviandoConcesion ? "Registrando Concesión..." : "Confirmar y Revelar"}
-            </Boton>
-          </div>
-        </form>
-      </Modal>
+        onConcesionConcedida={() => {
+          setFeedbackConcesion("Concesión de acceso autorizada. Los datos sensibles han sido revelados en claro.");
+          void refetch();
+        }}
+      />
     </main>
+      )}
+    </ContenedorEstado>
   );
 };

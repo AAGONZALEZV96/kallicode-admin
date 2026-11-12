@@ -22,6 +22,7 @@ export interface SolicitudConcesionModalProps {
   alCerrar: () => void;
   tenantId?: string;
   razonSocial?: string;
+  titulo?: string;
   onConcesionConcedida?: () => void;
 }
 
@@ -30,6 +31,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
   alCerrar,
   tenantId: tenantIdProp = "",
   razonSocial = "",
+  titulo = "Solicitar Revelación de Datos de Cliente (E6)",
   onConcesionConcedida,
 }) => {
   const queryClient = useQueryClient();
@@ -130,7 +132,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
     <Modal
       abierto={abierto}
       alCerrar={handleCerrar}
-      titulo="Solicitar Revelación de Datos de Cliente (E6)"
+      titulo={titulo}
       idTitulo="titulo-solicitud-concesion"
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -147,7 +149,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
             style={{
               padding: "0.75rem",
               borderRadius: "var(--radius-sm)",
-              backgroundColor: "rgba(34, 197, 94, 0.15)",
+              backgroundColor: "var(--surface2)",
               color: "var(--good)",
               border: "1px solid var(--good)",
               fontSize: "0.875rem",
@@ -160,14 +162,14 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
 
         {error && (
           <div
-            data-testid="error-concesion"
+            data-testid="error-validacion-modal"
             role="alert"
             style={{
               padding: "0.75rem",
               borderRadius: "var(--radius-sm)",
-              backgroundColor: "rgba(239, 68, 68, 0.15)",
-              color: "var(--danger)",
-              border: "1px solid var(--danger)",
+              backgroundColor: "var(--surface2)",
+              color: "var(--bad)",
+              border: "1px solid var(--bad)",
               fontSize: "0.875rem",
             }}
           >
