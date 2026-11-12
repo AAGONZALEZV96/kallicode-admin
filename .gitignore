@@ -12,6 +12,7 @@ auditoria-proyecto.md
 .geminiignore
 CONTEX/*
 AGENTS.md
+gia-rapida.md
 # ==========================================
 # 2. Backend / Workers (Python)
 # ==========================================

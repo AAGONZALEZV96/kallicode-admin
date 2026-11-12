@@ -82,6 +82,19 @@ const OPCIONES_COMPARACION = [
 
 const LIMITE_FRESCURA_MS = 6 * 60 * 60 * 1000; // 6 horas
 
+function formatearFrescuraRelativa(fechaIso: string): string {
+  const timestamp = new Date(fechaIso).getTime();
+  if (isNaN(timestamp)) return "Fecha no disponible";
+  const diffSegundos = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSegundos < 60) return "Actualizado hace unos segundos";
+  const diffMinutos = Math.floor(diffSegundos / 60);
+  if (diffMinutos < 60) return `Actualizado hace ${diffMinutos} min`;
+  const diffHoras = Math.floor(diffMinutos / 60);
+  if (diffHoras < 24) return `Actualizado hace ${diffHoras} h`;
+  const diffDias = Math.floor(diffHoras / 24);
+  return `Actualizado hace ${diffDias} d`;
+}
+
 export const BizOverview: React.FC = () => {
   const { usuario } = useAuth();
   const [periodo, setPeriodo] = useState<PeriodoRango>("mes_actual");
@@ -361,21 +374,19 @@ export const BizOverview: React.FC = () => {
         >
           {esFrescuraAlta ? (
             <Badge variante="warn" data-testid="badge-frescura-warn">
-              WARN admin.business.frescura_alta
+              {"Datos desactualizados (> 6h)"}
             </Badge>
           ) : (
             <Badge variante="good" data-testid="badge-frescura-ok">
               ACTIVO
             </Badge>
           )}
-          <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            Frescura:{" "}
+          <span
+            style={{ fontSize: "0.75rem", color: "var(--muted)" }}
+            title={`Frescura exacta: ${new Date(data.frescura).toLocaleString("es-ES")}`}
+          >
             <time dateTime={data.frescura}>
-              {new Date(data.frescura).toLocaleTimeString("es-ES", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
+              {formatearFrescuraRelativa(data.frescura)}
             </time>
           </span>
           {isFetching && (
@@ -537,8 +548,17 @@ export const BizOverview: React.FC = () => {
             {data.clientes.activos}
           </div>
 
-          <footer style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            +{altasClientes} altas | -{data.clientes.perdidos} cancelaciones
+          <footer
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
+          >
+            <span style={{ color: "var(--good)" }}>+{altasClientes} altas</span>
+            <span style={{ color: "var(--bad)" }}>-{data.clientes.perdidos} cancelaciones</span>
           </footer>
         </article>
 
@@ -581,8 +601,17 @@ export const BizOverview: React.FC = () => {
             {data.consumo.tokens.toLocaleString("es-ES")}
           </div>
 
-          <footer style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            {data.consumo.loc.toLocaleString("es-ES")} LOC | Coste: {data.consumo.coste_estimado.toFixed(2)} €
+          <footer
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.2rem",
+            }}
+          >
+            <span>{data.consumo.loc.toLocaleString("es-ES")} LOC</span>
+            <span>Coste: {data.consumo.coste_estimado.toFixed(2)} €</span>
           </footer>
         </article>
 
@@ -625,8 +654,17 @@ export const BizOverview: React.FC = () => {
             {data.pipeline.tickets_entregados}
           </div>
 
-          <footer style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            Escalado humano: {data.pipeline.escalado_humano_pct}% | p50: {data.pipeline.tiempo_e2e_p50_h ?? 0}h
+          <footer
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.2rem",
+            }}
+          >
+            <span>Escalado humano: {data.pipeline.escalado_humano_pct}%</span>
+            <span>Tiempo p50: {data.pipeline.tiempo_e2e_p50_h ?? 0}h</span>
           </footer>
         </article>
       </section>

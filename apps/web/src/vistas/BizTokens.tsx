@@ -377,7 +377,6 @@ export const BizTokens: React.FC = () => {
             <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>
               Consumo de Tokens y FinOps
             </h1>
-            <Badge variante="accent">§18.21</Badge>
             {data?.frescura && (
               <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
                 Frescura: {new Date(data.frescura).toLocaleTimeString("es-ES")}
@@ -923,14 +922,19 @@ export const BizTokens: React.FC = () => {
                       ? "Agregado Consolidado por Tier de Modelo"
                       : "Serie Temporal de Consumo Diario"}
                   </h2>
-                  <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                    Mostrando {data.items.length} de {data.total} registros | Ciclo: {data.ciclo || periodo}
-                  </span>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.25rem", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                      Mostrando {data.items.length} de {data.total} registros
+                    </span>
+                    <Badge variante="neutro" style={{ fontSize: "0.75rem" }}>
+                      Ciclo: {data.ciclo || periodo}
+                    </Badge>
+                  </div>
                 </div>
 
                 {data.alguna_enmascarada && (
                   <Badge variante="warn">
-                    DATOS ENMASCARADOS BAJO POLÍTICA E6
+                    DATOS ENMASCARADOS BAJO POLÍTICA DE PRIVACIDAD
                   </Badge>
                 )}
               </div>
@@ -951,7 +955,7 @@ export const BizTokens: React.FC = () => {
                           <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Coste Est.</TablaCeldaEncabezado>
                           <TablaCeldaEncabezado scope="col">Cuota de Uso</TablaCeldaEncabezado>
                           <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>Facturación</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>Privacidad E6</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>Privacidad</TablaCeldaEncabezado>
                         </>
                       ) : agruparPor === "tier" ? (
                         <>
