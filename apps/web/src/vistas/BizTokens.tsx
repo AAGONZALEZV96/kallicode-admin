@@ -276,7 +276,9 @@ export const BizTokens: React.FC = () => {
     let pro = 0;
     let fable = 0;
 
-    if (!data?.items) return { flash, pro, fable, total: 0 };
+    if (!data?.items || data.items.length === 0) {
+      return { flash: 0, pro: 0, fable: 0, total: 0, pctFlash: 0, pctPro: 0, pctFable: 0 };
+    }
 
     data.items.forEach((item) => {
       if (item.por_tier) {
@@ -290,15 +292,26 @@ export const BizTokens: React.FC = () => {
       }
     });
 
-    const total = flash + pro + fable || data.resumen?.total_tokens || 1;
+    const sumaTiers = flash + pro + fable;
+    const total = sumaTiers || data.resumen?.total_tokens || 0;
+
+    if (total === 0) {
+      return { flash, pro, fable, total: 0, pctFlash: 0, pctPro: 0, pctFable: 0 };
+    }
+
+    const pctFlash = Math.round((flash / total) * 100);
+    const pctPro = Math.round((pro / total) * 100);
+    // Garantía matemática estricta de suma 100% sin desviación por redondeo
+    const pctFable = 100 - pctFlash - pctPro;
+
     return {
       flash,
       pro,
       fable,
       total,
-      pctFlash: Math.round((flash / total) * 100) || 0,
-      pctPro: Math.round((pro / total) * 100) || 0,
-      pctFable: Math.round((fable / total) * 100) || 0,
+      pctFlash,
+      pctPro,
+      pctFable,
     };
   }, [data]);
 
@@ -431,6 +444,25 @@ export const BizTokens: React.FC = () => {
           <Badge variante="error">AUDITORÍA REQUERIDA</Badge>
         </section>
       )}
+
+      {/* Región de anuncio reactivo accesible para cambios de filtros (§18.21 / A11Y) */}
+      <div
+        role="status"
+        aria-live="polite"
+        data-testid="anuncio-filtros-dinamicos"
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          margin: "-1px",
+          padding: 0,
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          border: 0,
+        }}
+      >
+        {`Filtros activos: Periodo ${periodo}, Plan ${plan}, Agrupación ${agruparPor}${qUrl ? `, Búsqueda ${qUrl}` : ""}`}
+      </div>
 
       {/* Barra de Filtros y Controles Analíticos */}
       <section
@@ -684,7 +716,10 @@ export const BizTokens: React.FC = () => {
 
             {/* Panel de Tendencias y Desglose por Tier (Regla estricta: fable separado de pro) */}
             <section
+              role="region"
               aria-labelledby="titulo-panel-tiers"
+              aria-label="Panel de tendencias y desglose por tier de modelo"
+              data-testid="panel-graficos-tendencias"
               style={{
                 padding: "1.25rem",
                 backgroundColor: "var(--card)",
@@ -710,6 +745,7 @@ export const BizTokens: React.FC = () => {
               {/* Barra de Distribución Proporcional */}
               <div
                 role="img"
+                data-testid="barra-distribucion-proporcional"
                 aria-label={`Distribución por tier: Flash ${totalesPorTier.pctFlash}%, Pro ${totalesPorTier.pctPro}%, Fable ${totalesPorTier.pctFable}%`}
                 style={{
                   height: "12px",
@@ -720,14 +756,17 @@ export const BizTokens: React.FC = () => {
                 }}
               >
                 <div
+                  data-testid="segmento-flash"
                   title={`Flash: ${totalesPorTier.pctFlash}%`}
                   style={{ width: `${totalesPorTier.pctFlash}%`, backgroundColor: "var(--accent)" }}
                 />
                 <div
+                  data-testid="segmento-pro"
                   title={`Pro: ${totalesPorTier.pctPro}%`}
                   style={{ width: `${totalesPorTier.pctPro}%`, backgroundColor: "var(--purple)" }}
                 />
                 <div
+                  data-testid="segmento-fable"
                   title={`Fable: ${totalesPorTier.pctFable}%`}
                   style={{ width: `${totalesPorTier.pctFable}%`, backgroundColor: "var(--warn)" }}
                 />
