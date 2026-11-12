@@ -197,6 +197,28 @@ describe("MSW Handlers — Endpoints de Negocio (/admin/v1/business/*)", () => {
     expect(res.items[0].por_tier.fable).toBeGreaterThan(0);
     expect(res.items[0].cuadra_con_facturacion).toBe(true);
   });
+
+  // 12. GET /upgrade-requests
+  it("GET /admin/v1/business/upgrade-requests devuelve solicitudes pendientes ordenadas por antigüedad", async () => {
+    const res = await peticionApi<{
+      items: Array<{
+        solicitud_id: string;
+        tenant_id: string;
+        plan_actual: string;
+        plan_deseado: string;
+        urgente: boolean;
+        estado: string;
+        antiguedad_h: number;
+      }>;
+      total: number;
+    }>("/admin/v1/business/upgrade-requests");
+
+    expect(res.total).toBe(2); // 2 pendientes por defecto
+    expect(res.items.length).toBe(2);
+    expect(res.items[0].estado).toBe("pendiente");
+    expect(res.items[0].solicitud_id).toBe("req_001");
+    expect(res.items[0].urgente).toBe(true);
+  });
 });
 
 describe("MSW Handlers — Endpoints de Operaciones y Telemetría (§17.13 – §17.16)", () => {

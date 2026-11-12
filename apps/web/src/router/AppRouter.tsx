@@ -20,6 +20,7 @@ import { OpsSLA } from "../vistas/OpsSLA";
 import { BizOverview } from "../vistas/BizOverview";
 import { BizCustomers } from "../vistas/BizCustomers";
 import { CustomerDetail } from "../vistas/CustomerDetail";
+import { BizSubscriptions } from "../vistas/BizSubscriptions";
 import { BizTokens } from "../vistas/BizTokens";
 
 const InicioRedireccion: React.FC = () => {
@@ -60,6 +61,24 @@ export const AppRouter: React.FC = () => {
               element={
                 <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
                   <BizOverview />
+                </RutaProtegidaPorRol>
+              }
+            />
+
+            {/* Rutas de Suscripciones: Exclusivo staff_negocio y staff_admin (§18.19) */}
+            <Route
+              path="/business/subscriptions"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
+                  <BizSubscriptions />
+                </RutaProtegidaPorRol>
+              }
+            />
+            <Route
+              path="/subscriptions"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
+                  <BizSubscriptions />
                 </RutaProtegidaPorRol>
               }
             />
