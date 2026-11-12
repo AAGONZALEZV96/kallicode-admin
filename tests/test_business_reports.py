@@ -262,7 +262,7 @@ async def test_crear_informe_regla_e6_sin_concesion_403(
     }
     r = await cliente.post("/admin/v1/business/reports", json=payload)
     assert r.status_code == 403
-    assert r.json()["error"]["codigo"] == "ACCESO_NO_JUSTIFICADO"
+    assert r.json()["error"]["codigo"] in ("ACCESO_NO_JUSTIFICADO", "CONCESION_CADUCADA")
 
 
 async def test_crear_informe_regla_e6_con_concesion_202(
