@@ -21,8 +21,6 @@ meses:
 from __future__ import annotations
 
 import asyncio
-import csv
-import io
 import signal
 import uuid
 from typing import Any
@@ -121,113 +119,6 @@ async def refrescar_agregados(db: Any) -> None:
 
 
 # ------------------------------------------------------------------- informes
-_COLUMNAS: dict[str, tuple[str, str]] = {
-    "consumo": (
-        "tenant_id, ciclo, loc_consumidas, tokens_in, tokens_out, "
-        "tokens_flash, tokens_pro, tokens_fable, coste",
-        "admin.agg_usage_cycle",
-    ),
-    "suscripciones": (
-        "tenant_id, razon_social, plan_codigo, suscripcion_estado, inicia_el, "
-        "renueva_el, finaliza_el, importe_mes, moneda",
-        "admin.agg_customer_state",
-    ),
-    "clientes": (
-        "tenant_id, razon_social, plan_codigo, suscripcion_estado, alta_el, "
-        "lineas_contratadas, lineas_activas, usuarios_activos, "
-        "tickets_abiertos, ultima_actividad",
-        "admin.agg_customer_state",
-    ),
-    "sla": (
-        "tenant_id, ticket_numero, plan_codigo, objetivo_h, transcurrido_h, "
-        "bruto_h, resultado, iniciado_en, terminado_en",
-        "admin.sla_cases",
-    ),
-    "staff_actions": (
-        "occurred_at, staff_id, staff_role, action, tenant_id, "
-        "scope, reason, resource, endpoint, seal",
-        "admin.staff_actions",
-    ),
-}
-
-# Columnas identificables: solo se incluyen si el informe las autoriza.
-_PII = {"razon_social", "ticket_numero", "reason", "comentario"}
-
-
-def _construir_xlsx(seleccion: list[str], filas: list[dict[str, Any]]) -> bytes:
-    """Construye un libro de cálculo XLSX estándar en memoria sin dependencias externas."""
-    import xml.sax.saxutils as saxutils
-    import zipfile
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        content_types = (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n'
-            '  <Default Extension="rels" '
-            'ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n'
-            '  <Default Extension="xml" ContentType="application/xml"/>\n'
-            '  <Override PartName="/xl/workbook.xml" '
-            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>\n'
-            '  <Override PartName="/xl/worksheets/sheet1.xml" '
-            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>\n'
-            "</Types>"
-        )
-        z.writestr("[Content_Types].xml", content_types)
-        rels = (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
-            '  <Relationship Id="rId1" '
-            'Type="http://schemas.openxmlformats.org/officeDocument/2006/'
-            'relationships/officeDocument" '
-            'Target="xl/workbook.xml"/>\n'
-            "</Relationships>"
-        )
-        z.writestr("_rels/.rels", rels)
-        z.writestr(
-            "xl/workbook.xml",
-            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheets>
-    <sheet name="Reporte" sheetId="1" r:id="rId1"/>
-  </sheets>
-</workbook>""",
-        )
-        wb_rels = (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
-            '  <Relationship Id="rId1" '
-            'Type="http://schemas.openxmlformats.org/officeDocument/2006/'
-            'relationships/worksheet" '
-            'Target="worksheets/sheet1.xml"/>\n'
-            "</Relationships>"
-        )
-        z.writestr("xl/_rels/workbook.xml.rels", wb_rels)
-        sheet_rows: list[str] = []
-        header_cells = "".join(
-            f"""<c t="inlineStr"><is><t>{saxutils.escape(h)}</t></is></c>""" for h in seleccion
-        )
-        sheet_rows.append(f"""<row r="1">{header_cells}</row>""")
-        for r_idx, row in enumerate(filas, start=2):
-            cells = []
-            for col in seleccion:
-                raw_val = row.get(col)
-                val_str = str(raw_val) if raw_val is not None else ""
-                cells.append(
-                    f"""<c t="inlineStr"><is><t>{saxutils.escape(val_str)}</t></is></c>"""
-                )
-            sheet_rows.append(f"""<row r="{r_idx}">{"".join(cells)}</row>""")
-
-        sheet_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <sheetData>
-    {"".join(sheet_rows)}
-  </sheetData>
-</worksheet>"""
-        z.writestr("xl/worksheets/sheet1.xml", sheet_xml)
-    return buf.getvalue()
-
-
 async def generar_informes(db: Any) -> None:
     """Genera los informes en cola, los sube y solo entonces los marca listos."""
     while True:
@@ -250,63 +141,21 @@ async def generar_informes(db: Any) -> None:
 async def _generar_uno(r: dict[str, Any], db: Any) -> None:
     import json
 
-    s = get_admin_settings()
+    from admin_api.reports import generar_contenido_informe
+
     bind_contexto(report_id=r["id"])
     try:
-        cols, tabla = _COLUMNAS[r["kind"]]
-        seleccion = [c.strip() for c in cols.split(",")]
-        if not r["includes_pii"]:
-            seleccion = [c for c in seleccion if c not in _PII]
-
         params = r["params"] or {}
         if isinstance(params, str):
             params = json.loads(params)
 
-        from datetime import date, timedelta
-
-        d_raw = params.get("desde")
-        h_raw = params.get("hasta")
-        d_val: date | None = date.fromisoformat(str(d_raw)[:10]) if d_raw else None
-        h_val: date | None = date.fromisoformat(str(h_raw)[:10]) if h_raw else None
-        h_next = (h_val + timedelta(days=1)) if h_val else None
-
-        campo_fecha = {
-            "consumo": "to_date(ciclo || '-01', 'YYYY-MM-DD')",
-            "suscripciones": "coalesce(inicia_el, alta_el::date)",
-            "sla": "iniciado_en",
-            "staff_actions": "occurred_at",
-        }.get(r["kind"], "alta_el")
-        filtro = f"WHERE {campo_fecha} >= :d AND {campo_fecha} < :h_next"
-        if params.get("tenant_id"):
-            filtro += " AND tenant_id = :t"
-
-        async with read_session() as rdb:
-            filas = await todos(
-                rdb,
-                f"""
-                SELECT {", ".join(seleccion)} FROM {tabla} {filtro}
-                ORDER BY 1 LIMIT :chunk
-            """,
-                {
-                    "d": d_val,
-                    "h_next": h_next,
-                    "t": params.get("tenant_id"),
-                    "chunk": s.export_chunk_events,
-                },
-            )
-
         formato = (r.get("format") or "csv").lower()
-        if formato == "xlsx":
-            datos = _construir_xlsx(seleccion, filas)
-            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        else:
-            buf = io.StringIO()
-            w = csv.DictWriter(buf, fieldnames=seleccion, extrasaction="ignore")
-            w.writeheader()
-            for f in filas:
-                w.writerow({k: f.get(k) for k in seleccion})
-            datos = buf.getvalue().encode("utf-8")
-            content_type = "text/csv; charset=utf-8"
+        datos, content_type, num_filas = await generar_contenido_informe(
+            r["kind"],
+            formato,
+            params,
+            r["includes_pii"],
+        )
 
         blob_ref = ruta_informe(r["id"], formato)
         # La subida va ANTES de marcar como listo: si falla, el informe queda
@@ -321,14 +170,14 @@ async def _generar_uno(r: dict[str, Any], db: Any) -> None:
                 rows_total = :n, completed_at = now(), error = NULL
             WHERE id = :i RETURNING id
         """,
-            {"b": blob_ref, "h": digest, "n": len(filas), "i": r["id"]},
+            {"b": blob_ref, "h": digest, "n": num_filas, "i": r["id"]},
         )
         if hasattr(db, "commit"):
             await db.commit()
         log.info(
             "admin.informe.generado",
             report_id=r["id"],
-            filas=len(filas),
+            filas=num_filas,
             bytes=len(datos),
             identificables=r["includes_pii"],
         )

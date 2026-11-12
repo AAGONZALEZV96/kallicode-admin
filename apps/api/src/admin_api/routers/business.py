@@ -23,7 +23,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 from kallicode_core.errors import conflicto, no_encontrado, validacion
 from kallicode_core.ids import nuevo
 from kallicode_core.logging import log
@@ -959,7 +959,7 @@ async def crear_informe(
     s = get_admin_settings()
     if cuerpo.tipo not in ("consumo", "suscripciones", "clientes", "sla"):
         raise validacion("Tipo de informe desconocido.", {"tipo": cuerpo.tipo})
-    if cuerpo.formato not in ("csv", "xlsx"):
+    if cuerpo.formato not in ("csv", "xlsx", "pdf"):
         raise validacion("Formato no admitido.", {"formato": cuerpo.formato})
     if cuerpo.desde > cuerpo.hasta:
         raise validacion("El rango de fechas no es válido.")
@@ -1029,7 +1029,11 @@ async def crear_informe(
 
 
 # ------------------------------------------------------------------ §18.23
-@router.get("/reports/{report_id}", summary="Estado y descarga de un informe")
+@router.get(
+    "/reports/{report_id}",
+    response_model=None,
+    summary="Estado y descarga de un informe",
+)
 async def informe(
     st: Annotated[Staff, Depends(limite_rl4)],
     report_id: Annotated[str, Path()],
@@ -1039,7 +1043,7 @@ async def informe(
     download: Annotated[
         bool, Query(description="Indica si se solicita la descarga directa del informe.")
     ] = False,
-) -> dict[str, Any]:
+) -> dict[str, Any] | Response:
     """Estado del informe y, si está listo, URL firmada de vencimiento corto.
 
     No se sirve como descarga directa sin registro: toda salida de datos queda
@@ -1047,7 +1051,10 @@ async def informe(
     administración accede a todos. Si se intenta descargar antes de finalizar,
     se rechaza con 409 CONFLICTO_ESTADO.
     """
-    from ..servicios.blob import url_descarga
+    from ..servicios.blob import descargar_informe, url_descarga
+
+    quiere_descarga = descargar or download
+    datos_blob: bytes | None = None
 
     async with admin_session() as db:
         r = await uno(
@@ -1066,7 +1073,7 @@ async def informe(
             raise no_encontrado("El informe")
 
         # Comprobación de descarga prematura ante petición explícita
-        if (descargar or download) and r["status"] != "listo":
+        if quiere_descarga and r["status"] != "listo":
             raise conflicto(
                 "CONFLICTO_ESTADO", "El informe aún no ha finalizado su generación."
             )
@@ -1074,6 +1081,8 @@ async def informe(
         url = None
         if r["status"] == "listo" and r["blob_ref"]:
             url = url_descarga(r["blob_ref"])
+            if quiere_descarga:
+                datos_blob = await descargar_informe(r["blob_ref"])
             await registrar_accion(
                 db,
                 staff_id=st.id,
@@ -1098,6 +1107,20 @@ async def informe(
                 request_id=st.request_id,
                 payload={"report_id": report_id, "evento": "consultado", "estado": r["status"]},
             )
+
+    if quiere_descarga and datos_blob is not None:
+        media_types = {
+            "csv": "text/csv; charset=utf-8",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "pdf": "application/pdf",
+        }
+        media_type = media_types.get(r["format"].lower(), "application/octet-stream")
+        nombre_archivo = f"informe_{r['kind']}_{report_id}.{r['format']}"
+        return Response(
+            content=datos_blob,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'},
+        )
 
     return {
         "report_id": r["id"],
