@@ -23,6 +23,7 @@ export interface ContenedorEstadoProps {
   tiempoLimiteMs?: number;
   alExpirarTiempoLimite?: () => void;
   alReintentar?: () => void;
+  onReintentar?: () => void;
   textoBotonReintento?: string;
   reintentando?: boolean;
   tituloError?: string;
@@ -35,6 +36,9 @@ export interface ContenedorEstadoProps {
   textoAccionVacio?: string;
   accionVacio?: React.ReactNode;
   compacto?: boolean;
+  dataTestIdCarga?: string;
+  dataTestIdError?: string;
+  dataTestIdTrace?: string;
   children: React.ReactNode;
 }
 
@@ -50,6 +54,7 @@ export const ContenedorEstado: React.FC<ContenedorEstadoProps> = ({
   tiempoLimiteMs,
   alExpirarTiempoLimite,
   alReintentar,
+  onReintentar,
   textoBotonReintento,
   reintentando,
   tituloError,
@@ -62,12 +67,18 @@ export const ContenedorEstado: React.FC<ContenedorEstadoProps> = ({
   textoAccionVacio,
   accionVacio,
   compacto = false,
+  dataTestIdCarga,
+  dataTestIdError,
+  dataTestIdTrace,
   children,
 }) => {
+  const funcionReintento = alReintentar || onReintentar;
+
   // 1. Estado de Carga
   if (cargando) {
     return (
       <EstadoCarga
+        data-testid={dataTestIdCarga}
         tipo={tipoCarga}
         filas={filasCarga}
         columnas={columnasCarga}
@@ -83,10 +94,12 @@ export const ContenedorEstado: React.FC<ContenedorEstadoProps> = ({
   if (error) {
     return (
       <EstadoError
+        data-testid={dataTestIdError}
+        dataTestIdTrace={dataTestIdTrace}
         error={error}
         titulo={tituloError}
         mensaje={mensajeError}
-        alReintentar={alReintentar}
+        alReintentar={funcionReintento}
         textoBotonReintento={textoBotonReintento}
         reintentando={reintentando}
         accionSecundaria={accionSecundariaError}

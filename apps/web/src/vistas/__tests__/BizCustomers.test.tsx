@@ -233,9 +233,9 @@ describe("BizCustomers — Pantalla de Listado de Clientes", () => {
       expect(screen.getByTestId("banner-enmascaramiento")).toBeDefined();
     });
 
-    // Clic en solicitar acceso justificado
-    const botonSolicitar = screen.getByText("Solicitar acceso justificado");
-    fireEvent.click(botonSolicitar);
+    // Clic en Política de Privacidad y Enmascaramiento
+    const botonPolitica = screen.getByText("Política de Privacidad y Enmascaramiento");
+    fireEvent.click(botonPolitica);
 
     await waitFor(() => {
       expect(screen.getByText("Política de Privacidad y Acceso Justificado")).toBeDefined();
@@ -342,5 +342,33 @@ describe("BizCustomers — Pantalla de Listado de Clientes", () => {
 
     const linkDetalle = screen.getByLabelText("Ver detalles de org_acme");
     expect(linkDetalle.getAttribute("href")).toBe("/business/customers/org_acme");
+  });
+
+  it("12. abre el modal canónico SolicitudConcesionModal desde el botón de la fila o banner", async () => {
+    renderBizCustomers();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("fila-cliente-org_acme")).toBeDefined();
+    });
+
+    // Clic en solicitar acceso para org_acme
+    const btnSolicitar = screen.getByTestId("btn-solicitar-concesion-org_acme");
+    fireEvent.click(btnSolicitar);
+
+    await waitFor(() => {
+      expect(screen.getByText("Solicitar Revelación de Datos de Cliente (E6)")).toBeDefined();
+    });
+
+    // Verificar campos del formulario E6
+    expect(screen.getByTestId("input-concesion-motivo")).toBeDefined();
+    expect(screen.getByTestId("input-concesion-referencia")).toBeDefined();
+
+    // Cerrar modal
+    const btnCancelar = screen.getByText("Cancelar");
+    fireEvent.click(btnCancelar);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Solicitar Revelación de Datos de Cliente (E6)")).toBeNull();
+    });
   });
 });
