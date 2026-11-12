@@ -135,10 +135,8 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         <p style={{ color: "var(--muted)", margin: 0, fontSize: "0.875rem" }}>
-          Los datos comerciales y personales están enmascarados por defecto. Una concesión activa en{" "}
-          <code style={{ color: "var(--accent)" }}>admin.access_grants</code> permite revelar temporalmente los
-          campos protegidos. Toda consulta con concesión queda registrada de forma inmutable en el registro de
-          auditoría.
+          Los datos comerciales y personales están enmascarados por defecto. Una solicitud de concesión aprobada permite revelar temporalmente los
+          campos protegidos. Toda consulta con concesión queda registrada de forma inmutable en la cadena de auditoría de la plataforma.
         </p>
 
         {exito && (

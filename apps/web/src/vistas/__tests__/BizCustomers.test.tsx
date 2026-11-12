@@ -238,11 +238,11 @@ describe("BizCustomers — Pantalla de Listado de Clientes", () => {
     fireEvent.click(botonSolicitar);
 
     await waitFor(() => {
-      expect(screen.getByText("Política de Privacidad y Acceso Justificado (E6)")).toBeDefined();
+      expect(screen.getByText("Política de Privacidad y Acceso Justificado")).toBeDefined();
     });
 
-    expect(screen.getAllByText(/admin.access_grants/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/admin.staff_actions/)).toBeDefined();
+    expect(screen.getAllByText(/solicitud de concesión aprobada/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/cadena de auditoría inmutable de la plataforma/)).toBeDefined();
 
     // Cerrar modal
     const botonEntendido = screen.getByText("Entendido");

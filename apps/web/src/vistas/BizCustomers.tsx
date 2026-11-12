@@ -386,7 +386,7 @@ export const BizCustomers: React.FC = () => {
               onClick={() => setModalConcesionAbierto(true)}
               aria-label="Ver información sobre política de enmascaramiento"
             >
-              🔒 Política de Enmascaramiento E6
+              Política de Privacidad y Enmascaramiento
             </Boton>
           )}
           <Boton
@@ -420,7 +420,7 @@ export const BizCustomers: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Badge variante="warn">ENMASCARADO ACTIVO</Badge>
             <span style={{ fontSize: "0.8125rem", color: "var(--text)" }}>
-              Los datos sensibles de clientes están protegidos por defecto bajo la política E6. Para ver en claro se requiere una concesión activa en <code>admin.access_grants</code>.
+              Los datos sensibles de clientes están protegidos por defecto bajo la política de privacidad. Para ver en claro se requiere una solicitud de concesión aprobada.
             </span>
           </div>
           <Boton
@@ -604,7 +604,7 @@ export const BizCustomers: React.FC = () => {
                     <span
                       data-testid={`razon-enmascarada-${c.tenant_id}`}
                       style={{ color: "var(--muted)", fontStyle: "italic" }}
-                      title="Dato enmascarado por política de privacidad E6"
+                      title="Dato enmascarado por política de privacidad y enmascaramiento"
                     >
                       {c.razon_social}
                     </span>
@@ -783,15 +783,15 @@ export const BizCustomers: React.FC = () => {
         </div>
       </footer>
 
-      {/* Modal Informativo de Concesión y Revelación E6 */}
+      {/* Modal Informativo de Concesión y Revelación */}
       <Modal
         abierto={modalConcesionAbierto}
         alCerrar={() => setModalConcesionAbierto(false)}
-        titulo="Política de Privacidad y Acceso Justificado (E6)"
+        titulo="Política de Privacidad y Acceso Justificado"
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <p style={{ color: "var(--text)", margin: 0, fontSize: "0.875rem" }}>
-            Bajo las directivas de seguridad del Equipo E6 de KalliCode, la razón social, correos y datos sensibles de clientes se muestran <strong>enmascarados por defecto</strong> para todo el personal.
+            Bajo las directivas de seguridad de la Consola de Administración de KalliCode, la razón social, correos y datos sensibles de clientes se muestran <strong>enmascarados por defecto</strong> para todo el personal.
           </p>
           <div
             style={{
@@ -807,8 +807,8 @@ export const BizCustomers: React.FC = () => {
               Condiciones para revelación en claro:
             </p>
             <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-              <li>Debe existir una concesión activa en <code>admin.access_grants</code> autorizada con justificación operativa.</li>
-              <li>Toda consulta sobre datos revelados se registra en la auditoría inmutable <code>admin.staff_actions</code>.</li>
+              <li>Debe existir una solicitud de concesión aprobada autorizada con justificación operativa.</li>
+              <li>Toda consulta sobre datos revelados queda registrada en la cadena de auditoría inmutable de la plataforma.</li>
               <li>Las concesiones son temporales y expiran automáticamente tras su ventana de validez.</li>
             </ul>
           </div>

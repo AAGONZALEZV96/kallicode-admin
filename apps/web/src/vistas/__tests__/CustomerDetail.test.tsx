@@ -142,7 +142,7 @@ describe("CustomerDetail — Ficha 360° de Cliente y Concesión de Revelación"
     });
 
     const banner = screen.getByTestId("banner-enmascaramiento-e6");
-    expect(banner.textContent).toContain("Protección de PII y Política de Enmascaramiento por Defecto (E6)");
+    expect(banner.textContent).toContain("Protección de PII y Política de Privacidad y Enmascaramiento por Defecto");
     expect(screen.getByTestId("btn-solicitar-revelacion")).toBeDefined();
     expect(screen.getByTestId("btn-revelar-banner")).toBeDefined();
   });

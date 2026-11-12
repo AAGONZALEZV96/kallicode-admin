@@ -3,7 +3,7 @@
  *
  * Valida:
  * 1. Renderizado de los 4 bloques principales de KPIs y distribución de planes vía MSW v2.
- * 2. Indicador de frescura normal (ACTIVO) vs alerta de antigüedad (> 6h) "WARN admin.business.frescura_alta".
+ * 2. Indicador de frescura normal (ACTIVO) vs alerta de antigüedad (> 6h) "Datos desactualizados (> 6h)".
  * 3. Actualización interactiva de filtros de rango temporal (periodo) y comparación.
  * 4. Estado de carga estructurado (skeleton loading) con accesibilidad (role="status", aria-busy="true").
  * 5. Manejo de error HTTP 503 con visualización de X-Trace-Id y reintento.
@@ -118,7 +118,7 @@ describe("BizOverview — Panel General de Negocio", () => {
     expect(screen.queryByTestId("badge-frescura-warn")).toBeNull();
   });
 
-  it("3. muestra advertencia 'WARN admin.business.frescura_alta' cuando la antigüedad supera las 6 horas", async () => {
+  it("3. muestra advertencia 'Datos desactualizados (> 6h)' cuando la antigüedad supera las 6 horas", async () => {
     // 8 horas de antigüedad
     const fechaAntigua = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString();
     setMockFrescura(fechaAntigua);
@@ -129,7 +129,7 @@ describe("BizOverview — Panel General de Negocio", () => {
       expect(screen.getByTestId("badge-frescura-warn")).toBeDefined();
     });
 
-    expect(screen.getByText("WARN admin.business.frescura_alta")).toBeDefined();
+    expect(screen.getByText("Datos desactualizados (> 6h)")).toBeDefined();
     expect(screen.queryByTestId("badge-frescura-ok")).toBeNull();
   });
 

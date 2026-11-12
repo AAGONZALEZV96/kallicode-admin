@@ -573,7 +573,7 @@ export const CustomerDetail: React.FC = () => {
                 fontWeight: "var(--font-semibold)",
               }}
             >
-              🔓 Solicitar Revelación de Datos
+               Solicitar Revelación de Datos
             </Boton>
           ) : (
             <span
@@ -619,7 +619,7 @@ export const CustomerDetail: React.FC = () => {
               id="titulo-politica-privacidad"
               style={{ fontSize: "var(--text-base)", fontWeight: "var(--font-semibold)", color: "var(--text)" }}
             >
-              🛡️ Protección de PII y Política de Enmascaramiento por Defecto (E6)
+              Protección de PII y Política de Privacidad y Enmascaramiento por Defecto
             </h2>
             <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", marginTop: "var(--space-1)" }}>
               Para garantizar el principio de mínimo privilegio y auditoría inmutable, los bloques de identificación,
@@ -987,7 +987,7 @@ export const CustomerDetail: React.FC = () => {
         <article className="card" data-testid="card-actividad-grafo" style={{ gridColumn: "1 / -1" }}>
           <header style={{ marginBottom: "var(--space-4)" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
-              6. Actividad de Pipeline & Grafo CodeMapping
+              6. Actividad de Pipeline y Estructura CodeMapping
             </h2>
           </header>
           <div
@@ -1038,8 +1038,7 @@ export const CustomerDetail: React.FC = () => {
       >
         <form onSubmit={handleEnviarConcesion} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-            De conformidad con la política inmutable de seguridad E6, cada acceso a PII de clientes queda registrado en{" "}
-            <code className="mono">admin.staff_actions</code> y es auditable por el cliente en su portal.
+            De conformidad con la política de seguridad y privacidad de la administración, cada acceso a PII de clientes queda registrado en la cadena de auditoría inmutable de la plataforma y es auditable por el cliente en su portal.
           </p>
 
           {errorConcesion && (

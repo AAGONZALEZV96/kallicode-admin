@@ -376,10 +376,10 @@ export const BizSubscriptions: React.FC = () => {
               gap: "0.5rem",
             }}
           >
-            <span>💳</span> Gestión de Suscripciones y Renovaciones
+            Gestión de Suscripciones y Renovaciones
           </h1>
           <p style={{ color: "var(--muted)", margin: "0.25rem 0 0 0", fontSize: "0.875rem" }}>
-            Supervisión del ciclo comercial, radar de renovaciones y tramitación de solicitudes de cambio de plan (§18.19 - §18.20).
+            Supervisión del ciclo comercial, radar de renovaciones y tramitación de solicitudes de cambio de plan.
           </p>
         </div>
 
@@ -610,7 +610,7 @@ export const BizSubscriptions: React.FC = () => {
                                 {sub.enmascarado ? (
                                   <button
                                     onClick={() => handleAbrirConcesion(sub.tenant_id, sub.razon_social)}
-                                    title="Dato enmascarado por política E6. Clic para solicitar revelación justificada."
+                                    title="Dato enmascarado por política de privacidad. Clic para solicitar revelación justificada."
                                     style={{
                                       background: "none",
                                       border: "none",
@@ -899,7 +899,7 @@ export const BizSubscriptions: React.FC = () => {
                               {upg.enmascarado ? (
                                 <button
                                   onClick={() => handleAbrirConcesion(upg.tenant_id, upg.razon_social)}
-                                  title="Dato enmascarado por política E6. Clic para solicitar revelación justificada."
+                                  title="Dato enmascarado por política de privacidad. Clic para solicitar revelación justificada."
                                   style={{
                                     background: "none",
                                     border: "none",
