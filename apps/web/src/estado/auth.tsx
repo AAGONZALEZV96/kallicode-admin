@@ -417,3 +417,8 @@ export function useAuth(): AuthContextType {
   }
   return contexto;
 }
+
+/** Variante tolerante cuando el componente se renderiza de forma aislada en pruebas unitarias. */
+export function useOptionalAuth(): AuthContextType | null {
+  return useContext(AuthContext);
+}

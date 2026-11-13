@@ -20,6 +20,8 @@ export const AdminLayout: React.FC = () => {
   const tienePermisoNegocio = rol === "staff_negocio" || rol === "staff_admin";
   const tienePermisoClientes = rol === "staff_soporte" || rol === "staff_negocio" || rol === "staff_admin";
   const tienePermisoOps = rol === "staff_operaciones" || rol === "staff_admin";
+  const tienePermisoSla =
+    rol === "staff_operaciones" || rol === "staff_negocio" || rol === "staff_admin";
 
   const getBadgeVariant = (r?: RolStaff): "accent" | "warn" | "good" | "neutro" => {
     switch (r) {
@@ -178,21 +180,24 @@ export const AdminLayout: React.FC = () => {
                 >
                   Modelos
                 </Link>
-                <Link
-                  to="/ops/sla"
-                  style={{
-                    fontSize: "0.875rem",
-                    padding: "0.375rem 0.75rem",
-                    borderRadius: "0.375rem",
-                    textDecoration: "none",
-                    color: isActive("/ops/sla") ? "var(--text, #f8fafc)" : "var(--muted, #94a3b8)",
-                    backgroundColor: isActive("/ops/sla") ? "var(--surface2, #334155)" : "transparent",
-                    fontWeight: isActive("/ops/sla") ? 600 : 400,
-                  }}
-                >
-                  SLA
-                </Link>
               </>
+            )}
+
+            {tienePermisoSla && (
+              <Link
+                to="/ops/sla"
+                style={{
+                  fontSize: "0.875rem",
+                  padding: "0.375rem 0.75rem",
+                  borderRadius: "0.375rem",
+                  textDecoration: "none",
+                  color: isActive("/ops/sla") ? "var(--text, #f8fafc)" : "var(--muted, #94a3b8)",
+                  backgroundColor: isActive("/ops/sla") ? "var(--surface2, #334155)" : "transparent",
+                  fontWeight: isActive("/ops/sla") ? 600 : 400,
+                }}
+              >
+                SLA
+              </Link>
             )}
           </nav>
         </div>
@@ -321,14 +326,17 @@ export const AdminLayout: React.FC = () => {
                 >
                   Modelos
                 </Link>
-                <Link
-                  to="/ops/sla"
-                  onClick={cerrarMenuMovil}
-                  className={`nav-link-mobile ${isActive("/ops/sla") ? "active" : ""}`}
-                >
-                  SLA
-                </Link>
               </>
+            )}
+
+            {tienePermisoSla && (
+              <Link
+                to="/ops/sla"
+                onClick={cerrarMenuMovil}
+                className={`nav-link-mobile ${isActive("/ops/sla") ? "active" : ""}`}
+              >
+                SLA
+              </Link>
             )}
           </nav>
 
