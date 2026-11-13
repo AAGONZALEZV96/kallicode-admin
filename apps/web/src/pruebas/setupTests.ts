@@ -13,6 +13,9 @@ beforeAll(() => {
 afterEach(() => {
   server.resetHandlers();
   resetMockState();
+  if (typeof window !== "undefined" && window.localStorage) {
+    window.localStorage.clear();
+  }
 });
 
 afterAll(() => {

@@ -1,11 +1,12 @@
 /**
  * auth.tsx — Contexto y proveedor de autenticación para personal (§18)
  * 
- * Mantiene la sesión exclusivamente en memoria (previene fugas de JWT en almacenamiento
- * inseguro), coordina el desafío 2FA/TOTP obligatorio y expone el estado de identidad.
+ * Gestiona la identidad de personal staff, el desafío 2FA/TOTP obligatorio,
+ * la persistencia segura sincronizada entre pestañas y el temporizador
+ * automático de inactividad de 15 minutos (mínimo privilegio y no-fuga E6).
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { clienteApi, setTokenGetter, setUnauthorizedHandler } from "../api/clienteApi";
 import { limpiarQueryCache } from "../api/queryClient";
 
@@ -28,6 +29,67 @@ export interface RespuestaLogin {
   mfa_token: string;
   mfa_inscrito: boolean;
   expira_en: number;
+}
+
+export interface SesionGuardada {
+  token: string;
+  refreshToken: string;
+  usuario: UsuarioStaff;
+  ultimoAcceso: number;
+}
+
+export const CLAVE_SESION_STORAGE = "kc_staff_session";
+export const TIEMPO_INACTIVIDAD_MS = 15 * 60 * 1000; // 15 minutos en milisegundos
+
+function leerSesionAlmacenada(): SesionGuardada | null {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(CLAVE_SESION_STORAGE);
+    if (!raw) return null;
+    const parsed: SesionGuardada = JSON.parse(raw);
+    if (!parsed || !parsed.token || !parsed.usuario) {
+      window.localStorage.removeItem(CLAVE_SESION_STORAGE);
+      return null;
+    }
+    const ahora = Date.now();
+    if (ahora - (parsed.ultimoAcceso || 0) > TIEMPO_INACTIVIDAD_MS) {
+      window.localStorage.removeItem(CLAVE_SESION_STORAGE);
+      return null;
+    }
+    // Refrescar timestamp al reanudar sesión en pestaña/ventana nueva
+    parsed.ultimoAcceso = ahora;
+    window.localStorage.setItem(CLAVE_SESION_STORAGE, JSON.stringify(parsed));
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function guardarSesionEnStorage(token: string, refreshToken: string, usuario: UsuarioStaff): void {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const data: SesionGuardada = {
+        token,
+        refreshToken,
+        usuario,
+        ultimoAcceso: Date.now(),
+      };
+      window.localStorage.setItem(CLAVE_SESION_STORAGE, JSON.stringify(data));
+    }
+  } catch {
+    // Evitar fallos si el almacenamiento está restringido
+  }
+}
+
+function eliminarSesionDeStorage(): void {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.removeItem(CLAVE_SESION_STORAGE);
+      window.localStorage.removeItem("kc_mock_concesiones_tenants");
+    }
+  } catch {
+    // ignorar
+  }
 }
 
 export interface AuthContextType {
@@ -58,18 +120,35 @@ export interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInicial = null }) => {
-  const [token, setToken] = useState<string | null>(sesionInicial?.token ?? null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(sesionInicial?.refreshToken ?? null);
-  const [usuario, setUsuario] = useState<UsuarioStaff | null>(sesionInicial?.usuario ?? null);
+  const sesionRecuperada = useMemo(() => {
+    if (sesionInicial) return sesionInicial;
+    return leerSesionAlmacenada();
+  }, [sesionInicial]);
+
+  const [token, setToken] = useState<string | null>(sesionRecuperada?.token ?? null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(sesionRecuperada?.refreshToken ?? null);
+  const [usuario, setUsuario] = useState<UsuarioStaff | null>(sesionRecuperada?.usuario ?? null);
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [emailTemporal, setEmailTemporal] = useState<string>("");
   const [cargando, setCargando] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const ultimaEscrituraRef = useRef<number>(Date.now());
+
   // Sincroniza el getter del token con clienteApi
   useEffect(() => {
     setTokenGetter(() => token);
   }, [token]);
+
+  const estaAutenticado = useMemo(
+    () => Boolean(token && usuario && usuario.mfa_validado),
+    [token, usuario]
+  );
+
+  const mfaPendiente = useMemo(
+    () => Boolean(mfaToken && !estaAutenticado),
+    [mfaToken, estaAutenticado]
+  );
 
   const limpiarEstadoLocal = useCallback(() => {
     setToken(null);
@@ -78,6 +157,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
     setMfaToken(null);
     setEmailTemporal("");
     setError(null);
+    eliminarSesionDeStorage();
     limpiarQueryCache();
   }, []);
 
@@ -120,11 +200,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
 
       setToken(data.access_token);
       setRefreshToken(data.refresh_token);
+      if (usuario) {
+        guardarSesionEnStorage(data.access_token, data.refresh_token, usuario);
+      }
     } catch {
       limpiarEstadoLocal();
       throw new Error("No fue posible renovar la sesión de personal.");
     }
-  }, [refreshToken, limpiarEstadoLocal]);
+  }, [refreshToken, usuario, limpiarEstadoLocal]);
 
   const login = useCallback(async (credenciales: CredencialesLogin): Promise<RespuestaLogin> => {
     setCargando(true);
@@ -183,6 +266,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
       setRefreshToken(resp.refresh_token);
       setUsuario(nuevoUsuario);
       setMfaToken(null);
+      guardarSesionEnStorage(resp.access_token, resp.refresh_token, nuevoUsuario);
       return nuevoUsuario;
     } catch (err: unknown) {
       const mensaje = err instanceof Error ? err.message : "Código de verificación incorrecto.";
@@ -197,15 +281,100 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
     setError(null);
   }, []);
 
-  const estaAutenticado = useMemo(
-    () => Boolean(token && usuario && usuario.mfa_validado),
-    [token, usuario]
-  );
+  // Registro de actividad del usuario para reiniciar el reloj de inactividad
+  const registrarActividad = useCallback(() => {
+    if (!token || !usuario) return;
+    const ahora = Date.now();
+    // Throttle escrituras a localStorage a máximo una cada 15 segundos
+    if (ahora - ultimaEscrituraRef.current < 15000) return;
+    ultimaEscrituraRef.current = ahora;
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        const raw = window.localStorage.getItem(CLAVE_SESION_STORAGE);
+        if (raw) {
+          const sesion = JSON.parse(raw);
+          sesion.ultimoAcceso = ahora;
+          window.localStorage.setItem(CLAVE_SESION_STORAGE, JSON.stringify(sesion));
+        }
+      }
+    } catch {
+      // ignorar
+    }
+  }, [token, usuario]);
 
-  const mfaPendiente = useMemo(
-    () => Boolean(mfaToken && !estaAutenticado),
-    [mfaToken, estaAutenticado]
-  );
+  // Escuchar eventos de interacción del usuario (teclado, ratón, scroll, click)
+  useEffect(() => {
+    if (!estaAutenticado) return;
+
+    const manejarActividad = () => {
+      registrarActividad();
+    };
+
+    const eventos = ["mousedown", "keydown", "scroll", "touchstart", "click"];
+    eventos.forEach((evt) => window.addEventListener(evt, manejarActividad, { passive: true }));
+
+    return () => {
+      eventos.forEach((evt) => window.removeEventListener(evt, manejarActividad));
+    };
+  }, [estaAutenticado, registrarActividad]);
+
+  // Verificación periódica del temporizador de inactividad de 15 minutos
+  useEffect(() => {
+    if (!estaAutenticado) return;
+
+    const intervalo = setInterval(() => {
+      try {
+        if (typeof window === "undefined" || !window.localStorage) return;
+        const raw = window.localStorage.getItem(CLAVE_SESION_STORAGE);
+        if (!raw) {
+          // La sesión fue cerrada en otra pestaña
+          limpiarEstadoLocal();
+          return;
+        }
+        const sesion = JSON.parse(raw);
+        const inactivoMs = Date.now() - (sesion.ultimoAcceso || 0);
+        if (inactivoMs >= TIEMPO_INACTIVIDAD_MS) {
+          // Excedidos 15 minutos sin actividad de usuario: cerrar sesión
+          void logout();
+        }
+      } catch {
+        // ignorar
+      }
+    }, 10000);
+
+    return () => clearInterval(intervalo);
+  }, [estaAutenticado, logout, limpiarEstadoLocal]);
+
+  // Sincronización entre pestañas mediante el evento 'storage'
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const manejarStorage = (e: StorageEvent) => {
+      if (e.key === CLAVE_SESION_STORAGE) {
+        if (!e.newValue) {
+          // Otra pestaña cerró la sesión o expiró por inactividad
+          limpiarEstadoLocal();
+        } else {
+          try {
+            const sesion: SesionGuardada = JSON.parse(e.newValue);
+            const ahora = Date.now();
+            if (ahora - (sesion.ultimoAcceso || 0) < TIEMPO_INACTIVIDAD_MS) {
+              setToken(sesion.token);
+              setRefreshToken(sesion.refreshToken);
+              setUsuario(sesion.usuario);
+            } else {
+              limpiarEstadoLocal();
+            }
+          } catch {
+            limpiarEstadoLocal();
+          }
+        }
+      }
+    };
+
+    window.addEventListener("storage", manejarStorage);
+    return () => window.removeEventListener("storage", manejarStorage);
+  }, [limpiarEstadoLocal]);
 
   const valor = useMemo<AuthContextType>(
     () => ({

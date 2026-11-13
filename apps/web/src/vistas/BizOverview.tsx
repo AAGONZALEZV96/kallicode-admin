@@ -301,7 +301,7 @@ export const BizOverview: React.FC = () => {
         aria-label="Tarjetas principales de indicadores de negocio"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
           gap: "1rem",
         }}
       >

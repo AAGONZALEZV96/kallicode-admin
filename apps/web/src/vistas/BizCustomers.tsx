@@ -361,7 +361,7 @@ export const BizCustomers: React.FC = () => {
         }}
       >
         {/* Búsqueda por texto (q) */}
-        <div style={{ flex: "1 1 240px", minWidth: "200px" }}>
+        <div style={{ flex: "1 1 200px", minWidth: "min(100%, 200px)" }}>
           <Input
             id="filtro-busqueda-clientes"
             etiqueta="Buscar por ID u organización"
@@ -372,7 +372,7 @@ export const BizCustomers: React.FC = () => {
         </div>
 
         {/* Filtro por Plan */}
-        <div style={{ minWidth: "160px" }}>
+        <div style={{ flex: "1 1 140px", minWidth: "min(100%, 140px)" }}>
           <Select
             id="filtro-plan-clientes"
             etiqueta="Plan comercial"
@@ -383,7 +383,7 @@ export const BizCustomers: React.FC = () => {
         </div>
 
         {/* Filtro por Estado */}
-        <div style={{ minWidth: "180px" }}>
+        <div style={{ flex: "1 1 150px", minWidth: "min(100%, 150px)" }}>
           <Select
             id="filtro-estado-clientes"
             etiqueta="Estado"

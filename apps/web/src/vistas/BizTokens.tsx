@@ -468,7 +468,7 @@ export const BizTokens: React.FC = () => {
         aria-label="Controles y Filtros Analíticos"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
           gap: "1rem",
           padding: "1rem",
           backgroundColor: "var(--card)",
@@ -588,7 +588,7 @@ export const BizTokens: React.FC = () => {
               aria-label="Resumen Ejecutivo FinOps"
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
                 gap: "1rem",
               }}
             >
