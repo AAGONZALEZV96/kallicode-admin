@@ -1518,6 +1518,7 @@ function responderAgentes(request: Request): Response {
   const traceId = request.headers.get("x-trace-id") || "trc_ops_ag_001";
   const url = new URL(request.url);
   const ventana = url.searchParams.get("ventana") || "1h";
+  const etapaFiltro = url.searchParams.get("etapa");
   const escenario =
     request.headers.get("x-mock-scenario") || estadoGlobal.telemetriaEstado;
 
@@ -1554,6 +1555,14 @@ function responderAgentes(request: Request): Response {
   }
 
   if (escenario === "sin-trabajo") {
+    const etapasVacias = [
+      { etapa: "triage", agentes_total: 4, agentes_ocupados: 0, agentes_caidos: 0, jobs_completados: 0, duracion_p95_s: null },
+      { etapa: "design", agentes_total: 4, agentes_ocupados: 0, agentes_caidos: 0, jobs_completados: 0, duracion_p95_s: null },
+      { etapa: "build", agentes_total: 8, agentes_ocupados: 0, agentes_caidos: 0, jobs_completados: 0, duracion_p95_s: null },
+      { etapa: "qa", agentes_total: 4, agentes_ocupados: 0, agentes_caidos: 0, jobs_completados: 0, duracion_p95_s: null },
+      { etapa: "security", agentes_total: 3, agentes_ocupados: 0, agentes_caidos: 0, jobs_completados: 0, duracion_p95_s: null },
+      { etapa: "deploy", agentes_total: 2, agentes_ocupados: 0, agentes_caidos: 0, jobs_completados: 0, duracion_p95_s: null },
+    ];
     return HttpResponse.json(
       {
         ventana,
@@ -1566,72 +1575,117 @@ function responderAgentes(request: Request): Response {
         agentes_ocupados: 0,
         agentes_caidos: 0,
         lineas: { activas: 12, mantenimiento: 0, libres: 5 },
-        etapas: [
-          { etapa: "triage", agentes_total: 4, agentes_ocupados: 0, agentes_caidos: 0 },
-          { etapa: "design", agentes_total: 6, agentes_ocupados: 0, agentes_caidos: 0 },
-          { etapa: "build", agentes_total: 10, agentes_ocupados: 0, agentes_caidos: 0 },
-          { etapa: "qa", agentes_total: 5, agentes_ocupados: 0, agentes_caidos: 0 },
-        ],
+        etapas: etapaFiltro
+          ? etapasVacias.filter((e) => e.etapa === etapaFiltro)
+          : etapasVacias,
         alertas: [],
       },
       { status: 200, headers: { "x-trace-id": traceId } }
     );
   }
 
+  const mult = ventana === "5m" ? 0.2 : ventana === "24h" ? 8 : 1;
+  const antiguedadS = escenario === "advertencia-5m" ? 360 : 4;
+  const desdeIso = new Date(Date.now() - antiguedadS * 1000).toISOString();
+
+  const etapasBase = [
+    {
+      etapa: "triage",
+      agentes_total: 4,
+      agentes_ocupados: 2,
+      agentes_caidos: 0,
+      jobs_completados: Math.round(42 * mult),
+      duracion_p95_s: 12.4,
+      en_cola: 5,
+      latencia_p95_ms: 1200,
+      errores: 0,
+    },
+    {
+      etapa: "design",
+      agentes_total: 4,
+      agentes_ocupados: 3,
+      agentes_caidos: 0,
+      jobs_completados: Math.round(28 * mult),
+      duracion_p95_s: 26.8,
+      en_cola: 12,
+      latencia_p95_ms: 4800,
+      errores: 0,
+    },
+    {
+      etapa: "build",
+      agentes_total: 8,
+      agentes_ocupados: 6,
+      agentes_caidos: 1,
+      jobs_completados: Math.round(36 * mult),
+      duracion_p95_s: 54.2,
+      en_cola: 18,
+      latencia_p95_ms: 14200,
+      errores: 1,
+    },
+    {
+      etapa: "qa",
+      agentes_total: 4,
+      agentes_ocupados: 3,
+      agentes_caidos: 0,
+      jobs_completados: Math.round(19 * mult),
+      duracion_p95_s: 41.0,
+      en_cola: 2,
+      latencia_p95_ms: 6100,
+      errores: 0,
+    },
+    {
+      etapa: "security",
+      agentes_total: 3,
+      agentes_ocupados: 2,
+      agentes_caidos: 0,
+      jobs_completados: Math.round(11 * mult),
+      duracion_p95_s: 33.5,
+      en_cola: 3,
+      latencia_p95_ms: 5200,
+      errores: 0,
+    },
+    {
+      etapa: "deploy",
+      agentes_total: 2,
+      agentes_ocupados: 2,
+      agentes_caidos: 0,
+      jobs_completados: Math.round(6 * mult),
+      duracion_p95_s: 48.0,
+      en_cola: 1,
+      latencia_p95_ms: 7800,
+      errores: 0,
+    },
+  ];
+
+  const etapas = etapaFiltro
+    ? etapasBase.filter((e) => e.etapa === etapaFiltro)
+    : etapasBase;
+
   return HttpResponse.json(
     {
       ventana,
       telemetria: {
         disponible: true,
-        antiguedad_s: 4,
-        desde: new Date().toISOString(),
+        antiguedad_s: antiguedadS,
+        desde: desdeIso,
       },
       agentes_total: 25,
       agentes_ocupados: 18,
       agentes_caidos: 1,
-      jobs_completados: 142,
+      jobs_completados: Math.round(142 * mult),
       duracion_p95_s: 38.5,
       lineas_activas: 12,
       lineas: { activas: 12, mantenimiento: 1, libres: 5 },
-      etapas: [
+      etapas,
+      alertas: [
         {
-          etapa: "triage",
-          agentes_total: 4,
-          agentes_ocupados: 2,
-          agentes_caidos: 0,
-          en_cola: 5,
-          latencia_p95_ms: 1200,
-          errores: 0,
-        },
-        {
-          etapa: "design",
-          agentes_total: 6,
-          agentes_ocupados: 5,
-          agentes_caidos: 0,
-          en_cola: 12,
-          latencia_p95_ms: 4800,
-          errores: 0,
-        },
-        {
+          tipo: "agentes_caidos",
           etapa: "build",
-          agentes_total: 10,
-          agentes_ocupados: 8,
-          agentes_caidos: 1,
-          en_cola: 18,
-          latencia_p95_ms: 14200,
-          errores: 1,
-        },
-        {
-          etapa: "qa",
-          agentes_total: 5,
-          agentes_ocupados: 3,
-          agentes_caidos: 0,
-          en_cola: 2,
-          latencia_p95_ms: 6100,
-          errores: 0,
+          mensaje: "1 agente sin latido en etapa build",
+          valor: 1,
+          umbral: 0,
         },
       ],
-      alertas: [{ tipo: "agentes_caidos", etapa: "build", valor: 1 }],
     },
     { status: 200, headers: { "x-trace-id": traceId } }
   );
@@ -1639,45 +1693,106 @@ function responderAgentes(request: Request): Response {
 
 function responderColas(request: Request): Response {
   const traceId = request.headers.get("x-trace-id") || "trc_ops_q_001";
+  const url = new URL(request.url);
+  const incluirDlq = url.searchParams.get("incluir_dlq") !== "false";
+  const escenario =
+    request.headers.get("x-mock-scenario") || estadoGlobal.telemetriaEstado;
+
+  if (escenario === "desactualizada" || escenario === "error-503") {
+    return HttpResponse.json(
+      {
+        error: {
+          codigo: "TELEMETRIA_NO_DISPONIBLE",
+          mensaje: "La telemetría de colas no está disponible (> 15 min).",
+        },
+      },
+      { status: 503, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  if (escenario === "vacio") {
+    return HttpResponse.json(
+      {
+        telemetria_desde: new Date().toISOString(),
+        resumen: {
+          criticas: 0,
+          atencion: 0,
+          pendientes_total: 0,
+          fallidos_total: 0,
+        },
+        colas: [],
+      },
+      { status: 200, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  const todasLasColas = [
+    {
+      nombre: "kc:inbox",
+      pendientes: 14,
+      profundidad: 14,
+      reclamados: 3,
+      no_confirmados: 3,
+      fallidos: 0,
+      dlq: 0,
+      antiguedad_max_s: 12,
+      umbral_atencion_s: 60,
+      estado: "normal",
+    },
+    {
+      nombre: "cola_ingesta",
+      pendientes: 10,
+      profundidad: 10,
+      reclamados: 1,
+      no_confirmados: 1,
+      fallidos: 0,
+      dlq: 0,
+      antiguedad_max_s: 15,
+      umbral_atencion_s: 60,
+      estado: "normal",
+    },
+    {
+      nombre: "cola_generacion",
+      pendientes: 78,
+      profundidad: 78,
+      reclamados: 12,
+      no_confirmados: 12,
+      fallidos: 0,
+      dlq: 0,
+      antiguedad_max_s: 75,
+      umbral_atencion_s: 60,
+      estado: "atencion",
+    },
+    {
+      nombre: "kc:dlq",
+      pendientes: 2,
+      profundidad: 2,
+      reclamados: 0,
+      no_confirmados: 0,
+      fallidos: 2,
+      dlq: 2,
+      antiguedad_max_s: 320,
+      umbral_atencion_s: 0,
+      estado: "critico",
+    },
+  ];
+
+  const colasFiltradas = incluirDlq
+    ? todasLasColas
+    : todasLasColas.filter((c) => !c.nombre.includes("dlq") && c.fallidos === 0);
+
+  const resumen = {
+    criticas: colasFiltradas.filter((c) => c.estado === "critico").length,
+    atencion: colasFiltradas.filter((c) => c.estado === "atencion").length,
+    pendientes_total: colasFiltradas.reduce((acc, c) => acc + c.pendientes, 0),
+    fallidos_total: colasFiltradas.reduce((acc, c) => acc + c.fallidos, 0),
+  };
 
   return HttpResponse.json(
     {
       telemetria_desde: new Date().toISOString(),
-      resumen: {
-        criticas: 1,
-        atencion: 1,
-        pendientes_total: 104,
-        fallidos_total: 2,
-      },
-      colas: [
-        {
-          nombre: "cola_ingesta",
-          profundidad: 24,
-          antiguedad_max_s: 15,
-          no_confirmados: 4,
-          dlq: 0,
-          umbral_atencion_s: 60,
-          estado: "normal",
-        },
-        {
-          nombre: "cola_generacion",
-          profundidad: 78,
-          antiguedad_max_s: 75,
-          no_confirmados: 12,
-          dlq: 0,
-          umbral_atencion_s: 60,
-          estado: "atencion",
-        },
-        {
-          nombre: "kc:dlq",
-          profundidad: 2,
-          antiguedad_max_s: 320,
-          no_confirmados: 0,
-          dlq: 2,
-          umbral_atencion_s: 0,
-          estado: "critico",
-        },
-      ],
+      resumen,
+      colas: colasFiltradas,
     },
     { status: 200, headers: { "x-trace-id": traceId } }
   );
