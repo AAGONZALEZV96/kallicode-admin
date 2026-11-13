@@ -166,6 +166,11 @@ export const AdminLayout: React.FC = () => {
                 >
                   Agentes
                 </Link>
+              </>
+            )}
+
+            {tienePermisoSla && (
+              <>
                 <Link
                   to="/ops/models"
                   style={{
@@ -180,12 +185,8 @@ export const AdminLayout: React.FC = () => {
                 >
                   Modelos
                 </Link>
-              </>
-            )}
-
-            {tienePermisoSla && (
-              <Link
-                to="/ops/sla"
+                <Link
+                  to="/ops/sla"
                 style={{
                   fontSize: "0.875rem",
                   padding: "0.375rem 0.75rem",
@@ -198,6 +199,7 @@ export const AdminLayout: React.FC = () => {
               >
                 SLA
               </Link>
+              </>
             )}
           </nav>
         </div>
@@ -311,14 +313,17 @@ export const AdminLayout: React.FC = () => {
             )}
 
             {tienePermisoOps && (
+              <Link
+                to="/ops/agents"
+                onClick={cerrarMenuMovil}
+                className={`nav-link-mobile ${isActive("/ops/agents") ? "active" : ""}`}
+              >
+                Agentes
+              </Link>
+            )}
+
+            {tienePermisoSla && (
               <>
-                <Link
-                  to="/ops/agents"
-                  onClick={cerrarMenuMovil}
-                  className={`nav-link-mobile ${isActive("/ops/agents") ? "active" : ""}`}
-                >
-                  Agentes
-                </Link>
                 <Link
                   to="/ops/models"
                   onClick={cerrarMenuMovil}
@@ -326,17 +331,14 @@ export const AdminLayout: React.FC = () => {
                 >
                   Modelos
                 </Link>
+                <Link
+                  to="/ops/sla"
+                  onClick={cerrarMenuMovil}
+                  className={`nav-link-mobile ${isActive("/ops/sla") ? "active" : ""}`}
+                >
+                  SLA
+                </Link>
               </>
-            )}
-
-            {tienePermisoSla && (
-              <Link
-                to="/ops/sla"
-                onClick={cerrarMenuMovil}
-                className={`nav-link-mobile ${isActive("/ops/sla") ? "active" : ""}`}
-              >
-                SLA
-              </Link>
             )}
           </nav>
 

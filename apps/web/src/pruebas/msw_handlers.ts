@@ -1457,6 +1457,9 @@ export const handlers = [
   http.get("*/internal/v1/telemetry/providers", ({ request }) => {
     return responderModelos(request);
   }),
+  http.get("*/admin/v1/health", ({ request }) => {
+    return responderHealth(request);
+  }),
 
   http.get("*/admin/v1/ops/sla", ({ request }) => {
     return responderSla(request);
@@ -1798,90 +1801,182 @@ function responderColas(request: Request): Response {
   );
 }
 
+function responderHealth(request: Request): Response {
+  const traceId = request.headers.get("x-trace-id") || "trc_health_001";
+  const escenario = request.headers.get("x-mock-scenario") || estadoGlobal.telemetriaEstado;
+  const degradado = escenario === "salud-degradada" || escenario === "desactualizada";
+
+  return HttpResponse.json(
+    {
+      estado: degradado ? "degradado" : "ok",
+      dependencias: {
+        postgres: true,
+        lectura_analitica: true,
+        cache: true,
+        telemetria: !degradado,
+        agregados: true,
+      },
+      agregados_frescura_s: 30,
+      version: "0.1.0",
+    },
+    { status: 200, headers: { "x-trace-id": traceId } }
+  );
+}
+
 function responderModelos(request: Request): Response {
   const traceId = request.headers.get("x-trace-id") || "trc_ops_mod_001";
   const url = new URL(request.url);
   const ventana = url.searchParams.get("ventana") || "24h";
+  const proveedorFiltro = url.searchParams.get("proveedor")?.trim().toLowerCase() || null;
+  const tierFiltro = url.searchParams.get("tier")?.trim().toLowerCase() || null;
+  const compararCon = url.searchParams.get("comparar_con")?.trim().toLowerCase() || null;
+  const comparar = url.searchParams.get("comparar") === "true" || compararCon === "periodo_anterior";
+  const escenario =
+    request.headers.get("x-mock-scenario") || estadoGlobal.telemetriaEstado;
+
+  if (escenario === "desactualizada" || escenario === "error-503") {
+    return HttpResponse.json(
+      {
+        error: {
+          codigo: "TELEMETRIA_NO_DISPONIBLE",
+          mensaje: "La telemetría de modelos LLM no está disponible (> 15 min).",
+        },
+      },
+      { status: 503, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  if (escenario === "vacio") {
+    return HttpResponse.json(
+      {
+        ventana,
+        telemetria_desde: new Date().toISOString(),
+        proveedores: [],
+        modelos: [],
+        escalados: { flash_a_pro: 0, pro_a_fable: 0, a_humano: 0 },
+        tokens_por_tier: { flash: 0, pro: 0, fable: 0 },
+        coste_por_tier: { flash: 0, pro: 0, fable: 0 },
+        degradados: null,
+        comparacion: null,
+      },
+      { status: 200, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  const mult = ventana === "1h" ? 0.1 : ventana === "7d" ? 7 : ventana === "30d" ? 30 : 1;
+  const proveedorDegradado = escenario === "proveedor-degradado";
+
+  const catalogoBase = [
+    {
+      proveedor: "Google",
+      modelo: "gemini-3-flash",
+      tier: "flash",
+      llamadas: Math.round(42500 * mult),
+      disponibilidad_pct: 99.98,
+      latencia_p50_ms: 180,
+      latencia_p95_ms: 420,
+      tasa_error_pct: 0.05,
+    },
+    {
+      proveedor: "OpenAI",
+      modelo: "gpt-5-mini",
+      tier: "flash",
+      llamadas: Math.round(3200 * mult),
+      disponibilidad_pct: 99.95,
+      latencia_p50_ms: 210,
+      latencia_p95_ms: 490,
+      tasa_error_pct: 0.06,
+    },
+    {
+      proveedor: "Google",
+      modelo: "gemini-3-pro",
+      tier: "pro",
+      llamadas: Math.round(11200 * mult),
+      disponibilidad_pct: 99.85,
+      latencia_p50_ms: 650,
+      latencia_p95_ms: 1250,
+      tasa_error_pct: 0.12,
+    },
+    {
+      proveedor: "DeepSeek",
+      modelo: "deepseek-v4",
+      tier: "pro",
+      llamadas: Math.round(8400 * mult),
+      disponibilidad_pct: proveedorDegradado ? 97.8 : 99.72,
+      latencia_p50_ms: proveedorDegradado ? 1450 : 540,
+      latencia_p95_ms: proveedorDegradado ? 3200 : 1080,
+      tasa_error_pct: proveedorDegradado ? 2.2 : 0.19,
+    },
+    {
+      proveedor: "Anthropic",
+      modelo: "claude-fable-5",
+      tier: "fable",
+      llamadas: Math.round(1850 * mult),
+      disponibilidad_pct: 99.92,
+      latencia_p50_ms: 920,
+      latencia_p95_ms: 1840,
+      tasa_error_pct: 0.08,
+    },
+  ];
+
+  const filtrados = catalogoBase.filter((m) => {
+    if (proveedorFiltro && m.proveedor.toLowerCase() !== proveedorFiltro) return false;
+    if (tierFiltro && m.tier !== tierFiltro) return false;
+    return true;
+  });
+
+  const degradados = filtrados
+    .filter((m) => m.disponibilidad_pct < 99.0)
+    .map((m) => m.proveedor);
+
+  const escalados = {
+    flash_a_pro: Math.round(142 * mult) || (mult < 1 ? 14 : 142),
+    pro_a_fable: Math.round(18 * mult) || (mult < 1 ? 2 : 18),
+    a_humano: Math.round(3 * mult) || (mult < 1 ? 1 : 3),
+  };
+
+  const tokens_por_tier = {
+    flash: Math.round(80000000 * mult),
+    pro: Math.round(35000000 * mult),
+    fable: Math.round(10000000 * mult),
+  };
+
+  const coste_por_tier = {
+    flash: Number((120.5 * mult).toFixed(2)),
+    pro: Number((310.2 * mult).toFixed(2)),
+    fable: Number((450.0 * mult).toFixed(2)),
+  };
+
+  const comparacion = comparar
+    ? {
+        periodo: "periodo_anterior",
+        escalados: {
+          flash_a_pro: Math.max(0, Math.round(escalados.flash_a_pro * 0.9)),
+          pro_a_fable: Math.max(0, Math.round(escalados.pro_a_fable * 1.1)),
+          a_humano: Math.max(0, escalados.a_humano),
+        },
+        proveedores: filtrados.map((m) => ({
+          ...m,
+          llamadas: Math.round(m.llamadas * 0.92),
+          disponibilidad_pct: Number(Math.min(100, m.disponibilidad_pct + 0.02).toFixed(2)),
+          latencia_p50_ms: Math.round(m.latencia_p50_ms * 1.05),
+          latencia_p95_ms: Math.round(m.latencia_p95_ms * 1.08),
+          tasa_error_pct: Number(Math.max(0, m.tasa_error_pct - 0.02).toFixed(2)),
+        })),
+      }
+    : null;
 
   return HttpResponse.json(
     {
       ventana,
       telemetria_desde: new Date().toISOString(),
-      proveedores: [
-        {
-          proveedor: "Google",
-          modelo: "gemini-2.5-flash",
-          tier: "flash",
-          disponibilidad_pct: 99.98,
-          latencia_p50_ms: 180,
-          latencia_p95_ms: 420,
-          tasa_error_pct: 0.05,
-        },
-        {
-          proveedor: "Google",
-          modelo: "gemini-2.5-pro",
-          tier: "pro",
-          disponibilidad_pct: 99.85,
-          latencia_p50_ms: 650,
-          latencia_p95_ms: 1250,
-          tasa_error_pct: 0.12,
-        },
-        {
-          proveedor: "Anthropic",
-          modelo: "claude-3-7-sonnet",
-          tier: "fable",
-          disponibilidad_pct: 99.92,
-          latencia_p50_ms: 920,
-          latencia_p95_ms: 1840,
-          tasa_error_pct: 0.08,
-        },
-      ],
-      modelos: [
-        {
-          proveedor: "Google",
-          modelo: "gemini-2.5-flash",
-          tier: "flash",
-          disponibilidad_pct: 99.98,
-          latencia_p50_ms: 180,
-          latencia_p95_ms: 420,
-          tasa_error_pct: 0.05,
-        },
-        {
-          proveedor: "Google",
-          modelo: "gemini-2.5-pro",
-          tier: "pro",
-          disponibilidad_pct: 99.85,
-          latencia_p50_ms: 650,
-          latencia_p95_ms: 1250,
-          tasa_error_pct: 0.12,
-        },
-        {
-          proveedor: "Anthropic",
-          modelo: "claude-3-7-sonnet",
-          tier: "fable",
-          disponibilidad_pct: 99.92,
-          latencia_p50_ms: 920,
-          latencia_p95_ms: 1840,
-          tasa_error_pct: 0.08,
-        },
-      ],
-      escalados: {
-        flash_a_pro: 142,
-        pro_a_fable: 18,
-        a_humano: 3,
-      },
-      tokens_por_tier: {
-        flash: 80000000,
-        pro: 35000000,
-        fable: 10000000,
-      },
-      coste_por_tier: {
-        flash: 120.5,
-        pro: 310.2,
-        fable: 450.0,
-      },
-      degradados: null,
-      comparacion: null,
+      proveedores: filtrados,
+      modelos: filtrados,
+      escalados,
+      tokens_por_tier,
+      coste_por_tier,
+      degradados: degradados.length > 0 ? degradados : null,
+      comparacion,
     },
     { status: 200, headers: { "x-trace-id": traceId } }
   );

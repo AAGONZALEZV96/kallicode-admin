@@ -147,7 +147,7 @@ export const AppRouter: React.FC = () => {
             <Route
               path="/ops/models"
               element={
-                <RutaProtegidaPorRol rolesPermitidos={["staff_operaciones", "staff_admin"]}>
+                <RutaProtegidaPorRol rolesPermitidos={["staff_operaciones", "staff_negocio", "staff_admin"]}>
                   <OpsModels />
                 </RutaProtegidaPorRol>
               }
