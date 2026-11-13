@@ -61,6 +61,10 @@ _ERRORES_ADMIN = {
         "http": 503,
         "descripcion": "La telemetría del pipeline no está disponible.",
     },
+    "JOB_NO_ENCONTRADO": {
+        "http": 404,
+        "descripcion": "El caso o job de ejecución solicitado no existe.",
+    },
 }
 CATALOGO_ERRORES.update(_ERRORES_ADMIN)
 
@@ -70,6 +74,7 @@ __all__ = [
     "concesion_caducada",
     "concesion_duplicada",
     "credenciales_invalidas",
+    "job_no_encontrado",
     "mfa_invalido",
     "mfa_no_inscrito",
     "mfa_requerido",
@@ -235,4 +240,14 @@ def telemetria_no_disponible(edad_s: int | None = None) -> AppError:
         503,
         "La telemetría del pipeline no está disponible.",
         {"antiguedad_s": edad_s} if edad_s is not None else None,
+    )
+
+
+def job_no_encontrado(job_id: str | None = None) -> AppError:
+    """404 · el caso o job de ejecución solicitado no existe en el registro SLA (§18.28)."""
+    return AppError(
+        "JOB_NO_ENCONTRADO",
+        404,
+        "El caso solicitado no existe.",
+        {"job_id": job_id} if job_id else None,
     )
