@@ -303,7 +303,7 @@ async def test_colas_derivan_su_estado_del_umbral_configurado(
     r = await cliente.get("/admin/v1/ops/queues", headers=admin)
     assert r.status_code == 200, r.text
     for cola in r.json()["colas"]:
-        assert cola["estado"] in ("ok", "atencion", "critico"), cola
+        assert cola["estado"] in ("normal", "atencion", "critico"), cola
 
 
 async def test_modelos_separa_fable_del_resto(

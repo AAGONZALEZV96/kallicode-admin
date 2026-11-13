@@ -35,6 +35,17 @@ from ..errors import agregado_no_disponible, job_no_encontrado, sla_sin_definici
 from ..masking import enmascarar_filas, enmascarar_texto
 from ..pagination import Pagina, paginacion, sobre
 from ..schemas.ops import (
+    AlertaOpsOut,
+    ColaPipelineOut,
+    ColasResumenOut,
+    ComparacionModelosOut,
+    EscaladosLlmOut,
+    EtapaAgentesOut,
+    LineasProduccionOut,
+    OpsAgentsResponse,
+    OpsModelsResponse,
+    OpsQueuesResponse,
+    ProveedorModeloOut,
     SlaCaseDetailResponse,
     SlaCaseRiskItemOut,
     SlaClockSegmentOut,
@@ -42,6 +53,7 @@ from ..schemas.ops import (
     SlaResumenOut,
     SlaSummaryResponse,
     SlaTenantRowOut,
+    TelemetriaEstadoOut,
 )
 from ..settings import get_admin_settings
 
@@ -50,6 +62,15 @@ router = APIRouter(prefix="/admin/v1/ops", tags=["Consola de operaciones"])
 _VENTANAS_AGENTES = ("5m", "1h", "24h")
 _VENTANAS_MODELOS = ("1h", "24h", "7d", "30d")
 _ETAPAS = ("triage", "design", "build", "qa", "security", "deploy")
+_PROVEEDORES_MODELOS = ("anthropic", "google", "deepseek", "openai")
+_TIERS_MODELOS = ("flash", "pro", "fable")
+_COMPARACIONES_MODELOS = ("periodo_anterior",)
+# Tarifas oficiales ratificadas en docs/decisiones-negocio.md §2.3 (EUR por 1.000 tokens)
+_TARIFAS_OFICIALES_1K: dict[str, tuple[float, float]] = {
+    "flash": (0.000150, 0.000600),
+    "pro": (0.001200, 0.004800),
+    "fable": (0.012000, 0.060000),
+}
 _PLANES_CANONICOS = ("starter", "growth", "enterprise")
 _CICLO_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 _UMBRAL_RIESGO_RATIO = 0.75
@@ -59,14 +80,246 @@ def _concesiones(st: Staff, tenants: list[str]) -> dict[str, list[str]]:
     return {t: st.concedidos(t) for t in tenants}
 
 
+def _opt_int(raw: dict[str, Any], clave: str) -> int | None:
+    val = raw.get(clave)
+    return int(val) if val is not None else None
+
+
+def _opt_float(raw: dict[str, Any], clave: str) -> float | None:
+    val = raw.get(clave)
+    return float(val) if val is not None else None
+
+
+def _normalizar_etapas(
+    raw_etapas: list[dict[str, Any]], etapa_filtro: str | None
+) -> list[EtapaAgentesOut]:
+    salida: list[EtapaAgentesOut] = []
+    for raw in raw_etapas:
+        nombre = str(raw.get("etapa") or "")
+        if etapa_filtro is not None and nombre != etapa_filtro:
+            continue
+        agentes_total = raw.get("agentes_total")
+        if agentes_total is None and raw.get("activos") is not None:
+            agentes_total = raw.get("activos")
+        salida.append(
+            EtapaAgentesOut(
+                etapa=nombre,
+                agentes_total=int(agentes_total) if agentes_total is not None else None,
+                agentes_ocupados=_opt_int(raw, "agentes_ocupados"),
+                agentes_caidos=_opt_int(raw, "agentes_caidos"),
+                jobs_completados=_opt_int(raw, "jobs_completados"),
+                duracion_p95_s=_opt_float(raw, "duracion_p95_s"),
+                activos=_opt_int(raw, "activos"),
+                en_cola=_opt_int(raw, "en_cola"),
+                latencia_p95_ms=_opt_float(raw, "latencia_p95_ms"),
+                errores=_opt_int(raw, "errores"),
+            )
+        )
+    return salida
+
+
+def _construir_alertas_agentes(
+    etapas: list[EtapaAgentesOut], lineas: LineasProduccionOut | None
+) -> list[AlertaOpsOut]:
+    alertas: list[AlertaOpsOut] = []
+    for e in etapas:
+        caidos = e.agentes_caidos or 0
+        if caidos > 0:
+            alertas.append(
+                AlertaOpsOut(
+                    tipo="agentes_caidos",
+                    etapa=e.etapa,
+                    valor=caidos,
+                    umbral=0,
+                    mensaje=f"{caidos} agente(s) sin latido en etapa {e.etapa}.",
+                )
+            )
+    if lineas and lineas.mantenimiento > 0:
+        alertas.append(
+            AlertaOpsOut(
+                tipo="lineas_en_mantenimiento",
+                valor=lineas.mantenimiento,
+                umbral=0,
+                mensaje=f"{lineas.mantenimiento} línea(s) en mantenimiento.",
+            )
+        )
+    return alertas
+
+
+def _normalizar_colas(
+    raw_colas: list[dict[str, Any]], incluir_dlq: bool
+) -> list[ColaPipelineOut]:
+    colas_out: list[ColaPipelineOut] = []
+    for c in raw_colas:
+        nombre = str(c.get("nombre") or "")
+        es_dlq = nombre == "kc:dlq" or nombre.lower().endswith((":dlq", ".dlq"))
+        if not incluir_dlq and es_dlq:
+            continue
+
+        pendientes = int(
+            c["pendientes"] if c.get("pendientes") is not None else (c.get("profundidad") or 0)
+        )
+        reclamados = int(
+            c["reclamados"]
+            if c.get("reclamados") is not None
+            else (c.get("no_confirmados") or 0)
+        )
+        fallidos = int(c["fallidos"] if c.get("fallidos") is not None else (c.get("dlq") or 0))
+        antiguedad = int(c.get("antiguedad_max_s") or 0)
+        umbral = int(c.get("umbral_atencion_s") or 0)
+
+        # El estado se deriva del umbral configurado y la presencia de mensajes en DLQ.
+        estado: Literal["normal", "atencion", "critico"]
+        if (
+            fallidos > 0
+            or (umbral > 0 and antiguedad > umbral * 2)
+            or (es_dlq and pendientes > 0)
+        ):
+            estado = "critico"
+        elif umbral > 0 and antiguedad > umbral:
+            estado = "atencion"
+        else:
+            estado = "normal"
+
+        colas_out.append(
+            ColaPipelineOut(
+                nombre=nombre,
+                pendientes=pendientes,
+                reclamados=reclamados,
+                fallidos=fallidos,
+                profundidad=pendientes,
+                no_confirmados=reclamados,
+                dlq=fallidos,
+                antiguedad_max_s=antiguedad,
+                umbral_atencion_s=umbral,
+                estado=estado,
+            )
+        )
+    return colas_out
+
+
+def _inferir_tier_modelo(raw: dict[str, Any]) -> Literal["flash", "pro", "fable"]:
+    tier_raw = str(raw.get("tier") or "").strip().lower()
+    if tier_raw == "flash":
+        return "flash"
+    if tier_raw == "pro":
+        return "pro"
+    if tier_raw == "fable":
+        return "fable"
+
+    modelo = str(raw.get("modelo") or "").lower()
+    if any(clave in modelo for clave in ("fable", "sonnet", "opus")):
+        return "fable"
+    if any(clave in modelo for clave in ("pro", "deepseek")):
+        return "pro"
+    return "flash"
+
+
+def _normalizar_proveedores(
+    raw_items: list[dict[str, Any]],
+    proveedor_filtro: str | None,
+    tier_filtro: str | None,
+) -> list[ProveedorModeloOut]:
+    salida: list[ProveedorModeloOut] = []
+    for raw in raw_items:
+        proveedor_val = str(raw.get("proveedor") or "").strip()
+        tier_val = _inferir_tier_modelo(raw)
+        if proveedor_filtro is not None and proveedor_val.lower() != proveedor_filtro:
+            continue
+        if tier_filtro is not None and tier_val != tier_filtro:
+            continue
+
+        tasa_error_raw = raw.get("tasa_error_pct")
+        if tasa_error_raw is None:
+            tasa_error_raw = raw.get("error_pct")
+        lat_p50 = raw.get("latencia_p50_ms")
+        salida.append(
+            ProveedorModeloOut(
+                proveedor=proveedor_val,
+                modelo=str(raw.get("modelo") or ""),
+                tier=tier_val,
+                llamadas=int(raw.get("llamadas") or 0),
+                disponibilidad_pct=float(
+                    raw["disponibilidad_pct"]
+                    if raw.get("disponibilidad_pct") is not None
+                    else 100.0
+                ),
+                latencia_p50_ms=float(lat_p50) if lat_p50 is not None else None,
+                latencia_p95_ms=float(raw.get("latencia_p95_ms") or 0.0),
+                tasa_error_pct=0.0 if tasa_error_raw is None else float(tasa_error_raw),
+            )
+        )
+    return salida
+
+
+def _normalizar_escalados(raw: dict[str, Any] | None) -> EscaladosLlmOut:
+    datos = raw or {}
+    return EscaladosLlmOut(
+        flash_a_pro=int(datos.get("flash_a_pro") or 0),
+        pro_a_fable=int(datos.get("pro_a_fable") or 0),
+        a_humano=int(datos.get("a_humano") or 0),
+    )
+
+
+def _calcular_tokens_y_costes(
+    db_rows: list[dict[str, Any]],
+    raw_proveedores: list[dict[str, Any]],
+    tarifas: dict[str, tuple[float, float]],
+    tier_filtro: str | None,
+) -> tuple[dict[str, int], dict[str, float]]:
+    tokens_tier: dict[str, int] = {}
+    coste_tier: dict[str, float] = {}
+
+    for row in db_rows:
+        tier = str(row["tier"])
+        if tier_filtro is not None and tier != tier_filtro:
+            continue
+        t_in = int(row.get("tokens_in") or 0)
+        t_out = int(row.get("tokens_out") or 0)
+        t_total = int(row.get("tokens") or (t_in + t_out))
+        coste_db = float(row.get("coste") or 0.0)
+        if coste_db == 0.0 and (t_in > 0 or t_out > 0):
+            p_in, p_out = tarifas.get(tier, (0.0, 0.0))
+            coste_db = (t_in / 1000.0) * p_in + (t_out / 1000.0) * p_out
+        tokens_tier[tier] = tokens_tier.get(tier, 0) + t_total
+        coste_tier[tier] = round(coste_tier.get(tier, 0.0) + coste_db, 6)
+
+    # Si no hay agregados diarios aún para algún tier reportado en telemetría,
+    # estimamos con las tarifas oficiales sin mezclar jamás `fable` con `pro`.
+    for raw in raw_proveedores:
+        tier = _inferir_tier_modelo(raw)
+        if tier_filtro is not None and tier != tier_filtro:
+            continue
+        if tier in tokens_tier and tokens_tier[tier] > 0:
+            continue
+        t_in = int(raw.get("tokens_in") or 0)
+        t_out = int(raw.get("tokens_out") or 0)
+        t_total = int(raw.get("tokens") or (t_in + t_out))
+        if t_total <= 0:
+            continue
+        p_in, p_out = tarifas.get(tier, (0.0, 0.0))
+        if t_in > 0 or t_out > 0:
+            est = (t_in / 1000.0) * p_in + (t_out / 1000.0) * p_out
+        else:
+            est = (t_total / 1000.0) * p_in
+        tokens_tier[tier] = tokens_tier.get(tier, 0) + t_total
+        coste_tier[tier] = round(coste_tier.get(tier, 0.0) + est, 6)
+
+    return tokens_tier, coste_tier
+
+
 # ------------------------------------------------------------------ §18.24
-@router.get("/agents", summary="Agentes y líneas de producción")
+@router.get(
+    "/agents",
+    response_model=OpsAgentsResponse,
+    summary="Agentes y líneas de producción",
+)
 async def agents(
     st: Annotated[Staff, Depends(exigir(*OPS))],
     _lim: Annotated[Staff, Depends(limite_vivo)],
     ventana: Annotated[str, Query(description="5m | 1h | 24h.")] = "1h",
     etapa: Annotated[str | None, Query()] = None,
-) -> dict[str, Any]:
+) -> OpsAgentsResponse:
     """Estado de los agentes, rendimiento por etapa y ocupación de las líneas.
 
     Consume el agregado de §17.14. Si la telemetría no está disponible, los
@@ -86,7 +339,7 @@ async def agents(
     # Las líneas salen del esquema, no de la telemetría: existen aunque ningún
     # agente esté reportando, y su estado es un dato de negocio.
     async with read_session() as db:
-        lineas = await uno(
+        lineas_row = await uno(
             db,
             """
             SELECT count(*) FILTER (WHERE estado = 'ocupada')       AS activas,
@@ -96,37 +349,43 @@ async def agents(
         """,
         )
 
-    etapas = datos.get("etapas") or []
-    alertas = [
-        {"tipo": "agentes_caidos", "etapa": e.get("etapa"), "valor": e.get("agentes_caidos")}
-        for e in etapas
-        if (e.get("agentes_caidos") or 0) > 0
-    ]
-    if lineas and (lineas["mantenimiento"] or 0) > 0:
-        alertas.append({"tipo": "lineas_en_mantenimiento", "valor": lineas["mantenimiento"]})
+    lineas_out = (
+        LineasProduccionOut(
+            activas=int(lineas_row["activas"] or 0),
+            mantenimiento=int(lineas_row["mantenimiento"] or 0),
+            libres=int(lineas_row["libres"] or 0),
+        )
+        if lineas_row
+        else None
+    )
 
-    return {
-        "ventana": datos.get("ventana", ventana),
-        "telemetria": {
-            "disponible": not sin_telemetria,
-            "antiguedad_s": datos.get("_antiguedad_s"),
-            "desde": datos.get("telemetria_desde"),
-        },
+    etapas_out = (
+        None if sin_telemetria else _normalizar_etapas(datos.get("etapas") or [], etapa)
+    )
+    alertas_out = _construir_alertas_agentes(etapas_out or [], lineas_out)
+
+    return OpsAgentsResponse(
+        ventana=str(datos.get("ventana") or ventana),
+        telemetria=TelemetriaEstadoOut(
+            disponible=not sin_telemetria,
+            antiguedad_s=datos.get("_antiguedad_s"),
+            desde=datos.get("telemetria_desde"),
+        ),
         # Sin telemetría no se inventan ceros: el consumidor debe mostrar
         # «sin telemetría» y no «sin trabajo».
-        "etapas": None if sin_telemetria else etapas,
-        "lineas": dict(lineas) if lineas else None,
-        "alertas": alertas,
-    }
+        etapas=etapas_out,
+        lineas=lineas_out,
+        alertas=alertas_out,
+    )
 
 
 # ------------------------------------------------------------------ §18.25
-@router.get("/queues", summary="Colas del pipeline")
+@router.get("/queues", response_model=OpsQueuesResponse, summary="Colas del pipeline")
 async def queues(
     st: Annotated[Staff, Depends(exigir(*OPS))],
     _lim: Annotated[Staff, Depends(limite_vivo)],
     incluir_dlq: Annotated[bool, Query()] = True,
-) -> dict[str, Any]:
+) -> OpsQueuesResponse:
     """Profundidad, antigüedad y cola de fallidos de cada cola del pipeline.
 
     Complementa §18.24: una etapa sin agentes caídos y con la cola creciendo indica
@@ -135,44 +394,35 @@ async def queues(
     plataforma y no de la consola en esta versión.
     """
     datos = await telemetry.colas(incluir_dlq)
-    colas = datos.get("colas") or []
+    colas_out = _normalizar_colas(datos.get("colas") or [], incluir_dlq)
 
-    for c in colas:
-        umbral = c.get("umbral_atencion_s") or 0
-        antiguedad = c.get("antiguedad_max_s") or 0
-        fallidos = c.get("fallidos") or 0
-        # El estado se deriva del umbral configurado, no de un criterio propio.
-        if fallidos > 0 or (umbral and antiguedad > umbral * 2):
-            c["estado"] = "critico"
-        elif umbral and antiguedad > umbral:
-            c["estado"] = "atencion"
-        else:
-            c["estado"] = "ok"
-
-    criticas = [c["nombre"] for c in colas if c["estado"] == "critico"]
+    criticas = [c.nombre for c in colas_out if c.estado == "critico"]
     if criticas:
         log.warning("admin.ops.cola_critica", colas=criticas)
 
-    return {
-        "colas": colas,
-        "resumen": {
-            "criticas": len(criticas),
-            "atencion": sum(1 for c in colas if c["estado"] == "atencion"),
-            "pendientes_total": sum(c.get("pendientes") or 0 for c in colas),
-            "fallidos_total": sum(c.get("fallidos") or 0 for c in colas),
-        },
-    }
+    return OpsQueuesResponse(
+        telemetria_desde=datos.get("telemetria_desde"),
+        colas=colas_out,
+        resumen=ColasResumenOut(
+            criticas=len(criticas),
+            atencion=sum(1 for c in colas_out if c.estado == "atencion"),
+            pendientes_total=sum(c.pendientes for c in colas_out),
+            fallidos_total=sum(c.fallidos for c in colas_out),
+        ),
+    )
 
 
 # ------------------------------------------------------------------ §18.26
-@router.get("/models", summary="Modelos y proveedores")
+@router.get("/models", response_model=OpsModelsResponse, summary="Modelos y proveedores")
 async def models(
     st: Annotated[Staff, Depends(exigir(*OPS_NEGOCIO))],
     _lim: Annotated[Staff, Depends(limite_vivo)],
     ventana: Annotated[str, Query(description="1h | 24h | 7d | 30d.")] = "24h",
     proveedor: Annotated[str | None, Query()] = None,
+    tier: Annotated[str | None, Query(description="flash | pro | fable.")] = None,
     comparar: Annotated[bool, Query()] = False,
-) -> dict[str, Any]:
+    comparar_con: Annotated[str | None, Query(description="periodo_anterior.")] = None,
+) -> OpsModelsResponse:
     """Disponibilidad, latencia, tasa de error y escalados por proveedor y modelo.
 
     Responde la pregunta operativa —si un proveedor está degradado— y la económica,
@@ -185,16 +435,39 @@ async def models(
             "Ventana no válida.", {"ventana": ventana, "permitidas": list(_VENTANAS_MODELOS)}
         )
 
-    datos = await telemetry.proveedores(ventana, proveedor)
-    degradados = [
-        p
-        for p in (datos.get("proveedores") or [])
-        if (p.get("disponibilidad_pct") or 100) < 99.0
-    ]
+    proveedor_norm = proveedor.strip().lower() if proveedor is not None else None
+    if proveedor_norm is not None and proveedor_norm not in _PROVEEDORES_MODELOS:
+        raise validacion(
+            "Proveedor no válido.",
+            {"proveedor": proveedor, "permitidos": list(_PROVEEDORES_MODELOS)},
+        )
+
+    tier_norm = tier.strip().lower() if tier is not None else None
+    if tier_norm is not None and tier_norm not in _TIERS_MODELOS:
+        raise validacion("Tier no válido.", {"tier": tier, "permitidos": list(_TIERS_MODELOS)})
+
+    comparar_con_norm = comparar_con.strip().lower() if comparar_con is not None else None
+    if comparar_con_norm is not None and comparar_con_norm not in _COMPARACIONES_MODELOS:
+        raise validacion(
+            "Comparación no válida.",
+            {"comparar_con": comparar_con, "permitidas": list(_COMPARACIONES_MODELOS)},
+        )
+
+    datos = await telemetry.proveedores(ventana, proveedor_norm, tier_norm)
+    raw_proveedores = datos.get("proveedores") or []
+    proveedores_out = _normalizar_proveedores(raw_proveedores, proveedor_norm, tier_norm)
+    raw_modelos = datos.get("modelos")
+    modelos_out = (
+        _normalizar_proveedores(raw_modelos, proveedor_norm, tier_norm)
+        if raw_modelos
+        else list(proveedores_out)
+    )
+
+    degradados = [p for p in proveedores_out if p.disponibilidad_pct < 99.0]
     if degradados and ventana == "1h":
         log.warning(
             "admin.ops.proveedor_degradado",
-            proveedores=[p.get("proveedor") for p in degradados],
+            proveedores=[p.proveedor for p in degradados],
         )
 
     # El coste se toma de los agregados propios, que aplican la tarifa vigente:
@@ -206,34 +479,66 @@ async def models(
         )
         if estado is None or estado["status"] == "fallido":
             raise agregado_no_disponible("tokens_daily")
-        coste = await todos(
+        tarifas_rows = await todos(
             db,
             """
-            SELECT d.tier, sum(d.tokens_in + d.tokens_out) AS tokens,
+            SELECT DISTINCT ON (tier) tier, precio_in, precio_out
+            FROM admin.token_rates
+            WHERE modelo = '*'
+            ORDER BY tier, vigente_desde DESC
+        """,
+        )
+        filtro_tier_sql = "AND d.tier = :tier" if tier_norm is not None else ""
+        params_coste: dict[str, Any] = {"dias": dias}
+        if tier_norm is not None:
+            params_coste["tier"] = tier_norm
+        coste_rows = await todos(
+            db,
+            f"""
+            SELECT d.tier,
+                   coalesce(sum(d.tokens_in), 0) AS tokens_in,
+                   coalesce(sum(d.tokens_out), 0) AS tokens_out,
+                   sum(d.tokens_in + d.tokens_out) AS tokens,
                    sum(d.coste) AS coste
             FROM admin.agg_tokens_daily d
             WHERE d.dia > current_date - CAST(:dias AS int)
+              {filtro_tier_sql}
             GROUP BY d.tier
         """,
-            {"dias": dias},
+            params_coste,
         )
 
-    salida: dict[str, Any] = {
-        "ventana": datos.get("ventana", ventana),
-        "proveedores": datos.get("proveedores") or [],
-        "modelos": datos.get("modelos") or datos.get("proveedores") or [],
-        "escalados": datos.get("escalados") or {},
-        "tokens_por_tier": {c["tier"]: int(c["tokens"] or 0) for c in coste},
-        "coste_por_tier": {c["tier"]: float(c["coste"] or 0) for c in coste},
-        "degradados": [p.get("proveedor") for p in degradados] or None,
-    }
-    if comparar:
+    tarifas = dict(_TARIFAS_OFICIALES_1K)
+    for t_row in tarifas_rows:
+        tarifas[str(t_row["tier"])] = (float(t_row["precio_in"]), float(t_row["precio_out"]))
+
+    tokens_tier, coste_tier = _calcular_tokens_y_costes(
+        coste_rows, raw_proveedores, tarifas, tier_norm
+    )
+
+    comparacion_out: ComparacionModelosOut | None = None
+    if comparar or comparar_con_norm == "periodo_anterior":
         anterior = {"1h": "1h", "24h": "24h", "7d": "7d", "30d": "30d"}[ventana]
-        previa = await telemetry.proveedores(anterior, proveedor)
-        salida["comparacion"] = {"escalados": previa.get("escalados") or {}}
-    else:
-        salida["comparacion"] = None
-    return salida
+        previa = await telemetry.proveedores(anterior, proveedor_norm, tier_norm)
+        prev_proveedores = _normalizar_proveedores(
+            previa.get("proveedores") or [], proveedor_norm, tier_norm
+        )
+        comparacion_out = ComparacionModelosOut(
+            periodo="periodo_anterior",
+            escalados=_normalizar_escalados(previa.get("escalados")),
+            proveedores=prev_proveedores,
+        )
+
+    return OpsModelsResponse(
+        ventana=str(datos.get("ventana") or ventana),
+        proveedores=proveedores_out,
+        modelos=modelos_out,
+        escalados=_normalizar_escalados(datos.get("escalados")),
+        tokens_por_tier=tokens_tier,
+        coste_por_tier=coste_tier,
+        degradados=[p.proveedor for p in degradados] or None,
+        comparacion=comparacion_out,
+    )
 
 
 async def _frescura_sla(db: Any) -> datetime:

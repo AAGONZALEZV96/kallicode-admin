@@ -64,7 +64,7 @@ def _comprobar_frescura(datos: dict[str, Any], campo: str) -> int | None:
         ts = datetime.fromisoformat(str(marca).replace("Z", "+00:00"))
     except ValueError:
         return None
-    edad = int((datetime.now(UTC) - ts).total_seconds())
+    edad = max(0, int((datetime.now(UTC) - ts).total_seconds()))
     if edad > s.telemetry_max_age_s:
         log.warning("admin.telemetria.desactualizada", antiguedad_s=edad)
         raise telemetria_no_disponible(edad)
@@ -85,12 +85,22 @@ async def agentes(ventana: str = "1h", etapa: str | None = None) -> dict[str, An
 
 async def colas(incluir_dlq: bool = True) -> dict[str, Any]:
     """§17.15 · profundidad y antigüedad de las colas."""
-    return await _pedir("/telemetry/queues", {"incluir_dlq": incluir_dlq})
+    datos = await _pedir("/telemetry/queues", {"incluir_dlq": incluir_dlq})
+    _comprobar_frescura(datos, "telemetria_desde")
+    return datos
 
 
-async def proveedores(ventana: str = "24h", proveedor: str | None = None) -> dict[str, Any]:
+async def proveedores(
+    ventana: str = "24h",
+    proveedor: str | None = None,
+    tier: str | None = None,
+) -> dict[str, Any]:
     """§17.16 · agregados de disponibilidad, latencia y error por proveedor."""
-    return await _pedir(
-        "/telemetry/providers",
-        {"ventana": ventana, **({"proveedor": proveedor} if proveedor else {})},
-    )
+    params: dict[str, Any] = {"ventana": ventana}
+    if proveedor:
+        params["proveedor"] = proveedor
+    if tier:
+        params["tier"] = tier
+    datos = await _pedir("/telemetry/providers", params)
+    _comprobar_frescura(datos, "telemetria_desde")
+    return datos
