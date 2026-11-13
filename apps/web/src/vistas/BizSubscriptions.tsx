@@ -344,13 +344,11 @@ export const BizSubscriptions: React.FC = () => {
   }
 
   return (
-    <main
+    <div
       style={{
-        padding: "1.5rem",
         display: "flex",
         flexDirection: "column",
         gap: "1.25rem",
-        backgroundColor: "var(--bg)",
         minHeight: "100%",
       }}
     >
@@ -394,6 +392,9 @@ export const BizSubscriptions: React.FC = () => {
             borderRadius: "var(--radius-md, 0.5rem)",
             border: "1px solid var(--border)",
             gap: "0.25rem",
+            overflowX: "auto",
+            maxWidth: "100%",
+            WebkitOverflowScrolling: "touch",
           }}
         >
           <button
@@ -1017,6 +1018,6 @@ export const BizSubscriptions: React.FC = () => {
           refetchUpgrades();
         }}
       />
-    </main>
+    </div>
   );
 };

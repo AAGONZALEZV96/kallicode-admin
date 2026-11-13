@@ -7,7 +7,7 @@
  * y la auditoría append-only inmutable en admin.staff_actions.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { Modal } from "./Modal";
@@ -45,8 +45,11 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<boolean>(false);
 
+  const prevAbiertoRef = useRef(false);
+
+  // Inicializar/limpiar formulario únicamente cuando el modal pasa de cerrado a abierto
   useEffect(() => {
-    if (abierto) {
+    if (abierto && !prevAbiertoRef.current) {
       setTenantId(tenantIdProp);
       setMotivo("");
       setReferencia("");
@@ -55,13 +58,14 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
       setError(null);
       setExito(false);
     }
+    prevAbiertoRef.current = abierto;
   }, [abierto, tenantIdProp]);
 
-  const handleCerrar = () => {
+  const handleCerrar = useCallback(() => {
     setError(null);
     setExito(false);
     alCerrar();
-  };
+  }, [alCerrar]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -337,6 +341,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
               justifyContent: "flex-end",
               gap: "0.75rem",
               marginTop: "0.5rem",
+              flexWrap: "wrap",
             }}
           >
             <Boton

@@ -297,13 +297,12 @@ export const CustomerDetail: React.FC = () => {
       alReintentar={() => void refetch()}
     >
       {data && (
-        <main
+        <div
           className="customer-detail-page"
           style={{
-            padding: "var(--space-6)",
             display: "flex",
             flexDirection: "column",
-            gap: "var(--space-6)",
+            gap: "var(--space-5)",
           }}
         >
       {/* Región viva accesible para notificaciones de concesión */}
@@ -493,7 +492,7 @@ export const CustomerDetail: React.FC = () => {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
           gap: "var(--space-5)",
         }}
       >
@@ -504,7 +503,7 @@ export const CustomerDetail: React.FC = () => {
               1. Identificación & Suscripción
             </h2>
           </header>
-          <dl style={{ display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: "var(--space-3)", columnGap: "var(--space-4)" }}>
+          <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", rowGap: "var(--space-3)", columnGap: "var(--space-4)" }}>
             <div>
               <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Tenant ID</dt>
               <dd className="mono" style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)" }}>
@@ -570,7 +569,7 @@ export const CustomerDetail: React.FC = () => {
               2. Líneas de Producción
             </h2>
           </header>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Líneas Contratadas</span>
               <strong className="tabular" style={{ fontSize: "var(--text-xl)" }}>
@@ -875,7 +874,7 @@ export const CustomerDetail: React.FC = () => {
           void refetch();
         }}
       />
-    </main>
+    </div>
       )}
     </ContenedorEstado>
   );

@@ -513,3 +513,175 @@ body {
     opacity: 1;
   }
 }
+
+/* ==========================================================================
+   RESPONSIVIDAD Y ADAPTACIÓN MULTIDISPOSITIVO (Mobile First & Breakpoints)
+   ========================================================================== */
+
+/* Main Container Responsivo */
+.admin-main {
+  flex: 1;
+  padding: 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .admin-main {
+    padding: 1.5rem;
+  }
+}
+
+/* Header & Navbar Responsivo */
+.admin-header {
+  height: 64px;
+  background-color: var(--card, #1e293b);
+  border-bottom: 1px solid var(--border, #334155);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+@media (min-width: 768px) {
+  .admin-header {
+    padding: 0 1.5rem;
+  }
+}
+
+.nav-desktop {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (min-width: 900px) {
+  .nav-desktop {
+    display: flex;
+  }
+}
+
+.nav-user-desktop {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .nav-user-desktop {
+    display: flex;
+  }
+}
+
+.nav-mobile-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  cursor: pointer;
+  padding: 8px;
+  font-size: 1.25rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.nav-mobile-toggle:hover {
+  background-color: var(--surface2);
+}
+
+@media (min-width: 900px) {
+  .mobile-controls {
+    display: none !important;
+  }
+}
+
+.nav-mobile-drawer {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.25rem 2rem 1.25rem;
+  gap: 1rem;
+  z-index: 50;
+  overflow-y: auto;
+  animation: kc-fade-in var(--transition-fast);
+}
+
+@media (min-width: 900px) {
+  .nav-mobile-drawer {
+    display: none;
+  }
+}
+
+.nav-link-mobile {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--text);
+  min-height: 48px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.nav-link-mobile:hover {
+  background-color: var(--surface2);
+}
+
+.nav-link-mobile.active {
+  background-color: var(--surface2);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Tablas con scroll horizontal suave en pantallas estrechas */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modales adaptables a pantallas móviles */
+@media (max-width: 600px) {
+  .modal-overlay {
+    padding: var(--space-2);
+  }
+  .modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-md);
+  }
+  .modal-head {
+    padding: var(--space-3) var(--space-4);
+  }
+  .modal-body {
+    padding: var(--space-3) var(--space-4);
+  }
+  .modal-foot {
+    padding: var(--space-3) var(--space-4);
+    flex-direction: column-reverse;
+  }
+  .modal-foot button {
+    width: 100%;
+  }
+}

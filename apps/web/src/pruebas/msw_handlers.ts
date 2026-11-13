@@ -25,10 +25,64 @@ const configDefecto: MockConfig = {
 };
 
 let estadoGlobal: MockConfig = { ...configDefecto };
+const CLAVE_CONCESIONES_MOCK = "kc_mock_concesiones_tenants";
+const concesionesPorTenant = new Set<string>();
 
-/** Modifica dinámicamente si existe concesión activa de acceso simulada. */
+function obtenerConcesionesPersistidas(): Set<string> {
+  const conjunto = new Set(concesionesPorTenant);
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const raw = window.localStorage.getItem(CLAVE_CONCESIONES_MOCK);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          arr.forEach((id) => conjunto.add(String(id)));
+        }
+      }
+    }
+  } catch {
+    // ignorar
+  }
+  return conjunto;
+}
+
+function persistirConcesionTenant(tenantId: string): void {
+  concesionesPorTenant.add(tenantId);
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const actual = obtenerConcesionesPersistidas();
+      actual.add(tenantId);
+      window.localStorage.setItem(CLAVE_CONCESIONES_MOCK, JSON.stringify(Array.from(actual)));
+    }
+  } catch {
+    // ignorar
+  }
+}
+
+function limpiarTodasConcesiones(): void {
+  concesionesPorTenant.clear();
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.removeItem(CLAVE_CONCESIONES_MOCK);
+    }
+  } catch {
+    // ignorar
+  }
+}
+
+/** Modifica dinámicamente si existe concesión activa de acceso simulada (global para tests). */
 export function setMockConcesionActiva(activa: boolean): void {
   estadoGlobal.concesionActiva = activa;
+}
+
+/** Añade una concesión simulada para un tenant específico. */
+export function setMockConcesionTenant(tenantId: string): void {
+  persistirConcesionTenant(tenantId);
+}
+
+/** Limpia las concesiones por tenant simuladas. */
+export function limpiarMockConcesionesTenants(): void {
+  limpiarTodasConcesiones();
 }
 
 /** Modifica dinámicamente el estado de frescura de los agregados. */
@@ -58,6 +112,7 @@ export function setMockRolStaff(
 /** Restablece la configuración de los mocks a sus valores por defecto. */
 export function resetMockState(): void {
   estadoGlobal = { ...configDefecto };
+  limpiarTodasConcesiones();
 }
 
 // ------------------------------------------------------------------ Clientes mock
@@ -160,18 +215,35 @@ const CLIENTES_MOCK: ClienteMock[] = [
 ];
 
 // Helper para determinar si aplica concesión activa
-function tieneConcesion(request: Request, url: URL): boolean {
-  return (
+function tieneConcesion(request: Request, url: URL, tenantId?: string): boolean {
+  if (
     request.headers.get("x-mock-grant") === "true" ||
     request.headers.get("x-mock-concesion") === "true" ||
     url.searchParams.get("mock_grant") === "true" ||
     estadoGlobal.concesionActiva
-  );
+  ) {
+    return true;
+  }
+  if (tenantId) {
+    if (concesionesPorTenant.has(tenantId)) return true;
+    const persistidas = obtenerConcesionesPersistidas();
+    if (persistidas.has(tenantId)) return true;
+  }
+  return false;
 }
 
 // Helper para determinar el rol activo
 function obtenerRol(request: Request): string {
-  return request.headers.get("x-mock-role") || estadoGlobal.rolStaff;
+  const headerRole = request.headers.get("x-mock-role");
+  if (headerRole) return headerRole;
+  const auth = request.headers.get("authorization");
+  if (auth && auth.startsWith("Bearer mock_jwt_")) {
+    const rolePart = auth.replace("Bearer mock_jwt_", "").trim();
+    if (["staff_admin", "staff_negocio", "staff_soporte", "staff_operaciones"].includes(rolePart)) {
+      return rolePart;
+    }
+  }
+  return estadoGlobal.rolStaff;
 }
 
 // Helper para simular error 401
@@ -220,8 +292,69 @@ function verificarFrescuraAgregados(request: Request): Response | null {
   return null;
 }
 
+let sesionLoginPendiente: { email: string; rol: string } = {
+  email: "admin@kallicode.com",
+  rol: "staff_admin",
+};
+
 // ------------------------------------------------------------------ Handlers MSW
 export const handlers = [
+  // 0. Autenticación y 2FA/TOTP para modo interactivo en navegador
+  http.post("*/admin/v1/auth/login", async ({ request }) => {
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      // Ignorar error de parsing si viene vacío
+    }
+    const email = String(body.email || "admin@kallicode.com");
+    let rol: "staff_admin" | "staff_negocio" | "staff_soporte" | "staff_operaciones" = "staff_admin";
+    if (email.includes("soporte")) {
+      rol = "staff_soporte";
+    } else if (email.includes("operaciones")) {
+      rol = "staff_operaciones";
+    } else if (email.includes("negocio")) {
+      rol = "staff_negocio";
+    }
+    sesionLoginPendiente = { email, rol };
+    return HttpResponse.json({
+      mfa_token: `mfa_token_mock_${Date.now()}`,
+      mfa_inscrito: true,
+      expira_en: 300,
+    });
+  }),
+
+  http.post("*/admin/v1/auth/mfa/verify", async () => {
+    estadoGlobal.rolStaff = sesionLoginPendiente.rol as
+      | "staff_admin"
+      | "staff_negocio"
+      | "staff_soporte"
+      | "staff_operaciones";
+    return HttpResponse.json({
+      access_token: `mock_jwt_${sesionLoginPendiente.rol}`,
+      refresh_token: "mock_refresh_token_jwt",
+      staff: {
+        id: "st_dev_01",
+        nombre: `Personal (${sesionLoginPendiente.rol})`,
+        rol: sesionLoginPendiente.rol,
+      },
+      expira_en: 3600,
+    });
+  }),
+
+  http.post("*/admin/v1/auth/logout", () => {
+    limpiarTodasConcesiones();
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post("*/admin/v1/auth/refresh", () => {
+    return HttpResponse.json({
+      access_token: `mock_jwt_${estadoGlobal.rolStaff}`,
+      refresh_token: "mock_refresh_token_jwt",
+      expira_en: 3600,
+    });
+  }),
+
   // 1. GET /admin/v1/business/summary
   http.get("*/admin/v1/business/summary", ({ request }) => {
     const errAuth = verificarAutenticacion(request);
@@ -416,9 +549,9 @@ export const handlers = [
     );
 
     // Búsqueda por nombre requiere concesión activa si no es por org_...
-    const conConcesion = tieneConcesion(request, url);
+    const conConcesionGlobal = tieneConcesion(request, url);
     const busquedaPorNombre = Boolean(q && !q.startsWith("org_"));
-    if (busquedaPorNombre && !conConcesion) {
+    if (busquedaPorNombre && !conConcesionGlobal && obtenerConcesionesPersistidas().size === 0) {
       return HttpResponse.json(
         {
           error: {
@@ -468,9 +601,9 @@ export const handlers = [
     const offset = (page - 1) * pageSize;
     const paginados = filtrados.slice(offset, offset + pageSize);
 
-    // Mapeo de enmascaramiento según concesión
+    // Mapeo de enmascaramiento según concesión por tenant
     const items = paginados.map((c) => {
-      const masked = !conConcesion;
+      const masked = !tieneConcesion(request, url, c.tenant_id);
       return {
         tenant_id: c.tenant_id,
         razon_social: masked ? "A•••• S.L." : c.razon_social,
@@ -500,7 +633,7 @@ export const handlers = [
         page_size: pageSize,
         pages,
         frescura: "2026-10-30T14:00:00.000Z",
-        alguna_enmascarada: !conConcesion,
+        alguna_enmascarada: items.some((i) => i.enmascarado),
       },
       {
         headers: {
@@ -548,7 +681,7 @@ export const handlers = [
 
     const cliente = CLIENTES_MOCK.find((c) => c.tenant_id === tenant_id) || CLIENTES_MOCK[0];
     const url = new URL(request.url);
-    const conConcesion = tieneConcesion(request, url);
+    const conConcesion = tieneConcesion(request, url, cliente.tenant_id);
 
     const razonSocial = conConcesion ? cliente.razon_social : "A•••• S.L.";
     const dominio = conConcesion ? cliente.dominio : "a••••.com";
@@ -702,7 +835,6 @@ export const handlers = [
     }
 
     const url = new URL(request.url);
-    const conConcesion = tieneConcesion(request, url);
 
     const planParam = url.searchParams.get("plan");
     const estadoParam = url.searchParams.get("estado");
@@ -746,21 +878,24 @@ export const handlers = [
       },
     ];
 
-    let filtrados = suscripcionesBase.map((c) => ({
-      tenant_id: c.tenant_id,
-      razon_social: conConcesion ? c.razon_social : "A•••• S.L.",
-      plan: c.plan,
-      estado: c.estado,
-      suscripcion_estado: c.estado,
-      inicia_el: c.inicia_el,
-      renueva_el: c.renueva_el,
-      finaliza_el: null,
-      dias_para_renovacion: c.dias_para_renovacion,
-      importe_mes: c.mrr_eur,
-      moneda: "EUR",
-      cuota_uso_pct: c.consumo_ciclo.cuota_pct,
-      enmascarado: !conConcesion,
-    }));
+    let filtrados = suscripcionesBase.map((c) => {
+      const tieneGrant = tieneConcesion(request, url, c.tenant_id);
+      return {
+        tenant_id: c.tenant_id,
+        razon_social: tieneGrant ? c.razon_social : "A•••• S.L.",
+        plan: c.plan,
+        estado: c.estado,
+        suscripcion_estado: c.estado,
+        inicia_el: c.inicia_el,
+        renueva_el: c.renueva_el,
+        finaliza_el: null,
+        dias_para_renovacion: c.dias_para_renovacion,
+        importe_mes: c.mrr_eur,
+        moneda: "EUR",
+        cuota_uso_pct: c.consumo_ciclo.cuota_pct,
+        enmascarado: !tieneGrant,
+      };
+    });
 
     if (planParam && planParam !== "todos") {
       filtrados = filtrados.filter((s) => s.plan === planParam);
@@ -818,7 +953,7 @@ export const handlers = [
       page_size: pageSize,
       pages: Math.ceil(total / pageSize) || 1,
       frescura: "2026-10-30T14:00:00.000Z",
-      alguna_enmascarada: !conConcesion,
+      alguna_enmascarada: filtrados.some((s) => s.enmascarado),
     });
   }),
 
@@ -845,7 +980,6 @@ export const handlers = [
     }
 
     const url = new URL(request.url);
-    const conConcesion = tieneConcesion(request, url);
 
     const estadoParam = url.searchParams.get("estado") ?? "pendiente";
     const planDeseadoParam = url.searchParams.get("plan_deseado");
@@ -856,7 +990,7 @@ export const handlers = [
       {
         solicitud_id: "req_001",
         tenant_id: "org_initech",
-        razon_social: conConcesion ? "Initech Software Corporation" : "A•••• S.L.",
+        razon_social_real: "Initech Software Corporation",
         plan_actual: "starter",
         plan_deseado: "growth",
         urgente: true,
@@ -865,12 +999,11 @@ export const handlers = [
         solicitado_el: "2026-11-08T09:30:00Z",
         cuota_uso_pct: 94.0,
         antiguedad_h: 56,
-        enmascarado: !conConcesion,
       },
       {
         solicitud_id: "req_002",
         tenant_id: "org_acme",
-        razon_social: conConcesion ? "Acme Logística S.L." : "A•••• S.L.",
+        razon_social_real: "Acme Logística S.L.",
         plan_actual: "growth",
         plan_deseado: "enterprise",
         urgente: false,
@@ -879,12 +1012,11 @@ export const handlers = [
         solicitado_el: "2026-11-09T14:15:00Z",
         cuota_uso_pct: 85.0,
         antiguedad_h: 27,
-        enmascarado: !conConcesion,
       },
       {
         solicitud_id: "req_003",
         tenant_id: "org_globex",
-        razon_social: conConcesion ? "Globex Industrial S.A." : "A•••• S.L.",
+        razon_social_real: "Globex Industrial S.A.",
         plan_actual: "starter",
         plan_deseado: "enterprise",
         urgente: true,
@@ -893,12 +1025,11 @@ export const handlers = [
         solicitado_el: "2026-11-01T10:00:00Z",
         cuota_uso_pct: 92.5,
         antiguedad_h: 220,
-        enmascarado: !conConcesion,
       },
       {
         solicitud_id: "req_004",
         tenant_id: "org_umbrella",
-        razon_social: conConcesion ? "Umbrella BioTech SL" : "A•••• S.L.",
+        razon_social_real: "Umbrella BioTech SL",
         plan_actual: "starter",
         plan_deseado: "growth",
         urgente: false,
@@ -907,9 +1038,15 @@ export const handlers = [
         solicitado_el: "2026-10-25T11:00:00Z",
         cuota_uso_pct: 12.0,
         antiguedad_h: 380,
-        enmascarado: !conConcesion,
       },
-    ];
+    ].map((r) => {
+      const tieneGrant = tieneConcesion(request, url, r.tenant_id);
+      return {
+        ...r,
+        razon_social: tieneGrant ? r.razon_social_real : "A•••• S.L.",
+        enmascarado: !tieneGrant,
+      };
+    });
 
     let filtrados = [...upgradeRequestsMock];
 
@@ -934,7 +1071,7 @@ export const handlers = [
       page_size: pageSize,
       pages: Math.ceil(total / pageSize) || 1,
       frescura: "2026-10-30T14:00:00.000Z",
-      alguna_enmascarada: !conConcesion,
+      alguna_enmascarada: filtrados.some((s) => s.enmascarado),
     });
   }),
 
@@ -960,7 +1097,6 @@ export const handlers = [
     if (errFrescura) return errFrescura;
 
     const url = new URL(request.url);
-    const conConcesion = tieneConcesion(request, url);
     const agruparPor = url.searchParams.get("agrupar_por") || "cliente";
     const periodo = url.searchParams.get("periodo") || "mes_actual";
     const planFiltro = url.searchParams.get("plan") || url.searchParams.get("tier");
@@ -1108,7 +1244,7 @@ export const handlers = [
       {
         clave: "org_acme",
         tenant_id: "org_acme",
-        razon_social: conConcesion ? "Acme Logística S.L." : "A•••• S.L.",
+        razon_social_real: "Acme Logística S.L.",
         plan: "growth",
         tokens_in: 3000000,
         tokens_input: 3000000,
@@ -1127,12 +1263,11 @@ export const handlers = [
         cuota_pct: 75.0,
         porcentaje_consumido: 75.0,
         cuadra_con_facturacion: !forzarDescuadre,
-        enmascarado: !conConcesion,
       },
       {
         clave: "org_globex",
         tenant_id: "org_globex",
-        razon_social: conConcesion ? "Globex Industrial S.A." : "G•••• S.A.",
+        razon_social_real: "Globex Industrial S.A.",
         plan: "enterprise",
         tokens_in: 18000000,
         tokens_input: 18000000,
@@ -1151,9 +1286,19 @@ export const handlers = [
         cuota_pct: 92.5,
         porcentaje_consumido: 92.5,
         cuadra_con_facturacion: true,
-        enmascarado: !conConcesion,
       },
-    ];
+    ].map((i) => {
+      const tieneGrant = tieneConcesion(request, url, i.tenant_id);
+      return {
+        ...i,
+        razon_social: tieneGrant
+          ? i.razon_social_real
+          : i.tenant_id === "org_globex"
+          ? "G•••• S.A."
+          : "A•••• S.L.",
+        enmascarado: !tieneGrant,
+      };
+    });
 
     if (planFiltro && planFiltro !== "todos") {
       baseItems = baseItems.filter((i) => i.plan.toLowerCase() === planFiltro.toLowerCase());
@@ -1200,7 +1345,7 @@ export const handlers = [
       },
       cuadra_con_facturacion: descuadres.length === 0,
       descuadres: descuadres.length > 0 ? descuadres : null,
-      alguna_enmascarada: !conConcesion,
+      alguna_enmascarada: baseItems.some((i) => i.enmascarado),
     });
   }),
 
@@ -1263,7 +1408,9 @@ export const handlers = [
       );
     }
 
-    estadoGlobal.concesionActiva = true;
+    if (tenantId) {
+      persistirConcesionTenant(tenantId);
+    }
 
     const concedidoEn = new Date().toISOString();
     const caducaEn = new Date(Date.now() + duracionMin * 60 * 1000).toISOString();
