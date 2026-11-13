@@ -155,7 +155,7 @@ export const AppRouter: React.FC = () => {
             <Route
               path="/ops/sla"
               element={
-                <RutaProtegidaPorRol rolesPermitidos={["staff_operaciones", "staff_admin"]}>
+                <RutaProtegidaPorRol rolesPermitidos={["staff_operaciones", "staff_negocio", "staff_admin"]}>
                   <OpsSLA />
                 </RutaProtegidaPorRol>
               }

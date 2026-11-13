@@ -1458,6 +1458,13 @@ export const handlers = [
     return responderModelos(request);
   }),
 
+  http.get("*/admin/v1/ops/sla", ({ request }) => {
+    return responderSla(request);
+  }),
+  http.get("*/admin/v1/ops/sla/cases/:jobId", ({ request, params }) => {
+    return responderSlaCasoDetalle(request, String(params.jobId || ""));
+  }),
+
   http.post("*/internal/v1/telemetry/heartbeat", async ({ request }) => {
     const traceId = request.headers.get("x-trace-id") || "trc_hb_001";
     const escenario = request.headers.get("x-mock-scenario") || "";
@@ -1760,6 +1767,733 @@ function responderModelos(request: Request): Response {
       },
       degradados: null,
       comparacion: null,
+    },
+    { status: 200, headers: { "x-trace-id": traceId } }
+  );
+}
+
+interface TramoSlaMock {
+  inicio: string;
+  fin: string | null;
+  duracion_h: number;
+  horas: number;
+  computa: boolean;
+  etapa: string;
+  causa_pausa: string | null;
+}
+
+interface CasoSlaMock {
+  job_id: string;
+  ticket_id: string;
+  ticket_numero: string;
+  tenant_id_real: string;
+  razon_social_real: string;
+  razon_social_mask: string;
+  plan: "starter" | "growth" | "enterprise";
+  etapa_actual: string;
+  objetivo_h: number;
+  transcurrido_h: number;
+  pausa_total_h: number;
+  bruto_h: number;
+  resultado: "dentro" | "en_riesgo" | "incumplido" | "en_curso";
+  ciclo: string;
+  tramos: TramoSlaMock[];
+  reglas_aplicadas: string[];
+}
+
+const OBJETIVOS_PLAN_SLA: Record<"starter" | "growth" | "enterprise", number> = {
+  starter: 72,
+  growth: 24,
+  enterprise: 8,
+};
+
+const CASOS_SLA_MOCK: CasoSlaMock[] = [
+  {
+    job_id: "job_sla_ent_01",
+    ticket_id: "tkt_401",
+    ticket_numero: "KC-401",
+    tenant_id_real: "org_globex",
+    razon_social_real: "Globex Industrial S.A.",
+    razon_social_mask: "G••••• S.A.",
+    plan: "enterprise",
+    etapa_actual: "deploy",
+    objetivo_h: 8,
+    transcurrido_h: 5.2,
+    pausa_total_h: 4.0,
+    bruto_h: 9.2,
+    resultado: "dentro",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-10T08:00:00Z",
+        fin: "2026-11-10T10:12:00Z",
+        duracion_h: 2.2,
+        horas: 2.2,
+        computa: true,
+        etapa: "triage",
+        causa_pausa: null,
+      },
+      {
+        inicio: "2026-11-10T10:12:00Z",
+        fin: "2026-11-10T14:12:00Z",
+        duracion_h: 4.0,
+        horas: 4.0,
+        computa: false,
+        etapa: "design",
+        causa_pausa: "espera_firma_cliente",
+      },
+      {
+        inicio: "2026-11-10T14:12:00Z",
+        fin: "2026-11-10T17:12:00Z",
+        duracion_h: 3.0,
+        horas: 3.0,
+        computa: true,
+        etapa: "build",
+        causa_pausa: null,
+      },
+    ],
+    reglas_aplicadas: [
+      "Exclusión de tiempo por espera de firma del cliente en puerta de aprobación (Gate).",
+      "Objetivo de plan Enterprise aplicado: 8 horas computables totales.",
+    ],
+  },
+  {
+    job_id: "job_sla_ent_02",
+    ticket_id: "tkt_402",
+    ticket_numero: "KC-402",
+    tenant_id_real: "org_acme",
+    razon_social_real: "Acme Logística S.L.",
+    razon_social_mask: "A••••• S.L.",
+    plan: "enterprise",
+    etapa_actual: "qa",
+    objetivo_h: 8,
+    transcurrido_h: 6.8,
+    pausa_total_h: 2.5,
+    bruto_h: 9.3,
+    resultado: "en_riesgo",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-12T09:00:00Z",
+        fin: "2026-11-12T12:30:00Z",
+        duracion_h: 3.5,
+        horas: 3.5,
+        computa: true,
+        etapa: "build",
+        causa_pausa: null,
+      },
+      {
+        inicio: "2026-11-12T12:30:00Z",
+        fin: "2026-11-12T15:00:00Z",
+        duracion_h: 2.5,
+        horas: 2.5,
+        computa: false,
+        etapa: "qa",
+        causa_pausa: "escalado_humano",
+      },
+      {
+        inicio: "2026-11-12T15:00:00Z",
+        fin: null,
+        duracion_h: 3.3,
+        horas: 3.3,
+        computa: true,
+        etapa: "qa",
+        causa_pausa: null,
+      },
+    ],
+    reglas_aplicadas: [
+      "Pausa imputable a revisión por escalado humano descontada del reloj de acuerdo de servicio.",
+      "Alerta preventiva activada al superar el 75% del objetivo del plan Enterprise (6.8 h / 8.0 h).",
+    ],
+  },
+  {
+    job_id: "job_sla_gro_01",
+    ticket_id: "tkt_403",
+    ticket_numero: "KC-403",
+    tenant_id_real: "org_acme",
+    razon_social_real: "Acme Logística S.L.",
+    razon_social_mask: "A••••• S.L.",
+    plan: "growth",
+    etapa_actual: "security",
+    objetivo_h: 24,
+    transcurrido_h: 19.5,
+    pausa_total_h: 12.0,
+    bruto_h: 31.5,
+    resultado: "en_riesgo",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-11T08:00:00Z",
+        fin: "2026-11-11T16:00:00Z",
+        duracion_h: 8.0,
+        horas: 8.0,
+        computa: true,
+        etapa: "design",
+        causa_pausa: null,
+      },
+      {
+        inicio: "2026-11-11T16:00:00Z",
+        fin: "2026-11-12T02:00:00Z",
+        duracion_h: 10.0,
+        horas: 10.0,
+        computa: false,
+        etapa: "design",
+        causa_pausa: "espera_firma_cliente",
+      },
+      {
+        inicio: "2026-11-12T02:00:00Z",
+        fin: "2026-11-12T04:00:00Z",
+        duracion_h: 2.0,
+        horas: 2.0,
+        computa: false,
+        etapa: "build",
+        causa_pausa: "indisponibilidad_proveedor_llm",
+      },
+      {
+        inicio: "2026-11-12T04:00:00Z",
+        fin: null,
+        duracion_h: 11.5,
+        horas: 11.5,
+        computa: true,
+        etapa: "security",
+        causa_pausa: null,
+      },
+    ],
+    reglas_aplicadas: [
+      "Descuento de 10.0 h por espera de firma del cliente y 2.0 h por indisponibilidad externa de proveedor LLM.",
+      "Alerta preventiva al superar el 75% de consumo computable del objetivo Growth (24 h).",
+    ],
+  },
+  {
+    job_id: "job_sla_gro_02",
+    ticket_id: "tkt_404",
+    ticket_numero: "KC-404",
+    tenant_id_real: "org_initech",
+    razon_social_real: "Initech Software Corp.",
+    razon_social_mask: "I••••• Corp.",
+    plan: "growth",
+    etapa_actual: "deploy",
+    objetivo_h: 24,
+    transcurrido_h: 26.4,
+    pausa_total_h: 3.6,
+    bruto_h: 30.0,
+    resultado: "incumplido",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-08T08:00:00Z",
+        fin: "2026-11-08T20:00:00Z",
+        duracion_h: 12.0,
+        horas: 12.0,
+        computa: true,
+        etapa: "build",
+        causa_pausa: null,
+      },
+      {
+        inicio: "2026-11-08T20:00:00Z",
+        fin: "2026-11-08T23:36:00Z",
+        duracion_h: 3.6,
+        horas: 3.6,
+        computa: false,
+        etapa: "qa",
+        causa_pausa: "ventana_mantenimiento",
+      },
+      {
+        inicio: "2026-11-08T23:36:00Z",
+        fin: "2026-11-09T14:00:00Z",
+        duracion_h: 14.4,
+        horas: 14.4,
+        computa: true,
+        etapa: "deploy",
+        causa_pausa: null,
+      },
+    ],
+    reglas_aplicadas: [
+      "Ventana de mantenimiento programado excluida (3.6 h).",
+      "El tiempo neto computable (26.4 h) supera el objetivo de 24 h del plan Growth.",
+    ],
+  },
+  {
+    job_id: "job_sla_gro_03",
+    ticket_id: "tkt_405",
+    ticket_numero: "KC-405",
+    tenant_id_real: "org_globex",
+    razon_social_real: "Globex Industrial S.A.",
+    razon_social_mask: "G••••• S.A.",
+    plan: "growth",
+    etapa_actual: "deploy",
+    objetivo_h: 24,
+    transcurrido_h: 14.0,
+    pausa_total_h: 2.0,
+    bruto_h: 16.0,
+    resultado: "dentro",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-07T09:00:00Z",
+        fin: "2026-11-07T23:00:00Z",
+        duracion_h: 14.0,
+        horas: 14.0,
+        computa: true,
+        etapa: "build",
+        causa_pausa: null,
+      },
+      {
+        inicio: "2026-11-07T23:00:00Z",
+        fin: "2026-11-08T01:00:00Z",
+        duracion_h: 2.0,
+        horas: 2.0,
+        computa: false,
+        etapa: "deploy",
+        causa_pausa: "espera_firma_cliente",
+      },
+    ],
+    reglas_aplicadas: ["Caso cerrado dentro del objetivo comercial Growth (14.0 h <= 24.0 h)."],
+  },
+  {
+    job_id: "job_sla_sta_01",
+    ticket_id: "tkt_406",
+    ticket_numero: "KC-406",
+    tenant_id_real: "org_umbrella",
+    razon_social_real: "Umbrella BioTech S.L.",
+    razon_social_mask: "U••••• S.L.",
+    plan: "starter",
+    etapa_actual: "deploy",
+    objetivo_h: 72,
+    transcurrido_h: 48.0,
+    pausa_total_h: 18.0,
+    bruto_h: 66.0,
+    resultado: "dentro",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-05T10:00:00Z",
+        fin: "2026-11-06T10:00:00Z",
+        duracion_h: 24.0,
+        horas: 24.0,
+        computa: true,
+        etapa: "build",
+        causa_pausa: null,
+      },
+      {
+        inicio: "2026-11-06T10:00:00Z",
+        fin: "2026-11-07T04:00:00Z",
+        duracion_h: 18.0,
+        horas: 18.0,
+        computa: false,
+        etapa: "qa",
+        causa_pausa: "espera_firma_cliente",
+      },
+      {
+        inicio: "2026-11-07T04:00:00Z",
+        fin: "2026-11-08T04:00:00Z",
+        duracion_h: 24.0,
+        horas: 24.0,
+        computa: true,
+        etapa: "deploy",
+        causa_pausa: null,
+      },
+    ],
+    reglas_aplicadas: ["Descuento de 18.0 h por espera de validación de cliente en QA."],
+  },
+  {
+    job_id: "job_sla_sta_02",
+    ticket_id: "tkt_407",
+    ticket_numero: "KC-407",
+    tenant_id_real: "org_initech",
+    razon_social_real: "Initech Software Corp.",
+    razon_social_mask: "I••••• Corp.",
+    plan: "starter",
+    etapa_actual: "deploy",
+    objetivo_h: 72,
+    transcurrido_h: 75.5,
+    pausa_total_h: 6.5,
+    bruto_h: 82.0,
+    resultado: "incumplido",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-02T08:00:00Z",
+        fin: "2026-11-05T11:30:00Z",
+        duracion_h: 75.5,
+        horas: 75.5,
+        computa: true,
+        etapa: "build",
+        causa_pausa: null,
+      },
+      {
+        inicio: "2026-11-05T11:30:00Z",
+        fin: "2026-11-05T18:00:00Z",
+        duracion_h: 6.5,
+        horas: 6.5,
+        computa: false,
+        etapa: "qa",
+        causa_pausa: "escalado_humano",
+      },
+    ],
+    reglas_aplicadas: [
+      "Pausa de escalado humano descontada (6.5 h).",
+      "Incumplimiento confirmado: 75.5 h computables exceden las 72 h del plan Starter.",
+    ],
+  },
+  {
+    job_id: "job_sla_sta_03",
+    ticket_id: "tkt_408",
+    ticket_numero: "KC-408",
+    tenant_id_real: "org_acme",
+    razon_social_real: "Acme Logística S.L.",
+    razon_social_mask: "A••••• S.L.",
+    plan: "starter",
+    etapa_actual: "build",
+    objetivo_h: 72,
+    transcurrido_h: 30.0,
+    pausa_total_h: 4.0,
+    bruto_h: 34.0,
+    resultado: "en_curso",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-12T06:00:00Z",
+        fin: "2026-11-12T10:00:00Z",
+        duracion_h: 4.0,
+        horas: 4.0,
+        computa: false,
+        etapa: "triage",
+        causa_pausa: "espera_firma_cliente",
+      },
+      {
+        inicio: "2026-11-12T10:00:00Z",
+        fin: null,
+        duracion_h: 30.0,
+        horas: 30.0,
+        computa: true,
+        etapa: "build",
+        causa_pausa: null,
+      },
+    ],
+    reglas_aplicadas: ["Reloj en curso con 4.0 h de pausa inicial descontadas."],
+  },
+  {
+    job_id: "job_sla_ent_03",
+    ticket_id: "tkt_409",
+    ticket_numero: "KC-409",
+    tenant_id_real: "org_umbrella",
+    razon_social_real: "Umbrella BioTech S.L.",
+    razon_social_mask: "U••••• S.L.",
+    plan: "enterprise",
+    etapa_actual: "deploy",
+    objetivo_h: 8,
+    transcurrido_h: 4.5,
+    pausa_total_h: 1.5,
+    bruto_h: 6.0,
+    resultado: "dentro",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-11T08:00:00Z",
+        fin: "2026-11-11T12:30:00Z",
+        duracion_h: 4.5,
+        horas: 4.5,
+        computa: true,
+        etapa: "build",
+        causa_pausa: null,
+      },
+      {
+        inicio: "2026-11-11T12:30:00Z",
+        fin: "2026-11-11T14:00:00Z",
+        duracion_h: 1.5,
+        horas: 1.5,
+        computa: false,
+        etapa: "qa",
+        causa_pausa: "ventana_mantenimiento",
+      },
+    ],
+    reglas_aplicadas: ["Ventana de mantenimiento excluida del cómputo."],
+  },
+  {
+    job_id: "job_sla_sta_04",
+    ticket_id: "tkt_410",
+    ticket_numero: "KC-410",
+    tenant_id_real: "org_globex",
+    razon_social_real: "Globex Industrial S.A.",
+    razon_social_mask: "G••••• S.A.",
+    plan: "starter",
+    etapa_actual: "deploy",
+    objetivo_h: 72,
+    transcurrido_h: 40.0,
+    pausa_total_h: 0.0,
+    bruto_h: 40.0,
+    resultado: "dentro",
+    ciclo: "2026-11",
+    tramos: [
+      {
+        inicio: "2026-11-04T09:00:00Z",
+        fin: "2026-11-06T01:00:00Z",
+        duracion_h: 40.0,
+        horas: 40.0,
+        computa: true,
+        etapa: "deploy",
+        causa_pausa: null,
+      },
+    ],
+    reglas_aplicadas: ["Ejecución continua sin pausas ni incumplimientos."],
+  },
+];
+
+function calcularP95(valores: number[]): number | null {
+  if (valores.length === 0) return null;
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const idx = Math.min(ordenados.length - 1, Math.ceil(ordenados.length * 0.95) - 1);
+  return Number(ordenados[idx].toFixed(2));
+}
+
+function responderSla(request: Request): Response {
+  const errAuth = verificarAutenticacion(request);
+  if (errAuth) return errAuth;
+
+  const errFrescura = verificarFrescuraAgregados(request);
+  if (errFrescura) return errFrescura;
+
+  const rol = obtenerRol(request);
+  if (rol === "staff_soporte") {
+    return HttpResponse.json(
+      {
+        error: {
+          codigo: "ROL_STAFF_INSUFICIENTE",
+          code: "rol_staff_insuficiente",
+          mensaje: "El rol staff_soporte no tiene permisos para consultar cumplimiento SLA global.",
+        },
+      },
+      { status: 403 }
+    );
+  }
+
+  const traceId = request.headers.get("x-trace-id") || "trc_ops_sla_001";
+  const url = new URL(request.url);
+  const ciclo = url.searchParams.get("ciclo") || "2026-11";
+  const planParam = url.searchParams.get("plan");
+  const soloRiesgo =
+    url.searchParams.get("solo_incumplidos") === "true" ||
+    url.searchParams.get("solo_riesgo") === "true";
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+  const pageSize = Math.max(1, parseInt(url.searchParams.get("page_size") || "10", 10));
+  const escenario = request.headers.get("x-mock-scenario") || "";
+
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(ciclo)) {
+    return HttpResponse.json(
+      {
+        error: {
+          codigo: "VALIDACION_ENTRADA",
+          code: "validacion_entrada",
+          mensaje: "El ciclo debe tener el formato AAAA-MM.",
+        },
+      },
+      { status: 422, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  const frescuraIso =
+    estadoGlobal.frescuraCustom || new Date(Date.now() - 15 * 60 * 1000).toISOString();
+
+  // Escenario vacío explícito
+  let casosBase =
+    escenario === "vacio" || ciclo === "2026-01"
+      ? []
+      : escenario === "muestra-minima" || ciclo === "2026-02"
+      ? CASOS_SLA_MOCK.slice(0, 3)
+      : [...CASOS_SLA_MOCK];
+
+  if (planParam && ["starter", "growth", "enterprise"].includes(planParam)) {
+    casosBase = casosBase.filter((c) => c.plan === planParam);
+  }
+
+  const casosEvaluadosList = casosBase.filter(
+    (c) => c.resultado === "dentro" || c.resultado === "incumplido"
+  );
+  const casosDentro = casosEvaluadosList.filter((c) => c.resultado === "dentro").length;
+  const casosIncumplidos = casosEvaluadosList.filter((c) => c.resultado === "incumplido").length;
+  const casosEnRiesgoList = casosBase.filter((c) => c.resultado === "en_riesgo");
+  const casosEnCurso = casosBase.filter(
+    (c) => c.resultado === "en_curso" || c.resultado === "en_riesgo"
+  ).length;
+
+  const cumplimientoGlobal =
+    casosEvaluadosList.length >= 5
+      ? Number(((casosDentro / casosEvaluadosList.length) * 100).toFixed(1))
+      : null;
+
+  const tiempoMedioGlobal =
+    casosEvaluadosList.length > 0
+      ? Number(
+          (
+            casosEvaluadosList.reduce((acc, c) => acc + c.transcurrido_h, 0) /
+            casosEvaluadosList.length
+          ).toFixed(2)
+        )
+      : null;
+
+  const p95Global = calcularP95(casosEvaluadosList.map((c) => c.transcurrido_h));
+
+  const porPlan: Record<string, unknown> = {};
+  (["starter", "growth", "enterprise"] as const).forEach((planKey) => {
+    const delPlan = casosBase.filter((c) => c.plan === planKey);
+    const evalPlan = delPlan.filter(
+      (c) => c.resultado === "dentro" || c.resultado === "incumplido"
+    );
+    const dentroPlan = evalPlan.filter((c) => c.resultado === "dentro").length;
+    porPlan[planKey] = {
+      plan: planKey,
+      objetivo_h: OBJETIVOS_PLAN_SLA[planKey],
+      casos: delPlan.length,
+      casos_evaluados: evalPlan.length,
+      cumplimiento_pct:
+        evalPlan.length >= 5 ? Number(((dentroPlan / evalPlan.length) * 100).toFixed(1)) : null,
+      tiempo_medio_h:
+        evalPlan.length > 0
+          ? Number(
+              (evalPlan.reduce((a, c) => a + c.transcurrido_h, 0) / evalPlan.length).toFixed(2)
+            )
+          : null,
+      p95_h: calcularP95(evalPlan.map((c) => c.transcurrido_h)),
+      sin_definicion: false,
+    };
+  });
+
+  const casosEnmascarados = casosBase.map((c) => {
+    const tieneGrant = tieneConcesion(request, url, c.tenant_id_real);
+    return {
+      job_id: c.job_id,
+      ticket_id: c.ticket_id,
+      ticket_numero: c.ticket_numero,
+      tenant_id: tieneGrant ? c.tenant_id_real : "org_••••",
+      razon_social: tieneGrant ? c.razon_social_real : c.razon_social_mask,
+      plan: c.plan,
+      etapa_actual: c.etapa_actual,
+      objetivo_h: c.objetivo_h,
+      transcurrido_h: c.transcurrido_h,
+      bruto_h: c.bruto_h,
+      pausa_total_h: c.pausa_total_h,
+      porcentaje_objetivo: Number(((c.transcurrido_h / c.objetivo_h) * 100).toFixed(2)),
+      resultado: c.resultado,
+      enmascarado: !tieneGrant,
+    };
+  });
+
+  const filtradosTabla = soloRiesgo
+    ? casosEnmascarados.filter((c) => c.resultado === "en_riesgo" || c.resultado === "incumplido")
+    : casosEnmascarados;
+
+  const total = filtradosTabla.length;
+  const offset = (page - 1) * pageSize;
+  const paginados = filtradosTabla.slice(offset, offset + pageSize);
+
+  return HttpResponse.json(
+    {
+      ciclo,
+      frescura: frescuraIso,
+      sin_definicion: [],
+      resumen: {
+        casos_totales: casosBase.length,
+        casos_evaluados: casosEvaluadosList.length,
+        casos_dentro: casosDentro,
+        casos_incumplidos: casosIncumplidos,
+        casos_en_riesgo: casosEnRiesgoList.length,
+        casos_en_curso: casosEnCurso,
+        casos_sin_objetivo: 0,
+        cumplimiento_pct: cumplimientoGlobal,
+        tiempo_medio_h: tiempoMedioGlobal,
+        p95_h: p95Global,
+        evaluados: casosEvaluadosList.length,
+        incumplidos: casosIncumplidos,
+        en_riesgo: casosEnRiesgoList.length,
+        sin_objetivo: 0,
+      },
+      por_plan: porPlan,
+      casos_en_riesgo: casosEnmascarados.filter((c) => c.resultado === "en_riesgo"),
+      casos: paginados,
+      items: paginados.map((c) => ({
+        tenant_id: c.tenant_id,
+        razon_social: c.razon_social,
+        plan: c.plan,
+        objetivo_h: c.objetivo_h,
+        casos: 1,
+        evaluados: c.resultado === "dentro" || c.resultado === "incumplido" ? 1 : 0,
+        incumplidos: c.resultado === "incumplido" ? 1 : 0,
+        en_riesgo: c.resultado === "en_riesgo" ? 1 : 0,
+        cumplimiento_pct: null,
+        tiempo_medio_h: c.transcurrido_h,
+        p95_h: c.transcurrido_h,
+      })),
+      total,
+      page,
+      page_size: pageSize,
+      pages: Math.ceil(total / pageSize) || 0,
+    },
+    { status: 200, headers: { "x-trace-id": traceId } }
+  );
+}
+
+function responderSlaCasoDetalle(request: Request, jobId: string): Response {
+  const errAuth = verificarAutenticacion(request);
+  if (errAuth) return errAuth;
+
+  const errFrescura = verificarFrescuraAgregados(request);
+  if (errFrescura) return errFrescura;
+
+  const rol = obtenerRol(request);
+  if (rol === "staff_soporte") {
+    return HttpResponse.json(
+      {
+        error: {
+          codigo: "ROL_STAFF_INSUFICIENTE",
+          code: "rol_staff_insuficiente",
+          mensaje: "El rol staff_soporte no tiene permisos para inspeccionar el reloj SLA.",
+        },
+      },
+      { status: 403 }
+    );
+  }
+
+  const traceId = request.headers.get("x-trace-id") || "trc_ops_sla_case_001";
+  const url = new URL(request.url);
+  const caso = CASOS_SLA_MOCK.find((c) => c.job_id === jobId);
+
+  if (!caso) {
+    return HttpResponse.json(
+      {
+        error: {
+          codigo: "JOB_NO_ENCONTRADO",
+          code: "job_no_encontrado",
+          mensaje: `No se encontró registro de reloj SLA para el trabajo '${jobId}'.`,
+          trace_id: traceId,
+        },
+      },
+      { status: 404, headers: { "x-trace-id": traceId } }
+    );
+  }
+
+  const tieneGrant = tieneConcesion(request, url, caso.tenant_id_real);
+
+  return HttpResponse.json(
+    {
+      job_id: caso.job_id,
+      ticket_id: caso.ticket_id,
+      ticket_numero: tieneGrant ? caso.ticket_numero : "KC-••••",
+      razon_social: tieneGrant ? caso.razon_social_real : caso.razon_social_mask,
+      tenant_id: tieneGrant ? caso.tenant_id_real : "org_••••",
+      plan: caso.plan,
+      etapa_actual: caso.etapa_actual,
+      objetivo_h: caso.objetivo_h,
+      bruto_h: caso.bruto_h,
+      transcurrido_h: caso.transcurrido_h,
+      pausa_total_h: caso.pausa_total_h,
+      resultado: caso.resultado,
+      tramos: caso.tramos,
+      reglas_aplicadas: caso.reglas_aplicadas,
+      iniciado_en: caso.tramos[0]?.inicio ?? null,
+      terminado_en: caso.tramos[caso.tramos.length - 1]?.fin ?? null,
+      calculado_en: new Date().toISOString(),
+      enmascarado: tieneGrant ? [] : ["tenant_id", "razon_social", "ticket_numero"],
     },
     { status: 200, headers: { "x-trace-id": traceId } }
   );
