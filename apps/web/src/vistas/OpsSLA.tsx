@@ -323,6 +323,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
   const {
     data,
     isLoading,
+    isFetching,
     error,
     refetch,
   } = useQuery<OpsSLADatos>({
@@ -341,11 +342,14 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
 
   const liveRefresh = useLiveRefresh({
     intervaloMs: 30_000,
+    ejecutarAlInicio: false,
     alRefrescar: async () => {
       if (!rolNoAutorizado) {
         await refetch();
       }
     },
+    estaConsultando: isFetching,
+    refrescarAlVolverVisible: true,
     pausarEnSegundoPlano: true,
     pausarEnPerdidaFoco: true,
   });

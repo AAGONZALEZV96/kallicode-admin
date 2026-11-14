@@ -470,7 +470,11 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
     staleTime: 10_000,
   });
 
-  const { data: healthData, refetch: refetchHealth } = useQuery<RespuestaHealth>({
+  const {
+    data: healthData,
+    isFetching: isFetchingHealth,
+    refetch: refetchHealth,
+  } = useQuery<RespuestaHealth>({
     queryKey: ["ops-health"],
     queryFn: () => peticionApi<RespuestaHealth>("/admin/v1/health"),
     enabled: habilitadoQuery && !obtenerDatos,
@@ -490,6 +494,9 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
     intervaloMs: 15_000,
     ejecutarAlInicio: false,
     alRefrescar: refrescarTodo,
+    estaConsultando: isFetchingModels || isFetchingHealth,
+    refrescarAlVolverVisible: true,
+    peticionesPorCiclo: !obtenerDatos ? 2 : 1,
     pausarEnSegundoPlano: true,
     pausarEnPerdidaFoco: true,
   });
