@@ -33,6 +33,7 @@ from kallicode_core.logging import bind_contexto, configurar_logging, log
 from sqlalchemy import text
 
 from admin_workers.lider import LOCK_IDS, ejecutar_con_lider
+from admin_workers.sla import evaluar_sla, obtener_intervalo_sla_s
 
 _parar = asyncio.Event()
 
@@ -244,11 +245,17 @@ async def caducar_concesiones(db: Any) -> None:
         log.info("admin.grants.caducadas", n=len(vencidas))
 
 
+async def _evaluar_sla_programado(db: Any) -> dict[str, int]:
+    """Ejecuta la evaluación SLA propagando el evento global de parada."""
+    return await evaluar_sla(db, stop_event=_parar)
+
+
 # ------------------------------------------------------------------ runner
 _TRABAJOS: dict[str, tuple[Any, int]] = {
     "refrescar_agregados": (refrescar_agregados, 900),
     "generar_informes": (generar_informes, 30),
     "caducar_concesiones": (caducar_concesiones, 300),
+    "evaluar_sla": (_evaluar_sla_programado, 300),
 }
 
 
@@ -274,10 +281,13 @@ async def main() -> None:
         bucle.add_signal_handler(sig, _parar.set)
 
     intervalo_refresco = s.refresh_interval_s
+    intervalo_sla = obtener_intervalo_sla_s()
+    intervalos_override = {
+        "refrescar_agregados": intervalo_refresco,
+        "evaluar_sla": intervalo_sla,
+    }
     tareas = [
-        asyncio.create_task(
-            _bucle(n, c, intervalo_refresco if n == "refrescar_agregados" else i)
-        )
+        asyncio.create_task(_bucle(n, c, intervalos_override.get(n, i)))
         for n, (c, i) in _TRABAJOS.items()
     ]
     await _parar.wait()
