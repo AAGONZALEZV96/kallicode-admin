@@ -17,11 +17,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 LOCK_ID_AGREGADOS: int = 918_401
 LOCK_ID_INFORMES: int = 918_402
 LOCK_ID_CONCESIONES: int = 918_403
+LOCK_ID_SLA: int = 918_404
 
 LOCK_IDS: dict[str, int] = {
     "refrescar_agregados": LOCK_ID_AGREGADOS,
     "generar_informes": LOCK_ID_INFORMES,
     "caducar_concesiones": LOCK_ID_CONCESIONES,
+    "evaluar_sla": LOCK_ID_SLA,
 }
 
 
@@ -78,6 +80,7 @@ __all__ = [
     "LOCK_ID_AGREGADOS",
     "LOCK_ID_CONCESIONES",
     "LOCK_ID_INFORMES",
+    "LOCK_ID_SLA",
     "ejecutar_con_lider",
     "intentar_liderazgo_xact",
 ]
