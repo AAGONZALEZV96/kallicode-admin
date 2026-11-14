@@ -11,6 +11,13 @@ export interface ControlesLiveRefreshProps {
   className?: string;
 }
 
+const OPCIONES_FRECUENCIA = [
+  { valor: 15_000, etiqueta: "Cada 15 segundos (Recomendado)" },
+  { valor: 30_000, etiqueta: "Cada 30 segundos" },
+  { valor: 60_000, etiqueta: "Cada 60 segundos" },
+  { valor: 0, etiqueta: "Pausado / Manual" },
+];
+
 export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
   hook,
   mostrarSelector = true,
@@ -25,11 +32,13 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
     refrescando,
     ultimaActualizacion,
     segundosDesdeUltimaActualizacion,
+    tiempoRestanteSegundos,
     refrescarAhora,
-    enPausaPorVisibilidad,
+    pausadoPorVisibilidad,
   } = hook;
 
-  // Formatear texto de frescura
+  const enVivo = activo && !pausadoPorVisibilidad && intervaloMs > 0;
+
   const textoFrescura = (() => {
     if (!ultimaActualizacion) {
       return "Pendiente de actualización";
@@ -37,17 +46,21 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
     if (segundosDesdeUltimaActualizacion < 3) {
       return "Actualizado ahora";
     }
-    return `Última actualización: hace ${segundosDesdeUltimaActualizacion}s`;
+    return `Última: hace ${segundosDesdeUltimaActualizacion}s`;
   })();
 
-  // Opciones de selector de frecuencia
-  const opcionesFrecuencia = [
-    { valor: 10_000, etiqueta: "Cada 10 segundos" },
-    { valor: 15_000, etiqueta: "Cada 15 segundos (Recomendado)" },
-    { valor: 30_000, etiqueta: "Cada 30 segundos" },
-    { valor: 60_000, etiqueta: "Cada 60 segundos" },
-    { valor: 0, etiqueta: "Desactivado (Manual)" },
-  ];
+  const textoEstado = (() => {
+    if (refrescando) {
+      return "Actualizando...";
+    }
+    if (pausadoPorVisibilidad) {
+      return "En pausa por pestaña oculta";
+    }
+    if (enVivo && tiempoRestanteSegundos > 0) {
+      return `Próximo en ${tiempoRestanteSegundos}s · ${textoFrescura}`;
+    }
+    return textoFrescura;
+  })();
 
   return (
     <div
@@ -67,11 +80,11 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
     >
       {/* Indicador visual de actividad */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        {activo && !enPausaPorVisibilidad && intervaloMs > 0 ? (
+        {enVivo ? (
           <Badge variante="good" punto data-testid="live-badge-activo">
             <span style={{ fontWeight: 600 }}>EN VIVO</span>
           </Badge>
-        ) : enPausaPorVisibilidad ? (
+        ) : pausadoPorVisibilidad ? (
           <Badge variante="warn" punto data-testid="live-badge-segundo-plano">
             <span style={{ fontWeight: 600 }}>PAUSADO (Pestaña oculta)</span>
           </Badge>
@@ -85,22 +98,41 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
       {/* Botón Play / Pausa */}
       <Boton
         tamano="sm"
-        variante={activo ? "secondary" : "primary"}
+        variante={enVivo ? "secondary" : "primary"}
         onClick={alternarActivo}
-        aria-label={activo ? "Pausar refresco automático" : "Reanudar refresco automático"}
+        aria-label={enVivo ? "Pausar refresco automático" : "Reanudar refresco automático"}
         data-testid="live-btn-toggle"
       >
-        {activo ? "⏸ Pausar" : "▶ Reanudar"}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          {enVivo ? (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+              <rect x="2" y="2" width="3" height="8" rx="0.5" />
+              <rect x="7" y="2" width="3" height="8" rx="0.5" />
+            </svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+              <polygon points="3,2 10,6 3,10" />
+            </svg>
+          )}
+          <span>{enVivo ? "Pausar" : "Reanudar"}</span>
+        </span>
       </Boton>
 
       {/* Selector de frecuencia */}
       {mostrarSelector && (
-        <div style={{ display: "flex", alignItems: "center", minWidth: "180px" }}>
+        <div style={{ display: "flex", alignItems: "center", minWidth: "200px" }}>
           <Select
-            tamano-sm="true"
-            value={intervaloMs}
-            onChange={(e) => setIntervaloMs(Number(e.target.value))}
-            opciones={opcionesFrecuencia}
+            value={activo ? intervaloMs : 0}
+            onChange={(e) => {
+              const nuevoMs = Number(e.target.value);
+              if (nuevoMs === 0) {
+                setIntervaloMs(0);
+              } else {
+                hook.setPausado(false);
+                setIntervaloMs(nuevoMs);
+              }
+            }}
+            opciones={OPCIONES_FRECUENCIA}
             aria-label="Frecuencia de auto-refresco"
             data-testid="live-select-intervalo"
             style={{ padding: "4px 8px", fontSize: "12px" }}
@@ -118,11 +150,27 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
           aria-label="Refrescar datos manualmente ahora"
           data-testid="live-btn-manual"
         >
-          ↻ Refrescar ahora
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M13.5 8a5.5 5.5 0 1 1-1.35-3.6" />
+              <polyline points="13.5 2.5 13.5 5.5 10.5 5.5" />
+            </svg>
+            <span>Refrescar ahora</span>
+          </span>
         </Boton>
       )}
 
-      {/* Indicador de frescura */}
+      {/* Indicador de próximo refresco, carga y frescura */}
       <span
         style={{
           marginLeft: "auto",
@@ -130,9 +178,11 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
           color: "var(--muted)",
           fontVariantNumeric: "tabular-nums",
         }}
+        role="status"
+        aria-live="polite"
         data-testid="live-indicador-frescura"
       >
-        {textoFrescura}
+        {textoEstado}
       </span>
     </div>
   );

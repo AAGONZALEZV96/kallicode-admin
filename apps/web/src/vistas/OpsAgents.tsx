@@ -424,6 +424,9 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
     intervaloMs: 15_000,
     ejecutarAlInicio: false,
     alRefrescar: refrescarTodo,
+    estaConsultando: isFetchingAgentes || isFetchingColas,
+    refrescarAlVolverVisible: true,
+    peticionesPorCiclo: 2,
     pausarEnSegundoPlano: true,
     pausarEnPerdidaFoco: true,
   });

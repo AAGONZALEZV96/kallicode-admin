@@ -355,4 +355,153 @@ describe("useLiveRefresh", () => {
     // Debe haberse bloqueado a 5 llamadas por el presupuesto configurado
     expect(alRefrescar).toHaveBeenCalledTimes(5);
   });
+
+  it("11. omite ticks mientras TanStack Query reporta estaConsultando (isFetching=true)", async () => {
+    const alRefrescar = vi.fn().mockResolvedValue(undefined);
+
+    const { rerender } = renderHook(
+      ({ estaConsultando }: { estaConsultando: boolean }) =>
+        useLiveRefresh({
+          intervaloMs: 15_000,
+          activo: true,
+          alRefrescar,
+          estaConsultando,
+        }),
+      { initialProps: { estaConsultando: true } }
+    );
+
+    // Primer tick ocurre con isFetching=true -> debe saltarse sin invocar alRefrescar
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+    });
+    expect(alRefrescar).not.toHaveBeenCalled();
+
+    // Finaliza fetch externo de React Query -> siguiente tick debe ejecutarse
+    rerender({ estaConsultando: false });
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+    });
+    expect(alRefrescar).toHaveBeenCalledTimes(1);
+  });
+
+  it("12. expone intervaloSegundos, tiempoRestanteSegundos, setPausado y setIntervaloSegundos", async () => {
+    const alRefrescar = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useLiveRefresh({
+        intervaloMs: 15_000,
+        activo: true,
+        alRefrescar,
+      })
+    );
+
+    expect(result.current.intervaloSegundos).toBe(15);
+    expect(result.current.tiempoRestanteSegundos).toBe(15);
+    expect(result.current.porcentajeRestante).toBe(100);
+    expect(result.current.pausadoPorVisibilidad).toBe(false);
+
+    // Avanzar 5s -> quedan 10s
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+    expect(result.current.tiempoRestanteSegundos).toBe(10);
+
+    // Cambiar a 30s con setIntervaloSegundos
+    act(() => {
+      result.current.setIntervaloSegundos(30);
+    });
+    expect(result.current.intervaloMs).toBe(30_000);
+    expect(result.current.intervaloSegundos).toBe(30);
+    expect(result.current.tiempoRestanteSegundos).toBe(30);
+
+    // Pausar con setPausado(true) y verificar tiempoRestante=0
+    act(() => {
+      result.current.setPausado(true);
+    });
+    expect(result.current.activo).toBe(false);
+    expect(result.current.tiempoRestanteSegundos).toBe(0);
+  });
+
+  it("13. con refrescarAlVolverVisible=true refresca inmediatamente al volver a document.hidden=false", async () => {
+    const alRefrescar = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useLiveRefresh({
+        intervaloMs: 15_000,
+        activo: true,
+        alRefrescar,
+        pausarEnSegundoPlano: true,
+        refrescarAlVolverVisible: true,
+      })
+    );
+
+    act(() => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(result.current.pausadoPorVisibilidad).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(alRefrescar).not.toHaveBeenCalled();
+
+    // Volver a pestaña visible dispara recarga inmediata de recuperación
+    await act(async () => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(result.current.pausadoPorVisibilidad).toBe(false);
+    expect(alRefrescar).toHaveBeenCalledTimes(1);
+  });
+
+  it("14. reanudar desde cadencia manual (0) restaura 15s por defecto", async () => {
+    const alRefrescar = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useLiveRefresh({
+        intervaloMs: 15_000,
+        activo: true,
+        alRefrescar,
+      })
+    );
+
+    act(() => {
+      result.current.setIntervaloMs(0);
+    });
+    expect(result.current.activo).toBe(false);
+
+    act(() => {
+      result.current.alternarActivo();
+    });
+    expect(result.current.activo).toBe(true);
+    expect(result.current.intervaloMs).toBe(15_000);
+  });
+
+  it("15. limpia temporizadores y event listeners al desmontar sin fugas de memoria", async () => {
+    const docRemoveSpy = vi.spyOn(document, "removeEventListener");
+    const winRemoveSpy = vi.spyOn(window, "removeEventListener");
+    const alRefrescar = vi.fn().mockResolvedValue(undefined);
+
+    const { unmount } = renderHook(() =>
+      useLiveRefresh({
+        intervaloMs: 15_000,
+        activo: true,
+        alRefrescar,
+      })
+    );
+
+    unmount();
+
+    expect(docRemoveSpy).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+    expect(winRemoveSpy).toHaveBeenCalledWith("focus", expect.any(Function));
+    expect(winRemoveSpy).toHaveBeenCalledWith("blur", expect.any(Function));
+
+    // Avanzar el reloj tras desmontaje: no debe existir ningún callback colgante
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(alRefrescar).not.toHaveBeenCalled();
+  });
 });
