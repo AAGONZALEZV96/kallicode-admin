@@ -146,9 +146,12 @@ async def _generar_uno(r: dict[str, Any], db: Any) -> None:
 
     bind_contexto(report_id=r["id"])
     try:
-        params = r["params"] or {}
-        if isinstance(params, str):
-            params = json.loads(params)
+        params = dict(r["params"] or {})
+        if isinstance(r["params"], str):
+            params = json.loads(r["params"])
+        params.setdefault("report_id", r["id"])
+        if r.get("requested_by"):
+            params.setdefault("solicitante_id", r["requested_by"])
 
         formato = (r.get("format") or "csv").lower()
         datos, content_type, num_filas = await generar_contenido_informe(

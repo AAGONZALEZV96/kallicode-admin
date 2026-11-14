@@ -527,6 +527,53 @@ async def generar_contenido_informe(
     if formato_norm not in ("csv", "xlsx", "pdf"):
         raise ValueError(f"Formato no soportado: {formato}")
 
+    if kind == "sla":
+        from .sla_exporter import (
+            compilar_reporte_sla,
+            render_sla_csv,
+            reporte_sla_a_tabla,
+        )
+
+        hoy = date.today()
+        d_param = params.get("desde") or hoy.replace(day=1).isoformat()
+        h_param = params.get("hasta") or hoy.isoformat()
+        reporte_sla = await compilar_reporte_sla(
+            desde=str(d_param),
+            hasta=str(h_param),
+            tenant_id=params.get("tenant_id"),
+            incluir_identificables=includes_pii,
+            solicitante_id=params.get("solicitante_id"),
+            solicitante_rol=params.get("solicitante_rol"),
+            report_id=params.get("report_id"),
+            emitido_en=params.get("emitido_en"),
+            concesion_validada=True,
+        )
+        titulo = "Cumplimiento de SLA por Cliente y Periodo"
+        if formato_norm == "csv":
+            datos = render_sla_csv(reporte_sla)
+            content_type = "text/csv; charset=utf-8"
+        else:
+            columnas, filas = reporte_sla_a_tabla(reporte_sla)
+            if formato_norm == "xlsx":
+                datos = exportar_xlsx(columnas, filas, titulo=titulo)
+                content_type = (
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            else:
+                datos = exportar_pdf(columnas, filas, titulo=titulo)
+                content_type = "application/pdf"
+        num_filas_reales = len(reporte_sla["desglose_clientes"]) + len(
+            reporte_sla["casos_incidentes"]
+        )
+        log.info(
+            "admin.reports.generado",
+            tipo=kind,
+            formato=formato_norm,
+            filas=num_filas_reales,
+            bytes=len(datos),
+        )
+        return datos, content_type, num_filas_reales
+
     if kind == "clientes":
         columnas, filas = await compilar_informe_clientes(params, includes_pii)
         titulo = "Resumen de Clientes"
