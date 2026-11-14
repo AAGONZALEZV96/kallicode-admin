@@ -20,6 +20,7 @@ Tres reglas que atraviesan el bloque:
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from typing import Annotated, Any
 
@@ -36,11 +37,12 @@ from ..consultas.business import (
     consultar_resumen_negocio,
 )
 from ..db import admin_session, read_session, todos, uno
-from ..deps import CLIENTES, NEGOCIO, Staff, exigir, exigir_concesion, limite_rl4
-from ..errors import acceso_no_justificado, agregado_no_disponible
+from ..deps import CLIENTES, NEGOCIO, OPS_NEGOCIO, Staff, exigir, exigir_concesion, limite_rl4
+from ..errors import acceso_no_justificado, agregado_no_disponible, rol_staff_insuficiente
 from ..masking import enmascarar, enmascarar_filas
 from ..pagination import Pagina, paginacion, sobre
 from ..settings import get_admin_settings
+from ..sla_exporter import validar_rango_sla
 
 router = APIRouter(prefix="/admin/v1/business", tags=["Consola de negocio"])
 
@@ -947,7 +949,7 @@ async def usage_tokens(
 )
 async def crear_informe(
     cuerpo: ReporteIn,
-    st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
+    st: Annotated[Staff, Depends(exigir(*OPS_NEGOCIO))],
 ) -> ReporteOut:
     """Encola un informe exportable.
 
@@ -956,19 +958,28 @@ async def crear_informe(
     fichero recortado. Ningún informe puede exportar más de lo que el empleado ve
     en pantalla.
     """
+    if cuerpo.tipo != "sla" and st.role == "staff_operaciones":
+        raise rol_staff_insuficiente(
+            "Tu rol solo permite generar informes exportables de cumplimiento SLA."
+        )
+
     s = get_admin_settings()
     if cuerpo.tipo not in ("consumo", "suscripciones", "clientes", "sla"):
         raise validacion("Tipo de informe desconocido.", {"tipo": cuerpo.tipo})
     if cuerpo.formato not in ("csv", "xlsx", "pdf"):
         raise validacion("Formato no admitido.", {"formato": cuerpo.formato})
-    if cuerpo.desde > cuerpo.hasta:
-        raise validacion("El rango de fechas no es válido.")
+    if cuerpo.tipo == "sla":
+        validar_rango_sla(cuerpo.desde, cuerpo.hasta, max_meses=s.report_max_months)
+    else:
+        if cuerpo.desde > cuerpo.hasta:
+            raise validacion("El rango de fechas no es válido.")
+        meses_chk = (cuerpo.hasta - cuerpo.desde).days / 30.0
+        if meses_chk > s.report_max_months:
+            raise validacion(
+                f"El rango no puede superar {s.report_max_months} meses.",
+                {"meses": round(meses_chk, 1)},
+            )
     meses = (cuerpo.hasta - cuerpo.desde).days / 30.0
-    if meses > s.report_max_months:
-        raise validacion(
-            f"El rango no puede superar {s.report_max_months} meses.",
-            {"meses": round(meses, 1)},
-        )
 
     if cuerpo.incluir_identificables:
         if cuerpo.tenant_id:
@@ -977,6 +988,11 @@ async def crear_informe(
             raise acceso_no_justificado(alcance="datos_negocio")
 
     report_id = nuevo("rp")
+    params_serializados = cuerpo.model_dump(mode="json")
+    params_serializados["report_id"] = report_id
+    params_serializados["solicitante_id"] = st.id
+    params_serializados["solicitante_rol"] = st.role
+
     async with admin_session() as db:
         await uno(
             db,
@@ -992,7 +1008,7 @@ async def crear_informe(
                 "id": report_id,
                 "k": cuerpo.tipo,
                 "f": cuerpo.formato,
-                "p": cuerpo.model_dump_json(),
+                "p": json.dumps(params_serializados, sort_keys=True),
                 "by": st.id,
                 "pii": cuerpo.incluir_identificables,
                 "ret": s.report_retention_days,
@@ -1002,7 +1018,8 @@ async def crear_informe(
             db,
             staff_id=st.id,
             staff_role=st.role,
-            action="report",
+            action="informe" if cuerpo.tipo == "sla" else "report",
+            resource=cuerpo.tipo,
             endpoint="POST /admin/v1/business/reports",
             tenant_id=cuerpo.tenant_id,
             ip=st.ip,
@@ -1011,6 +1028,7 @@ async def crear_informe(
             payload={
                 "report_id": report_id,
                 "tipo": cuerpo.tipo,
+                "formato": cuerpo.formato,
                 "rango": [str(cuerpo.desde), str(cuerpo.hasta)],
                 "identificables": cuerpo.incluir_identificables,
             },
