@@ -946,55 +946,6 @@ export const handlers = [
     const offset = (page - 1) * pageSize;
     const paginados = filtrados.slice(offset, offset + pageSize);
 
-    if (planParam && planParam !== "todos") {
-      filtrados = filtrados.filter((s) => s.plan === planParam);
-    }
-    if (estadoParam && estadoParam !== "todos") {
-      filtrados = filtrados.filter((s) => s.estado === estadoParam);
-    }
-    if (renuevaParam && renuevaParam !== "todos") {
-      const diasMax = parseInt(renuevaParam, 10);
-      if (!isNaN(diasMax)) {
-        filtrados = filtrados.filter((s) => s.dias_para_renovacion <= diasMax && s.dias_para_renovacion >= 0);
-      }
-    }
-    if (qParam) {
-      filtrados = filtrados.filter(
-        (s) =>
-          s.tenant_id.toLowerCase().includes(qParam) ||
-          s.razon_social.toLowerCase().includes(qParam)
-      );
-    }
-
-    if (orderByParam) {
-      const descendente = orderByParam.endsWith("-desc");
-      const campo = orderByParam.replace(/-(asc|desc)$/, "");
-      filtrados.sort((a, b) => {
-        let valA: string | number = "";
-        let valB: string | number = "";
-        if (campo === "renovacion" || campo === "renueva_el") {
-          valA = a.dias_para_renovacion;
-          valB = b.dias_para_renovacion;
-        } else if (campo === "importe" || campo === "importe_mes") {
-          valA = a.importe_mes;
-          valB = b.importe_mes;
-        } else if (campo === "nombre" || campo === "razon_social") {
-          valA = a.razon_social;
-          valB = b.razon_social;
-        } else if (campo === "tenant_id") {
-          valA = a.tenant_id;
-          valB = b.tenant_id;
-        }
-        if (valA < valB) return descendente ? 1 : -1;
-        if (valA > valB) return descendente ? -1 : 1;
-        return 0;
-      });
-    }
-
-    const total = filtrados.length;
-    const offset = (page - 1) * pageSize;
-    const paginados = filtrados.slice(offset, offset + pageSize);
-
     return HttpResponse.json({
       items: paginados,
       total,
