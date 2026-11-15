@@ -20,11 +20,12 @@ Tres reglas que atraviesan el bloque:
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, Query, status
-from kallicode_core.errors import no_encontrado, validacion
+from fastapi import APIRouter, Depends, Path, Query, Response, status
+from kallicode_core.errors import conflicto, no_encontrado, validacion
 from kallicode_core.ids import nuevo
 from kallicode_core.logging import log
 from pydantic import BaseModel, ConfigDict, Field
@@ -36,11 +37,12 @@ from ..consultas.business import (
     consultar_resumen_negocio,
 )
 from ..db import admin_session, read_session, todos, uno
-from ..deps import CLIENTES, NEGOCIO, Staff, exigir, exigir_concesion, limite_rl4
-from ..errors import acceso_no_justificado, agregado_no_disponible
+from ..deps import CLIENTES, NEGOCIO, OPS_NEGOCIO, Staff, exigir, exigir_concesion, limite_rl4
+from ..errors import acceso_no_justificado, agregado_no_disponible, rol_staff_insuficiente
 from ..masking import enmascarar, enmascarar_filas
 from ..pagination import Pagina, paginacion, sobre
 from ..settings import get_admin_settings
+from ..sla_exporter import validar_rango_sla
 
 router = APIRouter(prefix="/admin/v1/business", tags=["Consola de negocio"])
 
@@ -580,12 +582,62 @@ async def upgrade_requests(
 
 
 # ------------------------------------------------------------------ §18.21
+ALLOWLIST_USAGE_TOKENS: dict[str, str] = {
+    "tokens_in": "sum(u.tokens_in)",
+    "tokens_input": "sum(u.tokens_in)",
+    "tokens_out": "sum(u.tokens_out)",
+    "tokens_output": "sum(u.tokens_out)",
+    "tokens_total": "sum(u.tokens_in + u.tokens_out)",
+    "coste_eur": "sum(u.coste)",
+    "coste_estimado_eur": "sum(u.coste)",
+    "coste": "sum(u.coste)",
+    "loc_consumidas": "sum(u.loc_consumidas)",
+    "loc_procesadas": "sum(u.loc_consumidas)",
+    "cuota_pct": "avg(u.cuota_pct)",
+    "porcentaje_consumido": "avg(u.cuota_pct)",
+    "tenant_id": "u.tenant_id",
+}
+
+ALLOWLIST_USAGE_TOKENS_TIER: dict[str, str] = {
+    "tokens_in": "sum(d.tokens_in)",
+    "tokens_input": "sum(d.tokens_in)",
+    "tokens_out": "sum(d.tokens_out)",
+    "tokens_output": "sum(d.tokens_out)",
+    "tokens_total": "sum(d.tokens_in + d.tokens_out)",
+    "coste_eur": "sum(d.coste)",
+    "coste_estimado_eur": "sum(d.coste)",
+    "coste": "sum(d.coste)",
+    "tier": "d.tier",
+}
+
+ALLOWLIST_USAGE_TOKENS_DIA: dict[str, str] = {
+    "tokens_in": "sum(d.tokens_in)",
+    "tokens_input": "sum(d.tokens_in)",
+    "tokens_out": "sum(d.tokens_out)",
+    "tokens_output": "sum(d.tokens_out)",
+    "tokens_total": "sum(d.tokens_in + d.tokens_out)",
+    "coste_eur": "sum(d.coste)",
+    "coste_estimado_eur": "sum(d.coste)",
+    "coste": "sum(d.coste)",
+    "dia": "d.dia",
+}
+
+
 @router.get("/usage/tokens", summary="Consumo de tokens por cliente, tier y periodo")
 async def usage_tokens(
     st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
     p: Annotated[Pagina, Depends(paginacion)],
     ciclo: Annotated[str | None, Query(description="AAAA-MM; defecto, ciclo en curso.")] = None,
-    tenant_id: Annotated[str | None, Query()] = None,
+    periodo: Annotated[
+        str, Query(description="mes_actual | mes_anterior | trimestre | ano.")
+    ] = "mes_actual",
+    tier: Annotated[
+        str | None, Query(description="starter | growth | enterprise | todos.")
+    ] = None,
+    plan: Annotated[
+        str | None, Query(description="starter | growth | enterprise | todos.")
+    ] = None,
+    tenant_id: Annotated[str | None, Query(description="Filtrar por tenant_id.")] = None,
     agrupar_por: Annotated[str, Query(description="cliente | tier | dia.")] = "cliente",
 ) -> dict[str, Any]:
     """Consumo con su coste estimado y el cuadre contra la facturación.
@@ -596,112 +648,295 @@ async def usage_tokens(
     advertirlo de forma visible en lugar de mostrar la cifra como buena.
     """
     if agrupar_por not in ("cliente", "tier", "dia"):
-        raise validacion("Agrupación no válida.", {"agrupar_por": agrupar_por})
+        raise validacion(
+            "Agrupación no válida.",
+            {"agrupar_por": agrupar_por, "permitidos": ["cliente", "dia", "tier"]},
+        )
+
     if ciclo is not None and len(ciclo) != 7:
         raise validacion("El ciclo debe tener el formato AAAA-MM.", {"ciclo": ciclo})
+
+    rangos_periodo = ("mes_actual", "mes_anterior", "trimestre", "ano")
+    if periodo not in rangos_periodo:
+        raise validacion(
+            "Periodo no válido.", {"periodo": periodo, "permitidos": sorted(rangos_periodo)}
+        )
+
+    plan_candidato = plan or tier
+    filtro_plan: str | None = None
+    if plan_candidato is not None:
+        norm_plan = plan_candidato.strip().lower()
+        if norm_plan == "todos":
+            filtro_plan = None
+        elif norm_plan in ("starter", "growth", "enterprise"):
+            filtro_plan = norm_plan
+        else:
+            raise validacion(
+                "Tier o plan no válido.",
+                {
+                    "plan": plan_candidato,
+                    "permitidos": ["enterprise", "growth", "starter", "todos"],
+                },
+            )
+
+    # Cláusula temporal para agg_usage_cycle (u) y agg_tokens_daily (d)
+    if ciclo is not None:
+        cond_tiempo_u = "u.ciclo = :ciclo"
+        cond_tiempo_d = "to_char(d.dia, 'YYYY-MM') = :ciclo"
+    elif periodo == "mes_actual":
+        cond_tiempo_u = "u.ciclo = to_char(current_date, 'YYYY-MM')"
+        cond_tiempo_d = "to_char(d.dia, 'YYYY-MM') = to_char(current_date, 'YYYY-MM')"
+    elif periodo == "mes_anterior":
+        cond_tiempo_u = "u.ciclo = to_char(current_date - interval '1 month', 'YYYY-MM')"
+        cond_tiempo_d = (
+            "to_char(d.dia, 'YYYY-MM') = to_char(current_date - interval '1 month', 'YYYY-MM')"
+        )
+    elif periodo == "trimestre":
+        cond_tiempo_u = (
+            "to_date(u.ciclo || '-01', 'YYYY-MM-DD') >= "
+            "date_trunc('month', current_date - interval '2 months')::date "
+            "AND to_date(u.ciclo || '-01', 'YYYY-MM-DD') <= "
+            "date_trunc('month', current_date)::date"
+        )
+        cond_tiempo_d = (
+            "d.dia >= date_trunc('month', current_date - interval '2 months')::date "
+            "AND d.dia < (current_date + 1)"
+        )
+    else:  # ano
+        cond_tiempo_u = (
+            "to_date(u.ciclo || '-01', 'YYYY-MM-DD') >= "
+            "date_trunc('year', current_date)::date "
+            "AND to_date(u.ciclo || '-01', 'YYYY-MM-DD') <= "
+            "date_trunc('month', current_date)::date"
+        )
+        cond_tiempo_d = (
+            "d.dia >= date_trunc('year', current_date)::date " "AND d.dia < (current_date + 1)"
+        )
 
     params: dict[str, Any] = {
         "ciclo": ciclo,
         "t": tenant_id,
+        "plan": filtro_plan,
         "lim": p.page_size,
         "off": p.offset,
     }
-    consultas = {
-        "cliente": (
-            """
-            SELECT count(*) AS n FROM admin.agg_usage_cycle u
-            WHERE u.ciclo = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
-              AND (CAST(:t AS text) IS NULL OR u.tenant_id = :t)""",
-            """
-            SELECT u.tenant_id AS clave, u.tenant_id, u.tokens_in, u.tokens_out,
-                   jsonb_build_object('flash', u.tokens_flash, 'pro', u.tokens_pro,
-                                      'fable', u.tokens_fable) AS por_tier,
-                   u.coste, u.loc_consumidas, u.cuota_pct,
-                   (u.loc_consumidas = coalesce((
-                        SELECT c.loc_consumidas FROM core.usage_cycles c
-                         WHERE c.tenant_id = u.tenant_id AND c.ciclo = u.ciclo),
-                        u.loc_consumidas)) AS cuadra_con_facturacion
+
+    if agrupar_por == "cliente":
+        orden = p.clausula_order(ALLOWLIST_USAGE_TOKENS, "sum(u.coste) DESC")
+        where_u = (
+            f"WHERE {cond_tiempo_u} "
+            "AND (CAST(:t AS text) IS NULL OR u.tenant_id = :t) "
+            "AND (CAST(:plan AS text) IS NULL OR c.plan_codigo = :plan)"
+        )
+        sql_total = f"""
+            SELECT count(DISTINCT u.tenant_id) AS n
             FROM admin.agg_usage_cycle u
-            WHERE u.ciclo = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
-              AND (CAST(:t AS text) IS NULL OR u.tenant_id = :t)
-            ORDER BY u.coste DESC LIMIT :lim OFFSET :off""",
-        ),
-        "tier": (
-            """
-            SELECT count(DISTINCT d.tier) AS n FROM admin.agg_tokens_daily d
-            WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))""",
-            """
-            SELECT d.tier AS clave, NULL::text AS tenant_id,
-                   sum(d.tokens_in) AS tokens_in, sum(d.tokens_out) AS tokens_out,
-                   jsonb_build_object(d.tier,
-                        sum(d.tokens_in + d.tokens_out)) AS por_tier,
-                   sum(d.coste) AS coste, NULL::int AS loc_consumidas,
-                   NULL::numeric AS cuota_pct, true AS cuadra_con_facturacion
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = u.tenant_id
+            {where_u}
+        """
+        sql_items = f"""
+            SELECT u.tenant_id AS clave,
+                   u.tenant_id,
+                   coalesce(c.razon_social, u.tenant_id) AS razon_social,
+                   coalesce(c.plan_codigo, 'starter') AS plan,
+                   sum(u.tokens_in)::bigint AS tokens_in,
+                   sum(u.tokens_in)::bigint AS tokens_input,
+                   sum(u.tokens_out)::bigint AS tokens_out,
+                   sum(u.tokens_out)::bigint AS tokens_output,
+                   sum(u.tokens_in + u.tokens_out)::bigint AS tokens_total,
+                   jsonb_build_object(
+                       'flash', coalesce(sum(u.tokens_flash), 0)::bigint,
+                       'pro', coalesce(sum(u.tokens_pro), 0)::bigint,
+                       'fable', coalesce(sum(u.tokens_fable), 0)::bigint
+                   ) AS por_tier,
+                   round(sum(u.coste), 2)::float AS coste,
+                   round(sum(u.coste), 2)::float AS coste_estimado_eur,
+                   sum(u.loc_consumidas)::int AS loc_consumidas,
+                   sum(u.loc_consumidas)::int AS loc_procesadas,
+                   coalesce(max(u.umbral), 0)::int AS umbral,
+                   coalesce(max(u.umbral), 0)::int AS cuota_asignada,
+                   round(coalesce(avg(u.cuota_pct), 0), 2)::float AS cuota_pct,
+                   round(coalesce(avg(u.cuota_pct), 0), 2)::float AS porcentaje_consumido,
+                   bool_and(u.loc_consumidas = coalesce((
+                       SELECT uc.loc_consumidas FROM core.usage_cycles uc
+                        WHERE uc.tenant_id = u.tenant_id AND uc.ciclo = u.ciclo),
+                       u.loc_consumidas)) AS cuadra_con_facturacion
+            FROM admin.agg_usage_cycle u
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = u.tenant_id
+            {where_u}
+            GROUP BY u.tenant_id, c.razon_social, c.plan_codigo
+            ORDER BY {orden} LIMIT :lim OFFSET :off
+        """
+        sql_totales = f"""
+            SELECT coalesce(sum(u.tokens_in + u.tokens_out), 0)::bigint AS tokens,
+                   round(coalesce(sum(u.coste), 0), 2)::float AS coste,
+                   round(coalesce(avg(u.cuota_pct), 0), 2)::float AS media_cuota,
+                   coalesce(max(u.moneda), 'EUR') AS moneda
+            FROM admin.agg_usage_cycle u
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = u.tenant_id
+            {where_u}
+        """
+    elif agrupar_por == "tier":
+        orden = p.clausula_order(ALLOWLIST_USAGE_TOKENS_TIER, "sum(d.coste) DESC")
+        where_d = (
+            f"WHERE {cond_tiempo_d} "
+            "AND (CAST(:t AS text) IS NULL OR d.tenant_id = :t) "
+            "AND (CAST(:plan AS text) IS NULL OR c.plan_codigo = :plan)"
+        )
+        sql_total = f"""
+            SELECT count(DISTINCT d.tier) AS n
             FROM admin.agg_tokens_daily d
-            WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
-              AND (CAST(:t AS text) IS NULL OR d.tenant_id = :t)
-            GROUP BY d.tier ORDER BY sum(d.coste) DESC
-            LIMIT :lim OFFSET :off""",
-        ),
-        "dia": (
-            """
-            SELECT count(DISTINCT d.dia) AS n FROM admin.agg_tokens_daily d
-            WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))""",
-            """
-            SELECT d.dia::text AS clave, NULL::text AS tenant_id,
-                   sum(d.tokens_in) AS tokens_in, sum(d.tokens_out) AS tokens_out,
-                   jsonb_object_agg(d.tier, d.tokens_in + d.tokens_out) AS por_tier,
-                   sum(d.coste) AS coste, NULL::int AS loc_consumidas,
-                   NULL::numeric AS cuota_pct, true AS cuadra_con_facturacion
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = d.tenant_id
+            {where_d}
+        """
+        sql_items = f"""
+            SELECT d.tier AS clave,
+                   d.tier,
+                   NULL::text AS tenant_id,
+                   sum(d.tokens_in)::bigint AS tokens_in,
+                   sum(d.tokens_in)::bigint AS tokens_input,
+                   sum(d.tokens_out)::bigint AS tokens_out,
+                   sum(d.tokens_out)::bigint AS tokens_output,
+                   sum(d.tokens_in + d.tokens_out)::bigint AS tokens_total,
+                   jsonb_build_object(d.tier, sum(d.tokens_in + d.tokens_out)) AS por_tier,
+                   round(sum(d.coste), 2)::float AS coste,
+                   round(sum(d.coste), 2)::float AS coste_estimado_eur,
+                   NULL::int AS loc_consumidas,
+                   NULL::int AS loc_procesadas,
+                   NULL::numeric AS cuota_pct,
+                   NULL::numeric AS porcentaje_consumido,
+                   true AS cuadra_con_facturacion,
+                   false AS enmascarado
             FROM admin.agg_tokens_daily d
-            WHERE to_char(d.dia, 'YYYY-MM')
-                      = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
-              AND (CAST(:t AS text) IS NULL OR d.tenant_id = :t)
-            GROUP BY d.dia ORDER BY d.dia DESC LIMIT :lim OFFSET :off""",
-        ),
-    }
-    sql_total, sql = consultas[agrupar_por]
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = d.tenant_id
+            {where_d}
+            GROUP BY d.tier
+            ORDER BY {orden} LIMIT :lim OFFSET :off
+        """
+        sql_totales = f"""
+            SELECT coalesce(sum(d.tokens_in + d.tokens_out), 0)::bigint AS tokens,
+                   round(coalesce(sum(d.coste), 0), 2)::float AS coste,
+                   0.0::float AS media_cuota,
+                   'EUR'::text AS moneda
+            FROM admin.agg_tokens_daily d
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = d.tenant_id
+            {where_d}
+        """
+    else:  # dia
+        orden = p.clausula_order(ALLOWLIST_USAGE_TOKENS_DIA, "d.dia DESC")
+        where_d = (
+            f"WHERE {cond_tiempo_d} "
+            "AND (CAST(:t AS text) IS NULL OR d.tenant_id = :t) "
+            "AND (CAST(:plan AS text) IS NULL OR c.plan_codigo = :plan)"
+        )
+        sql_total = f"""
+            SELECT count(DISTINCT d.dia) AS n
+            FROM admin.agg_tokens_daily d
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = d.tenant_id
+            {where_d}
+        """
+        sql_items = f"""
+            SELECT d.dia::text AS clave,
+                   d.dia::text AS dia,
+                   NULL::text AS tenant_id,
+                   sum(d.tokens_in)::bigint AS tokens_in,
+                   sum(d.tokens_in)::bigint AS tokens_input,
+                   sum(d.tokens_out)::bigint AS tokens_out,
+                   sum(d.tokens_out)::bigint AS tokens_output,
+                   sum(d.tokens_in + d.tokens_out)::bigint AS tokens_total,
+                   jsonb_build_object(
+                       'flash',
+                       coalesce(
+                           sum(d.tokens_in + d.tokens_out) FILTER (WHERE d.tier = 'flash'), 0
+                       ),
+                       'pro',
+                       coalesce(
+                           sum(d.tokens_in + d.tokens_out) FILTER (WHERE d.tier = 'pro'), 0
+                       ),
+                       'fable',
+                       coalesce(
+                           sum(d.tokens_in + d.tokens_out) FILTER (WHERE d.tier = 'fable'), 0
+                       )
+                   ) AS por_tier,
+                   round(sum(d.coste), 2)::float AS coste,
+                   round(sum(d.coste), 2)::float AS coste_estimado_eur,
+                   NULL::int AS loc_consumidas,
+                   NULL::int AS loc_procesadas,
+                   NULL::numeric AS cuota_pct,
+                   NULL::numeric AS porcentaje_consumido,
+                   true AS cuadra_con_facturacion,
+                   false AS enmascarado
+            FROM admin.agg_tokens_daily d
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = d.tenant_id
+            {where_d}
+            GROUP BY d.dia
+            ORDER BY {orden} LIMIT :lim OFFSET :off
+        """
+        sql_totales = f"""
+            SELECT coalesce(sum(d.tokens_in + d.tokens_out), 0)::bigint AS tokens,
+                   round(coalesce(sum(d.coste), 0), 2)::float AS coste,
+                   0.0::float AS media_cuota,
+                   'EUR'::text AS moneda
+            FROM admin.agg_tokens_daily d
+            LEFT JOIN admin.agg_customer_state c ON c.tenant_id = d.tenant_id
+            {where_d}
+        """
 
     async with read_session() as db:
         frescura = await _frescura(db, "usage_cycle", "tokens_daily")
-        totales = await uno(
-            db,
-            """
-            SELECT coalesce(sum(tokens_in + tokens_out), 0) AS tokens,
-                   coalesce(sum(coste), 0) AS coste, max(moneda) AS moneda
-            FROM admin.agg_usage_cycle
-            WHERE ciclo = coalesce(CAST(:ciclo AS text), to_char(current_date, 'YYYY-MM'))
-              AND (CAST(:t AS text) IS NULL OR tenant_id = :t)
-        """,
-            params,
-        )
+        totales = await uno(db, sql_totales, params)
         total = await uno(db, sql_total, params)
-        filas = await todos(db, sql, params)
+        filas = await todos(db, sql_items, params)
 
     descuadres = [f["clave"] for f in filas if f.get("cuadra_con_facturacion") is False]
     if descuadres:
         # Una consola de negocio cuyo consumo no cuadra con la factura destruye
         # la confianza en todas sus demás cifras: es alerta, no aviso.
-        log.critical("admin.usage.descuadre", claves=descuadres[:10], ciclo=ciclo or "actual")
+        log.critical("admin.usage.descuadre", claves=descuadres[:10], ciclo=ciclo or periodo)
 
+    alguna = False
     if agrupar_por == "cliente":
-        filas, _ = enmascarar_filas(
-            filas, _concesiones(st, [f["tenant_id"] for f in filas if f["tenant_id"]])
-        )
+        tenants = [f["tenant_id"] for f in filas if f.get("tenant_id")]
+        filas, alguna = enmascarar_filas(filas, _concesiones(st, tenants))
+        await _registrar_lecturas(st, "GET /admin/v1/business/usage/tokens", set(tenants))
+
+    frescura_iso = frescura.isoformat() if hasattr(frescura, "isoformat") else str(frescura)
+
+    total_tokens = (
+        int(totales["tokens"]) if totales and totales.get("tokens") is not None else 0
+    )
+    coste_consolidado = (
+        float(totales["coste"]) if totales and totales.get("coste") is not None else 0.0
+    )
+    media_cuota = (
+        float(totales["media_cuota"])
+        if totales and totales.get("media_cuota") is not None
+        else 0.0
+    )
+    moneda = (totales or {}).get("moneda") or "EUR"
 
     salida = sobre(filas, int(total["n"]) if total else 0, p)
     salida["ciclo"] = ciclo or datetime.now().strftime("%Y-%m")
-    salida["frescura"] = frescura
+    salida["periodo"] = periodo
+    salida["frescura"] = frescura_iso
     salida["totales"] = {
-        "tokens": int(totales["tokens"]) if totales else 0,
-        "coste": float(totales["coste"]) if totales else 0.0,
-        "moneda": (totales or {}).get("moneda") or "EUR",
+        "tokens": total_tokens,
+        "coste": coste_consolidado,
+        "moneda": moneda,
+    }
+    salida["resumen"] = {
+        "total_tokens": total_tokens,
+        "tokens_total": total_tokens,
+        "coste_consolidado": coste_consolidado,
+        "coste_total_eur": coste_consolidado,
+        "porcentaje_medio_cuota": media_cuota,
+        "cuota_consumo_media_pct": media_cuota,
+        "moneda": moneda,
     }
     salida["descuadres"] = descuadres or None
     salida["cuadra_con_facturacion"] = len(descuadres) == 0
+    if agrupar_por == "cliente":
+        salida["alguna_enmascarada"] = alguna
     return salida
 
 
@@ -714,7 +949,7 @@ async def usage_tokens(
 )
 async def crear_informe(
     cuerpo: ReporteIn,
-    st: Annotated[Staff, Depends(exigir(*NEGOCIO))],
+    st: Annotated[Staff, Depends(exigir(*OPS_NEGOCIO))],
 ) -> ReporteOut:
     """Encola un informe exportable.
 
@@ -723,19 +958,28 @@ async def crear_informe(
     fichero recortado. Ningún informe puede exportar más de lo que el empleado ve
     en pantalla.
     """
+    if cuerpo.tipo != "sla" and st.role == "staff_operaciones":
+        raise rol_staff_insuficiente(
+            "Tu rol solo permite generar informes exportables de cumplimiento SLA."
+        )
+
     s = get_admin_settings()
     if cuerpo.tipo not in ("consumo", "suscripciones", "clientes", "sla"):
         raise validacion("Tipo de informe desconocido.", {"tipo": cuerpo.tipo})
-    if cuerpo.formato not in ("csv", "xlsx"):
+    if cuerpo.formato not in ("csv", "xlsx", "pdf"):
         raise validacion("Formato no admitido.", {"formato": cuerpo.formato})
-    if cuerpo.desde > cuerpo.hasta:
-        raise validacion("El rango de fechas no es válido.")
+    if cuerpo.tipo == "sla":
+        validar_rango_sla(cuerpo.desde, cuerpo.hasta, max_meses=s.report_max_months)
+    else:
+        if cuerpo.desde > cuerpo.hasta:
+            raise validacion("El rango de fechas no es válido.")
+        meses_chk = (cuerpo.hasta - cuerpo.desde).days / 30.0
+        if meses_chk > s.report_max_months:
+            raise validacion(
+                f"El rango no puede superar {s.report_max_months} meses.",
+                {"meses": round(meses_chk, 1)},
+            )
     meses = (cuerpo.hasta - cuerpo.desde).days / 30.0
-    if meses > s.report_max_months:
-        raise validacion(
-            f"El rango no puede superar {s.report_max_months} meses.",
-            {"meses": round(meses, 1)},
-        )
 
     if cuerpo.incluir_identificables:
         if cuerpo.tenant_id:
@@ -744,6 +988,11 @@ async def crear_informe(
             raise acceso_no_justificado(alcance="datos_negocio")
 
     report_id = nuevo("rp")
+    params_serializados = cuerpo.model_dump(mode="json")
+    params_serializados["report_id"] = report_id
+    params_serializados["solicitante_id"] = st.id
+    params_serializados["solicitante_rol"] = st.role
+
     async with admin_session() as db:
         await uno(
             db,
@@ -759,7 +1008,7 @@ async def crear_informe(
                 "id": report_id,
                 "k": cuerpo.tipo,
                 "f": cuerpo.formato,
-                "p": cuerpo.model_dump_json(),
+                "p": json.dumps(params_serializados, sort_keys=True),
                 "by": st.id,
                 "pii": cuerpo.incluir_identificables,
                 "ret": s.report_retention_days,
@@ -769,7 +1018,8 @@ async def crear_informe(
             db,
             staff_id=st.id,
             staff_role=st.role,
-            action="report",
+            action="informe" if cuerpo.tipo == "sla" else "report",
+            resource=cuerpo.tipo,
             endpoint="POST /admin/v1/business/reports",
             tenant_id=cuerpo.tenant_id,
             ip=st.ip,
@@ -778,6 +1028,7 @@ async def crear_informe(
             payload={
                 "report_id": report_id,
                 "tipo": cuerpo.tipo,
+                "formato": cuerpo.formato,
                 "rango": [str(cuerpo.desde), str(cuerpo.hasta)],
                 "identificables": cuerpo.incluir_identificables,
             },
@@ -796,18 +1047,32 @@ async def crear_informe(
 
 
 # ------------------------------------------------------------------ §18.23
-@router.get("/reports/{report_id}", summary="Estado y descarga de un informe")
+@router.get(
+    "/reports/{report_id}",
+    response_model=None,
+    summary="Estado y descarga de un informe",
+)
 async def informe(
     st: Annotated[Staff, Depends(limite_rl4)],
     report_id: Annotated[str, Path()],
-) -> dict[str, Any]:
+    descargar: Annotated[
+        bool, Query(description="Indica si se solicita la descarga directa del informe.")
+    ] = False,
+    download: Annotated[
+        bool, Query(description="Indica si se solicita la descarga directa del informe.")
+    ] = False,
+) -> dict[str, Any] | Response:
     """Estado del informe y, si está listo, URL firmada de vencimiento corto.
 
     No se sirve como descarga directa sin registro: toda salida de datos queda
     trazada. Un empleado solo accede a los informes que ha solicitado; el rol de
-    administración accede a todos.
+    administración accede a todos. Si se intenta descargar antes de finalizar,
+    se rechaza con 409 CONFLICTO_ESTADO.
     """
-    from ..servicios.blob import url_descarga
+    from ..servicios.blob import descargar_informe, url_descarga
+
+    quiere_descarga = descargar or download
+    datos_blob: bytes | None = None
 
     async with admin_session() as db:
         r = await uno(
@@ -825,9 +1090,17 @@ async def informe(
         if r is None or (r["requested_by"] != st.id and st.role != "staff_admin"):
             raise no_encontrado("El informe")
 
+        # Comprobación de descarga prematura ante petición explícita
+        if quiere_descarga and r["status"] != "listo":
+            raise conflicto(
+                "CONFLICTO_ESTADO", "El informe aún no ha finalizado su generación."
+            )
+
         url = None
         if r["status"] == "listo" and r["blob_ref"]:
             url = url_descarga(r["blob_ref"])
+            if quiere_descarga:
+                datos_blob = await descargar_informe(r["blob_ref"])
             await registrar_accion(
                 db,
                 staff_id=st.id,
@@ -840,6 +1113,32 @@ async def informe(
                 payload={"report_id": report_id, "evento": "descargado", "sha256": r["sha256"]},
             )
             log.info("admin.report.descargado", report_id=report_id, staff_id=st.id)
+        else:
+            await registrar_accion(
+                db,
+                staff_id=st.id,
+                staff_role=st.role,
+                action="report",
+                endpoint=f"GET /admin/v1/business/reports/{report_id}",
+                ip=st.ip,
+                user_agent=st.user_agent,
+                request_id=st.request_id,
+                payload={"report_id": report_id, "evento": "consultado", "estado": r["status"]},
+            )
+
+    if quiere_descarga and datos_blob is not None:
+        media_types = {
+            "csv": "text/csv; charset=utf-8",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "pdf": "application/pdf",
+        }
+        media_type = media_types.get(r["format"].lower(), "application/octet-stream")
+        nombre_archivo = f"informe_{r['kind']}_{report_id}.{r['format']}"
+        return Response(
+            content=datos_blob,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'},
+        )
 
     return {
         "report_id": r["id"],

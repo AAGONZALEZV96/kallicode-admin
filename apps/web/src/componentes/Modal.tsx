@@ -24,13 +24,22 @@ export const Modal: React.FC<ModalProps> = ({
   idTitulo = "modal-titulo",
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const alCerrarRef = useRef(alCerrar);
+  alCerrarRef.current = alCerrar;
+
+  // Mover foco al contenedor del modal únicamente cuando se abre por primera vez
+  useEffect(() => {
+    if (abierto) {
+      modalRef.current?.focus();
+    }
+  }, [abierto]);
 
   useEffect(() => {
     if (!abierto) return;
 
     const manejarKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && cerrarConEscape) {
-        alCerrar();
+        alCerrarRef.current();
       }
     };
 
@@ -38,14 +47,11 @@ export const Modal: React.FC<ModalProps> = ({
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", manejarKeyDown);
 
-    // Mover foco al modal al abrir
-    modalRef.current?.focus();
-
     return () => {
       document.body.style.overflow = cuerpoOverflowOriginal;
       window.removeEventListener("keydown", manejarKeyDown);
     };
-  }, [abierto, alCerrar, cerrarConEscape]);
+  }, [abierto, cerrarConEscape]);
 
   if (!abierto) return null;
 

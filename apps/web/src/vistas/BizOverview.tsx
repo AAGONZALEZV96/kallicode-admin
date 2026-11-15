@@ -18,6 +18,7 @@ import { useAuth } from "../estado/auth";
 import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 import { Select } from "../componentes/Select";
+import { ContenedorEstado } from "../componentes/ContenedorEstado";
 
 export interface OverviewClientes {
   activos: number;
@@ -82,6 +83,19 @@ const OPCIONES_COMPARACION = [
 
 const LIMITE_FRESCURA_MS = 6 * 60 * 60 * 1000; // 6 horas
 
+function formatearFrescuraRelativa(fechaIso: string): string {
+  const timestamp = new Date(fechaIso).getTime();
+  if (isNaN(timestamp)) return "Fecha no disponible";
+  const diffSegundos = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSegundos < 60) return "Actualizado hace unos segundos";
+  const diffMinutos = Math.floor(diffSegundos / 60);
+  if (diffMinutos < 60) return `Actualizado hace ${diffMinutos} min`;
+  const diffHoras = Math.floor(diffMinutos / 60);
+  if (diffHoras < 24) return `Actualizado hace ${diffHoras} h`;
+  const diffDias = Math.floor(diffHoras / 24);
+  return `Actualizado hace ${diffDias} d`;
+}
+
 export const BizOverview: React.FC = () => {
   const { usuario } = useAuth();
   const [periodo, setPeriodo] = useState<PeriodoRango>("mes_actual");
@@ -134,194 +148,45 @@ export const BizOverview: React.FC = () => {
     );
   }
 
-  // 2. Estado de Carga: Skeleton Loading estructural preservando el layout
-  if (isLoading) {
-    return (
-      <main
-        className="biz-overview-loading"
-        data-testid="overview-loading"
-        role="status"
-        aria-busy="true"
-        style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-      >
-        <span className="sr-only">Cargando indicadores de negocio...</span>
+  const apiErr = error instanceof ApiError ? error : null;
+  const es503 = apiErr?.status === 503 || apiErr?.codigo === "AGREGADO_NO_DISPONIBLE";
+  const es403 = apiErr?.status === 403 || apiErr?.codigo === "ROL_STAFF_INSUFICIENTE";
 
-        {/* Cabecera Esqueleto */}
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "1rem",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                width: "220px",
-                height: "28px",
-                backgroundColor: "var(--surface2)",
-                borderRadius: "var(--radius-sm)",
-                marginBottom: "0.5rem",
-              }}
-            />
-            <div
-              style={{
-                width: "360px",
-                height: "16px",
-                backgroundColor: "var(--surface)",
-                borderRadius: "var(--radius-sm)",
-              }}
-            />
-          </div>
-          <div
-            style={{
-              width: "120px",
-              height: "24px",
-              backgroundColor: "var(--surface2)",
-              borderRadius: "var(--radius-sm)",
-            }}
-          />
-        </header>
-
-        {/* Barra de Filtros Esqueleto */}
-        <div
-          style={{
-            display: "flex",
-            gap: "1rem",
-            padding: "1rem",
-            backgroundColor: "var(--card)",
-            borderRadius: "var(--radius-md)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <div style={{ width: "180px", height: "36px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-          <div style={{ width: "220px", height: "36px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-        </div>
-
-        {/* Grid de KPIs Esqueleto */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1rem",
-          }}
-        >
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              style={{
-                padding: "1.25rem",
-                backgroundColor: "var(--card)",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--border)",
-                minHeight: "120px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-              }}
-            >
-              <div style={{ width: "60%", height: "14px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-              <div style={{ width: "80%", height: "32px", backgroundColor: "var(--surface)", borderRadius: "var(--radius-sm)" }} />
-              <div style={{ width: "40%", height: "12px", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-sm)" }} />
-            </div>
-          ))}
-        </div>
-
-        <p style={{ margin: 0, textAlign: "center", color: "var(--muted)", fontSize: "0.875rem" }}>
-          Cargando indicadores de negocio...
-        </p>
-      </main>
-    );
-  }
-
-  // 3. Manejo de Errores Accionable (HTTP 503, HTTP 403, Errores de Red)
-  if (error || !data) {
-    const apiErr = error instanceof ApiError ? error : null;
-    const es503 = apiErr?.status === 503 || apiErr?.codigo === "AGREGADO_NO_DISPONIBLE";
-    const es403 = apiErr?.status === 403 || apiErr?.codigo === "ROL_STAFF_INSUFICIENTE";
-    const traceId =
-      apiErr?.traceId ||
-      (apiErr?.detalle as Record<string, unknown>)?.trace_id as string ||
-      "trc_biz_overview_error";
-
-    return (
-      <main
-        className="biz-overview-error"
-        data-testid="overview-error"
-        role="alert"
-        style={{
-          padding: "1.5rem",
-          backgroundColor: "var(--bad-bg)",
-          borderRadius: "var(--radius-md)",
-          border: "1px solid var(--bad)",
-          color: "var(--text)",
-          margin: "1rem 0",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Badge variante="error">
-            {es503 ? "AGREGADOS EN REFRESCO" : es403 ? "ACCESO DENEGADO" : "ERROR"}
-          </Badge>
-          <strong style={{ fontSize: "1.1rem" }}>
-            {es503
-              ? "Agregados analíticos en proceso de cálculo"
-              : es403
-              ? "Permisos insuficientes"
-              : "No se pudieron cargar los datos de negocio"}
-          </strong>
-        </div>
-
-        <p style={{ color: "var(--muted)", margin: "0.5rem 0", fontSize: "0.875rem" }}>
-          {apiErr?.message || "Ocurrió un error inesperado al consultar la API de negocio."}
-        </p>
-
-        {/* Visualización explícita del X-Trace-Id para diagnóstico */}
-        <div
-          data-testid="overview-trace-id"
-          style={{
-            margin: "0.75rem 0",
-            fontSize: "0.75rem",
-            color: "var(--muted)",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-          }}
-        >
-          <span>X-Trace-Id:</span>
-          <code
-            style={{
-              padding: "0.15rem 0.4rem",
-              backgroundColor: "var(--surface)",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--border)",
-              color: "var(--text)",
-            }}
-          >
-            {traceId}
-          </code>
-        </div>
-
-        <Boton variante="secondary" tamano="sm" onClick={() => void refetch()}>
-          Reintentar consulta
-        </Boton>
-      </main>
-    );
-  }
-
-  // 4. Cálculo del estado de Frescura de los datos agregados
-  const antiguedadMs = Date.now() - new Date(data.frescura).getTime();
-  const esFrescuraAlta = Number.isNaN(antiguedadMs) ? false : antiguedadMs > LIMITE_FRESCURA_MS;
-  const variacionMrr = data.variacion_pct ?? data.tendencia?.mrr;
-  const altasClientes = data.clientes.nuevos ?? data.clientes.altas ?? 0;
+  // Cálculo del estado de Frescura de los datos agregados
+  const antiguedadMs = data ? Date.now() - new Date(data.frescura).getTime() : 0;
+  const esFrescuraAlta = data ? (Number.isNaN(antiguedadMs) ? false : antiguedadMs > LIMITE_FRESCURA_MS) : false;
+  const variacionMrr = data ? (data.variacion_pct ?? data.tendencia?.mrr) : null;
+  const altasClientes = data ? (data.clientes.nuevos ?? data.clientes.altas ?? 0) : 0;
 
   return (
-    <main
-      className="biz-overview"
-      aria-live="polite"
-      style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+    <ContenedorEstado
+      cargando={isLoading}
+      error={error}
+      vacio={!isLoading && !error && !data}
+      tipoCarga="kpis"
+      tarjetasCarga={4}
+      dataTestIdCarga="overview-loading"
+      dataTestIdError="overview-error"
+      dataTestIdTrace="overview-trace-id"
+      tituloError={
+        es503
+          ? "AGREGADOS EN REFRESCO"
+          : es403
+          ? "ACCESO DENEGADO"
+          : "ERROR EN DATOS DE NEGOCIO"
+      }
+      mensajeError={
+        apiErr?.message || (es503 ? "Los agregados de negocio están recalculándose en PostgreSQL." : undefined)
+      }
+      textoBotonReintento="Reintentar consulta"
+      alReintentar={() => void refetch()}
     >
+      {data && (
+        <main
+          className="biz-overview"
+          aria-live="polite"
+          style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+        >
       {/* Cabecera Ejecutiva */}
       <header
         style={{
@@ -361,21 +226,19 @@ export const BizOverview: React.FC = () => {
         >
           {esFrescuraAlta ? (
             <Badge variante="warn" data-testid="badge-frescura-warn">
-              WARN admin.business.frescura_alta
+              {"Datos desactualizados (> 6h)"}
             </Badge>
           ) : (
             <Badge variante="good" data-testid="badge-frescura-ok">
               ACTIVO
             </Badge>
           )}
-          <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            Frescura:{" "}
+          <span
+            style={{ fontSize: "0.75rem", color: "var(--muted)" }}
+            title={`Frescura exacta: ${new Date(data.frescura).toLocaleString("es-ES")}`}
+          >
             <time dateTime={data.frescura}>
-              {new Date(data.frescura).toLocaleTimeString("es-ES", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
+              {formatearFrescuraRelativa(data.frescura)}
             </time>
           </span>
           {isFetching && (
@@ -438,7 +301,7 @@ export const BizOverview: React.FC = () => {
         aria-label="Tarjetas principales de indicadores de negocio"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
           gap: "1rem",
         }}
       >
@@ -537,8 +400,17 @@ export const BizOverview: React.FC = () => {
             {data.clientes.activos}
           </div>
 
-          <footer style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            +{altasClientes} altas | -{data.clientes.perdidos} cancelaciones
+          <footer
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
+          >
+            <span style={{ color: "var(--good)" }}>+{altasClientes} altas</span>
+            <span style={{ color: "var(--bad)" }}>-{data.clientes.perdidos} cancelaciones</span>
           </footer>
         </article>
 
@@ -581,8 +453,17 @@ export const BizOverview: React.FC = () => {
             {data.consumo.tokens.toLocaleString("es-ES")}
           </div>
 
-          <footer style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            {data.consumo.loc.toLocaleString("es-ES")} LOC | Coste: {data.consumo.coste_estimado.toFixed(2)} €
+          <footer
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.2rem",
+            }}
+          >
+            <span>{data.consumo.loc.toLocaleString("es-ES")} LOC</span>
+            <span>Coste: {data.consumo.coste_estimado.toFixed(2)} €</span>
           </footer>
         </article>
 
@@ -625,8 +506,17 @@ export const BizOverview: React.FC = () => {
             {data.pipeline.tickets_entregados}
           </div>
 
-          <footer style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            Escalado humano: {data.pipeline.escalado_humano_pct}% | p50: {data.pipeline.tiempo_e2e_p50_h ?? 0}h
+          <footer
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.2rem",
+            }}
+          >
+            <span>Escalado humano: {data.pipeline.escalado_humano_pct}%</span>
+            <span>Tiempo p50: {data.pipeline.tiempo_e2e_p50_h ?? 0}h</span>
           </footer>
         </article>
       </section>
@@ -690,5 +580,7 @@ export const BizOverview: React.FC = () => {
         </div>
       </section>
     </main>
+      )}
+    </ContenedorEstado>
   );
 };

@@ -7,7 +7,7 @@
  * y la auditoría append-only inmutable en admin.staff_actions.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { Modal } from "./Modal";
@@ -22,6 +22,7 @@ export interface SolicitudConcesionModalProps {
   alCerrar: () => void;
   tenantId?: string;
   razonSocial?: string;
+  titulo?: string;
   onConcesionConcedida?: () => void;
 }
 
@@ -30,6 +31,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
   alCerrar,
   tenantId: tenantIdProp = "",
   razonSocial = "",
+  titulo = "Solicitar Revelación de Datos de Cliente (E6)",
   onConcesionConcedida,
 }) => {
   const queryClient = useQueryClient();
@@ -43,8 +45,11 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<boolean>(false);
 
+  const prevAbiertoRef = useRef(false);
+
+  // Inicializar/limpiar formulario únicamente cuando el modal pasa de cerrado a abierto
   useEffect(() => {
-    if (abierto) {
+    if (abierto && !prevAbiertoRef.current) {
       setTenantId(tenantIdProp);
       setMotivo("");
       setReferencia("");
@@ -53,13 +58,14 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
       setError(null);
       setExito(false);
     }
+    prevAbiertoRef.current = abierto;
   }, [abierto, tenantIdProp]);
 
-  const handleCerrar = () => {
+  const handleCerrar = useCallback(() => {
     setError(null);
     setExito(false);
     alCerrar();
-  };
+  }, [alCerrar]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -99,7 +105,8 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
         });
 
         setExito(true);
-        // Invalidar cachés relacionadas con negocio y clientes
+        // Invalidar cachés relacionadas con negocio, clientes y consumo de tokens
+        await queryClient.invalidateQueries({ queryKey: ["business-usage-tokens"] });
         await queryClient.invalidateQueries({ queryKey: ["business-subscriptions"] });
         await queryClient.invalidateQueries({ queryKey: ["business-upgrade-requests"] });
         await queryClient.invalidateQueries({ queryKey: ["business-customers"] });
@@ -129,90 +136,80 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
     <Modal
       abierto={abierto}
       alCerrar={handleCerrar}
-      titulo="Solicitar Revelación de Datos de Cliente (E6)"
+      titulo={titulo}
       idTitulo="titulo-solicitud-concesion"
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         <p style={{ color: "var(--muted)", margin: 0, fontSize: "0.875rem" }}>
-          Los datos comerciales y personales están enmascarados por defecto. Una concesión activa en{" "}
-          <code style={{ color: "var(--accent)" }}>admin.access_grants</code> permite su revelación temporal con
-          registro inmutable en auditoría.
+          Los datos comerciales y personales están enmascarados por defecto. Una solicitud de concesión aprobada permite revelar temporalmente los
+          campos protegidos. Toda consulta con concesión queda registrada de forma inmutable en la cadena de auditoría de la plataforma.
         </p>
 
-        {razonSocial && (
+        {exito && (
           <div
+            data-testid="exito-concesion"
+            role="status"
+            aria-live="polite"
             style={{
-              padding: "0.5rem 0.75rem",
-              backgroundColor: "var(--surface2)",
+              padding: "0.75rem",
               borderRadius: "var(--radius-sm)",
-              fontSize: "0.8125rem",
-              color: "var(--text)",
+              backgroundColor: "var(--surface2)",
+              color: "var(--good)",
+              border: "1px solid var(--good)",
+              fontSize: "0.875rem",
+              fontWeight: 500,
             }}
           >
-            Cliente objetivo: <strong>{razonSocial}</strong> ({tenantIdProp || tenantId})
+            ✓ Concesión autorizada y registrada. Actualizando datos en claro...
           </div>
         )}
 
         {error && (
           <div
-            data-testid="error-concesion"
+            data-testid="error-validacion-modal"
             role="alert"
             style={{
-              backgroundColor: "var(--bad-bg, rgba(239, 68, 68, 0.1))",
-              border: "1px solid var(--bad, #ef4444)",
-              color: "var(--bad, #ef4444)",
               padding: "0.75rem",
               borderRadius: "var(--radius-sm)",
-              fontSize: "0.8125rem",
+              backgroundColor: "var(--surface2)",
+              color: "var(--bad)",
+              border: "1px solid var(--bad)",
+              fontSize: "0.875rem",
             }}
           >
             {error}
           </div>
         )}
 
-        {exito && (
-          <div
-            data-testid="exito-concesion"
-            role="status"
-            style={{
-              backgroundColor: "var(--good-bg, rgba(34, 197, 94, 0.1))",
-              border: "1px solid var(--good, #22c55e)",
-              color: "var(--good, #22c55e)",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "0.8125rem",
-              fontWeight: 500,
-            }}
-          >
-            ✓ Concesión de acceso autorizada. Revelando datos en claro...
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {!tenantIdProp && (
-            <div>
-              <label
-                htmlFor="concesion-tenant-id"
-                style={{
-                  display: "block",
-                  fontSize: "0.8125rem",
-                  fontWeight: 500,
-                  marginBottom: "4px",
-                  color: "var(--text)",
-                }}
-              >
-                Identificador de Organización (tenant_id) *
-              </label>
-              <Input
-                id="concesion-tenant-id"
-                data-testid="input-concesion-tenant"
-                value={tenantId}
-                onChange={(e) => setTenantId(e.target.value)}
-                placeholder="Ej: org_acme"
-                required
-              />
-            </div>
-          )}
+          <div>
+            <label
+              htmlFor="concesion-tenant-id"
+              style={{
+                display: "block",
+                fontSize: "0.8125rem",
+                fontWeight: 500,
+                marginBottom: "4px",
+                color: "var(--text)",
+              }}
+            >
+              Organización (tenant_id) *
+            </label>
+            <Input
+              id="concesion-tenant-id"
+              data-testid="input-concesion-tenant"
+              value={tenantId}
+              onChange={(e) => setTenantId(e.target.value)}
+              placeholder="org_acme_corp"
+              required
+              disabled={Boolean(tenantIdProp)}
+            />
+            {razonSocial && (
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginTop: "2px" }}>
+                Razón Social protegida: <strong>{razonSocial}</strong>
+              </span>
+            )}
+          </div>
 
           <div>
             <label
@@ -225,14 +222,14 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                 color: "var(--text)",
               }}
             >
-              Motivo Operativo Obligatorio (mín. 20 caracteres y referencia a ticket) *
+              Motivo Justificado (Mínimo 20 caracteres y referencia a ticket) *
             </label>
             <textarea
               id="concesion-motivo"
               data-testid="input-concesion-motivo"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej: Revisión de renovación anticipada y cálculo de cuota según ticket KC-1049..."
+              placeholder="Ej: Revisión de consumo de tokens y auditoría de costes según ticket KC-1049..."
               rows={3}
               style={{
                 width: "100%",
@@ -344,6 +341,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
               justifyContent: "flex-end",
               gap: "0.75rem",
               marginTop: "0.5rem",
+              flexWrap: "wrap",
             }}
           >
             <Boton

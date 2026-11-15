@@ -54,7 +54,7 @@ export const MfaVerify: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "var(--bg, #0f172a)",
-        padding: "1.5rem",
+        padding: "1rem",
       }}
     >
       <div
@@ -64,7 +64,7 @@ export const MfaVerify: React.FC = () => {
           backgroundColor: "var(--card, #1e293b)",
           border: "1px solid var(--border, #334155)",
           borderRadius: "0.5rem",
-          padding: "2.5rem 2rem",
+          padding: "clamp(1.5rem, 5vw, 2.5rem) clamp(1rem, 5vw, 2rem)",
           boxShadow: "var(--shadow-lg, 0 10px 15px -3px rgba(0,0,0,0.4))",
         }}
       >

@@ -21,6 +21,7 @@ import { BizOverview } from "../vistas/BizOverview";
 import { BizCustomers } from "../vistas/BizCustomers";
 import { CustomerDetail } from "../vistas/CustomerDetail";
 import { BizSubscriptions } from "../vistas/BizSubscriptions";
+import { BizTokens } from "../vistas/BizTokens";
 
 const InicioRedireccion: React.FC = () => {
   const { usuario } = useAuth();
@@ -82,6 +83,24 @@ export const AppRouter: React.FC = () => {
               }
             />
 
+            {/* Rutas de Consumo de Tokens (FinOps): Exclusivo staff_negocio y staff_admin */}
+            <Route
+              path="/business/tokens"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
+                  <BizTokens />
+                </RutaProtegidaPorRol>
+              }
+            />
+            <Route
+              path="/tokens"
+              element={
+                <RutaProtegidaPorRol rolesPermitidos={["staff_negocio", "staff_admin"]}>
+                  <BizTokens />
+                </RutaProtegidaPorRol>
+              }
+            />
+
             {/* Rutas de Clientes: Exclusivo staff_soporte, staff_negocio y staff_admin */}
             <Route
               path="/business/customers"
@@ -128,7 +147,7 @@ export const AppRouter: React.FC = () => {
             <Route
               path="/ops/models"
               element={
-                <RutaProtegidaPorRol rolesPermitidos={["staff_operaciones", "staff_admin"]}>
+                <RutaProtegidaPorRol rolesPermitidos={["staff_operaciones", "staff_negocio", "staff_admin"]}>
                   <OpsModels />
                 </RutaProtegidaPorRol>
               }
@@ -136,7 +155,7 @@ export const AppRouter: React.FC = () => {
             <Route
               path="/ops/sla"
               element={
-                <RutaProtegidaPorRol rolesPermitidos={["staff_operaciones", "staff_admin"]}>
+                <RutaProtegidaPorRol rolesPermitidos={["staff_operaciones", "staff_negocio", "staff_admin"]}>
                   <OpsSLA />
                 </RutaProtegidaPorRol>
               }

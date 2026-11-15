@@ -222,4 +222,96 @@ describe("AuthProvider y useAuth", () => {
 
     consoleSpy.mockRestore();
   });
+
+  it("7. reanuda automáticamente la sesión compartida desde localStorage en una pestaña nueva si es reciente", () => {
+    const sesionValida = {
+      token: "jwt_pestaña_compartida",
+      refreshToken: "rt_pestaña_compartida",
+      usuario: {
+        staff_id: "st_compartido",
+        email: "staff@kallicode.com",
+        nombre: "Personal Compartido",
+        role: "staff_negocio",
+        mfa_validado: true,
+      },
+      ultimoAcceso: Date.now() - 5 * 60 * 1000, // Hace 5 minutos (válida dentro del margen de 15 min)
+    };
+
+    window.localStorage.setItem("kc_staff_session", JSON.stringify(sesionValida));
+
+    render(
+      <AuthProvider>
+        <ComponenteConsumidor />
+      </AuthProvider>
+    );
+
+    expect(screen.getByTestId("autenticado").textContent).toBe("si");
+    expect(screen.getByTestId("token").textContent).toBe("jwt_pestaña_compartida");
+    expect(screen.getByTestId("rol").textContent).toBe("staff_negocio");
+    expect(screen.getByTestId("email").textContent).toBe("staff@kallicode.com");
+  });
+
+  it("8. descarta la sesión en localStorage y permanece desautenticado si transcurrieron más de 15 minutos de inactividad", () => {
+    const sesionExpirada = {
+      token: "jwt_expirado",
+      refreshToken: "rt_expirado",
+      usuario: {
+        staff_id: "st_expirado",
+        email: "staff@kallicode.com",
+        nombre: "Personal Expirado",
+        role: "staff_negocio",
+        mfa_validado: true,
+      },
+      ultimoAcceso: Date.now() - 16 * 60 * 1000, // Hace 16 minutos (excede los 15 min de inactividad)
+    };
+
+    window.localStorage.setItem("kc_staff_session", JSON.stringify(sesionExpirada));
+
+    render(
+      <AuthProvider>
+        <ComponenteConsumidor />
+      </AuthProvider>
+    );
+
+    expect(screen.getByTestId("autenticado").textContent).toBe("no");
+    expect(screen.getByTestId("token").textContent).toBe("ninguno");
+    expect(window.localStorage.getItem("kc_staff_session")).toBeNull();
+  });
+
+  it("9. sincroniza el cierre de sesión entre pestañas ante un evento storage externo", async () => {
+    render(
+      <AuthProvider
+        sesionInicial={{
+          usuario: {
+            staff_id: "st_tab",
+            email: "staff@kallicode.com",
+            nombre: "Staff",
+            role: "staff_admin",
+            mfa_validado: true,
+          },
+          token: "jwt_tab",
+          refreshToken: "rt_tab",
+        }}
+      >
+        <ComponenteConsumidor />
+      </AuthProvider>
+    );
+
+    expect(screen.getByTestId("autenticado").textContent).toBe("si");
+
+    // Simular que otra pestaña eliminó la sesión
+    await act(async () => {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "kc_staff_session",
+          newValue: null,
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("autenticado").textContent).toBe("no");
+      expect(screen.getByTestId("token").textContent).toBe("ninguno");
+    });
+  });
 });

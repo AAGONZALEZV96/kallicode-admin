@@ -51,6 +51,16 @@ def pytest_configure(config: Any) -> None:
     )
 
 
+@pytest.fixture(autouse=True)
+def _aislar_circuit_breaker_telemetria() -> Iterator[None]:
+    """Reinicia el circuit breaker de telemetría antes y después de cada prueba."""
+    from admin_api import telemetry
+
+    telemetry.reset_circuit_breaker()
+    yield
+    telemetry.reset_circuit_breaker()
+
+
 # ============================================================ base de datos
 @pytest.fixture(scope="session")
 def dsn() -> Iterator[str]:

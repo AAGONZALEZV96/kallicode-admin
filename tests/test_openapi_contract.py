@@ -60,7 +60,7 @@ CHECKS_CONTRATO = [
 ]
 
 MFA_RAW = "mfa_raw_token_for_verify"
-TOTP_SECRET = "JBSWY3DPEHPK3PXP"
+TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 RT_RAW = "rt_raw_token_for_refresh"
 PRT_RAW = "prt_raw_token_for_reset"
 INV_RAW = "inv_raw_token_for_invitation"

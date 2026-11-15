@@ -21,8 +21,6 @@ meses:
 from __future__ import annotations
 
 import asyncio
-import csv
-import io
 import signal
 import uuid
 from typing import Any
@@ -35,6 +33,7 @@ from kallicode_core.logging import bind_contexto, configurar_logging, log
 from sqlalchemy import text
 
 from admin_workers.lider import LOCK_IDS, ejecutar_con_lider
+from admin_workers.sla import evaluar_sla, obtener_intervalo_sla_s
 
 _parar = asyncio.Event()
 
@@ -121,39 +120,6 @@ async def refrescar_agregados(db: Any) -> None:
 
 
 # ------------------------------------------------------------------- informes
-_COLUMNAS: dict[str, tuple[str, str]] = {
-    "consumo": (
-        "tenant_id, ciclo, loc_consumidas, tokens_in, tokens_out, "
-        "tokens_flash, tokens_pro, tokens_fable, coste",
-        "admin.agg_usage_cycle",
-    ),
-    "suscripciones": (
-        "tenant_id, plan_codigo, suscripcion_estado, inicia_el, "
-        "renueva_el, finaliza_el, importe_mes, moneda",
-        "admin.agg_customer_state",
-    ),
-    "clientes": (
-        "tenant_id, plan_codigo, suscripcion_estado, alta_el, "
-        "lineas_contratadas, lineas_activas, usuarios_activos, "
-        "tickets_abiertos, ultima_actividad",
-        "admin.agg_customer_state",
-    ),
-    "sla": (
-        "tenant_id, ticket_numero, plan_codigo, objetivo_h, transcurrido_h, "
-        "bruto_h, resultado, iniciado_en, terminado_en",
-        "admin.sla_cases",
-    ),
-    "staff_actions": (
-        "occurred_at, staff_id, staff_role, action, tenant_id, "
-        "scope, reason, resource, endpoint, seal",
-        "admin.staff_actions",
-    ),
-}
-
-# Columnas identificables: solo se incluyen si el informe las autoriza.
-_PII = {"razon_social", "ticket_numero", "reason", "comentario"}
-
-
 async def generar_informes(db: Any) -> None:
     """Genera los informes en cola, los sube y solo entonces los marca listos."""
     while True:
@@ -174,52 +140,31 @@ async def generar_informes(db: Any) -> None:
 
 
 async def _generar_uno(r: dict[str, Any], db: Any) -> None:
-    s = get_admin_settings()
+    import json
+
+    from admin_api.reports import generar_contenido_informe
+
     bind_contexto(report_id=r["id"])
     try:
-        cols, tabla = _COLUMNAS[r["kind"]]
-        seleccion = [c.strip() for c in cols.split(",")]
-        if not r["includes_pii"]:
-            seleccion = [c for c in seleccion if c not in _PII]
+        params = dict(r["params"] or {})
+        if isinstance(r["params"], str):
+            params = json.loads(r["params"])
+        params.setdefault("report_id", r["id"])
+        if r.get("requested_by"):
+            params.setdefault("solicitante_id", r["requested_by"])
 
-        params = r["params"] or {}
-        campo_fecha = {
-            "consumo": "to_date(ciclo || '-01', 'YYYY-MM-DD')",
-            "sla": "iniciado_en",
-            "staff_actions": "occurred_at",
-        }.get(r["kind"], "alta_el")
-        filtro = (
-            f"WHERE {campo_fecha} >= CAST(:d AS date) AND {campo_fecha} < CAST(:h AS date) + 1"
+        formato = (r.get("format") or "csv").lower()
+        datos, content_type, num_filas = await generar_contenido_informe(
+            r["kind"],
+            formato,
+            params,
+            r["includes_pii"],
         )
-        if params.get("tenant_id"):
-            filtro += " AND tenant_id = :t"
 
-        async with read_session() as rdb:
-            filas = await todos(
-                rdb,
-                f"""
-                SELECT {", ".join(seleccion)} FROM {tabla} {filtro}
-                ORDER BY 1 LIMIT :chunk
-            """,
-                {
-                    "d": params.get("desde"),
-                    "h": params.get("hasta"),
-                    "t": params.get("tenant_id"),
-                    "chunk": s.export_chunk_events,
-                },
-            )
-
-        buf = io.StringIO()
-        w = csv.DictWriter(buf, fieldnames=seleccion, extrasaction="ignore")
-        w.writeheader()
-        for f in filas:
-            w.writerow({k: f.get(k) for k in seleccion})
-        datos = buf.getvalue().encode("utf-8")
-
-        blob_ref = ruta_informe(r["id"], r["format"])
+        blob_ref = ruta_informe(r["id"], formato)
         # La subida va ANTES de marcar como listo: si falla, el informe queda
         # fallido y no se entrega una URL a un fichero inexistente.
-        digest = await subir_informe(blob_ref, datos, "text/csv; charset=utf-8")
+        digest = await subir_informe(blob_ref, datos, content_type)
 
         await uno(
             db,
@@ -229,14 +174,14 @@ async def _generar_uno(r: dict[str, Any], db: Any) -> None:
                 rows_total = :n, completed_at = now(), error = NULL
             WHERE id = :i RETURNING id
         """,
-            {"b": blob_ref, "h": digest, "n": len(filas), "i": r["id"]},
+            {"b": blob_ref, "h": digest, "n": num_filas, "i": r["id"]},
         )
         if hasattr(db, "commit"):
             await db.commit()
         log.info(
             "admin.informe.generado",
             report_id=r["id"],
-            filas=len(filas),
+            filas=num_filas,
             bytes=len(datos),
             identificables=r["includes_pii"],
         )
@@ -247,12 +192,17 @@ async def _generar_uno(r: dict[str, Any], db: Any) -> None:
                 """
             UPDATE admin.reports
             SET status = 'fallido', blob_ref = NULL,
-                error = jsonb_build_object('tipo', CAST(:t AS text), 'cuando', now()::text),
+                error = jsonb_build_object(
+                    'codigo', 'GENERACION_FALLIDA',
+                    'mensaje', CAST(:m AS text),
+                    'tipo', CAST(:t AS text),
+                    'cuando', now()::text
+                ),
                 completed_at = now()
             WHERE id = :i
         """
             ),
-            {"t": type(exc).__name__, "i": r["id"]},
+            {"m": str(exc), "t": type(exc).__name__, "i": r["id"]},
         )
         if hasattr(db, "commit"):
             await db.commit()
@@ -298,11 +248,17 @@ async def caducar_concesiones(db: Any) -> None:
         log.info("admin.grants.caducadas", n=len(vencidas))
 
 
+async def _evaluar_sla_programado(db: Any) -> dict[str, int]:
+    """Ejecuta la evaluación SLA propagando el evento global de parada."""
+    return await evaluar_sla(db, stop_event=_parar)
+
+
 # ------------------------------------------------------------------ runner
 _TRABAJOS: dict[str, tuple[Any, int]] = {
     "refrescar_agregados": (refrescar_agregados, 900),
     "generar_informes": (generar_informes, 30),
     "caducar_concesiones": (caducar_concesiones, 300),
+    "evaluar_sla": (_evaluar_sla_programado, 300),
 }
 
 
@@ -328,10 +284,13 @@ async def main() -> None:
         bucle.add_signal_handler(sig, _parar.set)
 
     intervalo_refresco = s.refresh_interval_s
+    intervalo_sla = obtener_intervalo_sla_s()
+    intervalos_override = {
+        "refrescar_agregados": intervalo_refresco,
+        "evaluar_sla": intervalo_sla,
+    }
     tareas = [
-        asyncio.create_task(
-            _bucle(n, c, intervalo_refresco if n == "refrescar_agregados" else i)
-        )
+        asyncio.create_task(_bucle(n, c, intervalos_override.get(n, i)))
         for n, (c, i) in _TRABAJOS.items()
     ]
     await _parar.wait()

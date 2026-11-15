@@ -16,6 +16,7 @@ si alguna de las dos apunta a un superusuario (véase `verificar_arranque`).
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic import field_validator
@@ -80,10 +81,15 @@ class AdminSettings(BaseSettings):
     aggregate_stale_s: int = 86_400  # 24 h: se considera no disponible
     refresh_interval_s: int = 900
 
-    # --- contrato de telemetría del pipeline (§17.14 – §17.16) ---
+    # --- contrato de telemetría del pipeline (§17.13 – §17.16) ---
     telemetry_base_url: str = "http://localhost:8001/internal/v1"
     telemetry_timeout_s: int = 5
-    telemetry_max_age_s: int = 900  # 15 min: por encima, no disponible
+    telemetry_connect_timeout_s: float = 2.0
+    telemetry_read_timeout_s: float = 3.0
+    telemetry_warn_age_s: int = 300  # 5 min: emite log WARN de señal desactualizada
+    telemetry_max_age_s: int = 900  # 15 min: por encima, no disponible (503)
+    telemetry_cb_failure_threshold: int = 3
+    telemetry_cb_cooldown_s: float = 30.0
 
     # --- informes (§18.22, §18.23) ---
     report_container: str = "informes-admin"
@@ -120,6 +126,19 @@ class AdminSettings(BaseSettings):
     @property
     def hosts_permitidos(self) -> list[str]:
         return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
+
+    def resolve_telemetry_base_url(self) -> str:
+        """Resuelve la URL base del servicio de telemetría (Equipo 2).
+
+        Prioriza `KC_PIPELINE_TELEMETRY_URL` si está definida en el entorno y mantiene
+        retrocompatibilidad con `KC_ADMIN_TELEMETRY_BASE_URL` / `telemetry_base_url`.
+        """
+        env_pipeline = os.getenv("KC_PIPELINE_TELEMETRY_URL", "").strip().rstrip("/")
+        if env_pipeline:
+            if env_pipeline.endswith("/internal/v1"):
+                return env_pipeline
+            return f"{env_pipeline}/internal/v1"
+        return self.telemetry_base_url.rstrip("/")
 
 
 @lru_cache
