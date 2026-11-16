@@ -1,6 +1,10 @@
 { 
     "$schema": "https://openapi.vercel.sh/vercel.json", 
     "rewrites": [ 
+        {
+            "source": "/admin/v1/:path*",
+            "destination": "https://kallicode-admin-api.onrender.com/admin/v1/:path*"
+        },
         { 
             "source": "/(.*)", 
             "destination": "/index.html" 
