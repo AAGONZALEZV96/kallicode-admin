@@ -314,4 +314,59 @@ describe("AuthProvider y useAuth", () => {
       expect(screen.getByTestId("token").textContent).toBe("ninguno");
     });
   });
+
+  it("10. expone el Bearer token a componentes hijos en el mismo ciclo tras verificar MFA", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    vi.spyOn(clienteApi, "post")
+      .mockResolvedValueOnce({
+        mfa_token: "mfa_tok_race",
+        mfa_inscrito: true,
+        expira_en: 300,
+      })
+      .mockResolvedValueOnce({
+        access_token: "jwt_inmediato",
+        refresh_token: "rt_inmediato",
+        staff: { id: "st_1", nombre: "Admin", rol: "staff_admin" },
+        expira_en: 900,
+      });
+
+    const HijoAlMontar: React.FC = () => {
+      const { estaAutenticado } = useAuth();
+      React.useEffect(() => {
+        if (estaAutenticado) {
+          void clienteApi.get("/admin/v1/business/subscriptions");
+        }
+      }, [estaAutenticado]);
+      return null;
+    };
+
+    render(
+      <AuthProvider>
+        <ComponenteConsumidor />
+        <HijoAlMontar />
+      </AuthProvider>
+    );
+
+    await act(async () => {
+      screen.getByText("Ejecutar Login").click();
+    });
+    await act(async () => {
+      screen.getByText("Verificar MFA").click();
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    const [, opcionesFetch] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = opcionesFetch.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer jwt_inmediato");
+    vi.unstubAllGlobals();
+  });
 });

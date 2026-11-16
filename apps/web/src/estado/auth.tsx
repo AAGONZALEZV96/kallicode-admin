@@ -133,11 +133,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
   const [cargando, setCargando] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const tokenRef = useRef<string | null>(sesionRecuperada?.token ?? null);
   const ultimaEscrituraRef = useRef<number>(Date.now());
 
-  // Sincroniza el getter del token con clienteApi
+  // Sincroniza el getter del token de forma síncrona para evitar carreras antes de useEffect
+  tokenRef.current = token;
+  setTokenGetter(() => tokenRef.current);
+
   useEffect(() => {
-    setTokenGetter(() => token);
+    setTokenGetter(() => tokenRef.current);
   }, [token]);
 
   const estaAutenticado = useMemo(
@@ -151,6 +155,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
   );
 
   const limpiarEstadoLocal = useCallback(() => {
+    tokenRef.current = null;
     setToken(null);
     setRefreshToken(null);
     setUsuario(null);
@@ -198,6 +203,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
         expira_en: number;
       }>("/admin/v1/auth/refresh", { refresh_token: refreshToken }, { skipAuth: true });
 
+      tokenRef.current = data.access_token;
       setToken(data.access_token);
       setRefreshToken(data.refresh_token);
       if (usuario) {
@@ -262,6 +268,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
         mfa_validado: true,
       };
 
+      tokenRef.current = resp.access_token;
       setToken(resp.access_token);
       setRefreshToken(resp.refresh_token);
       setUsuario(nuevoUsuario);
@@ -359,6 +366,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, sesionInic
             const sesion: SesionGuardada = JSON.parse(e.newValue);
             const ahora = Date.now();
             if (ahora - (sesion.ultimoAcceso || 0) < TIEMPO_INACTIVIDAD_MS) {
+              tokenRef.current = sesion.token;
               setToken(sesion.token);
               setRefreshToken(sesion.refreshToken);
               setUsuario(sesion.usuario);
