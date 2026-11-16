@@ -33,4 +33,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
 RUN useradd --create-home --uid 10001 appuser 
 USER appuser 
 EXPOSE 8000 
+<<<<<<< HEAD
 CMD ["sh", "-c", "uvicorn admin_api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+=======
+CMD ["sh", "-c", "uvicorn admin\_api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+>>>>>>> c02fab81f93f41ffff34cf18e8d87f023ce2144a
