@@ -24,6 +24,7 @@ import { Boton } from "../componentes/Boton";
 import { Select } from "../componentes/Select";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { DetalleRelojSLA, SlaResultado } from "../componentes/DetalleRelojSLA";
+import { ControlExportarReporte } from "../componentes/ControlExportarReporte";
 
 export interface SLACaso {
   job_id: string;
@@ -481,6 +482,12 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
             </span>
           </div>
 
+          <ControlExportarReporte
+            tipo="sla"
+            etiquetaBoton="Exportar SLA"
+            formatosPermitidos={["pdf", "csv"]}
+            rolesPermitidos={["staff_operaciones", "staff_negocio", "staff_admin"]}
+          />
           <ControlesLiveRefresh hook={liveRefresh} />
         </div>
       </div>

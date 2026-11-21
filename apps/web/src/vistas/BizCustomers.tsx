@@ -24,6 +24,7 @@ import { Input } from "../componentes/Input";
 import { Modal } from "../componentes/Modal";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { SolicitudConcesionModal } from "../componentes/SolicitudConcesionModal";
+import { ControlExportarReporte } from "../componentes/ControlExportarReporte";
 import {
   Tabla,
   TablaEncabezado,
@@ -294,6 +295,12 @@ export const BizCustomers: React.FC = () => {
                   Política de Privacidad y Enmascaramiento
                 </Boton>
               )}
+              <ControlExportarReporte
+                tipo="clientes"
+                etiquetaBoton="Exportar Clientes"
+                formatosPermitidos={["csv", "xlsx", "pdf"]}
+                rolesPermitidos={["staff_negocio", "staff_admin"]}
+              />
               <Boton
                 variante="secondary"
                 tamano="sm"
