@@ -1468,6 +1468,88 @@ export const handlers = [
     return responderSlaCasoDetalle(request, String(params.jobId || ""));
   }),
 
+  // 8b. POST /admin/v1/business/reports y GET /admin/v1/business/reports/:reportId (§18.22 - §18.23)
+  http.post("*/admin/v1/business/reports", async ({ request }) => {
+    const errAuth = verificarAutenticacion(request);
+    if (errAuth) return errAuth;
+
+    const rol = obtenerRol(request);
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return HttpResponse.json(
+        { error: { codigo: "VALIDACION_ENTRADA", mensaje: "Cuerpo JSON inválido." } },
+        { status: 422 }
+      );
+    }
+
+    const tipo = String(body.tipo || "consumo");
+    const formato = String(body.formato || "csv");
+
+    if (rol === "staff_soporte" || (rol === "staff_operaciones" && tipo !== "sla")) {
+      return HttpResponse.json(
+        {
+          error: {
+            codigo: "ROL_STAFF_INSUFICIENTE",
+            code: "rol_staff_insuficiente",
+            mensaje: "Tu rol no permite generar este tipo de informe.",
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!["consumo", "suscripciones", "clientes", "sla"].includes(tipo)) {
+      return HttpResponse.json(
+        { error: { codigo: "VALIDACION_ENTRADA", mensaje: "Tipo de informe no admitido." } },
+        { status: 422 }
+      );
+    }
+
+    if (!["csv", "xlsx", "pdf"].includes(formato)) {
+      return HttpResponse.json(
+        { error: { codigo: "VALIDACION_ENTRADA", mensaje: "Formato no admitido." } },
+        { status: 422 }
+      );
+    }
+
+    const reportId = `rp_mock_${tipo}_${formato}`;
+    return HttpResponse.json(
+      {
+        report_id: reportId,
+        estado: "listo",
+        estimacion_s: 1,
+      },
+      { status: 202 }
+    );
+  }),
+
+  http.get("*/admin/v1/business/reports/:reportId", ({ request, params }) => {
+    const errAuth = verificarAutenticacion(request);
+    if (errAuth) return errAuth;
+
+    const reportId = String(params.reportId || "rp_mock_consumo_csv");
+    const partes = reportId.split("_");
+    const tipo = ["consumo", "suscripciones", "clientes", "sla"].includes(partes[2])
+      ? partes[2]
+      : "consumo";
+    const formato = ["csv", "xlsx", "pdf"].includes(partes[3]) ? partes[3] : "csv";
+
+    return HttpResponse.json({
+      report_id: reportId,
+      tipo,
+      formato,
+      estado: "listo",
+      solicitado_por: { id: "st_dev_01", nombre: "Personal KalliCode" },
+      download_url: `/admin/v1/business/reports/${reportId}?descargar=true`,
+      hash_sha256: "8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4",
+      filas: 4,
+      caduca_el: "2026-12-21T00:00:00Z",
+      error: null,
+    });
+  }),
+
   http.post("*/internal/v1/telemetry/heartbeat", async ({ request }) => {
     const traceId = request.headers.get("x-trace-id") || "trc_hb_001";
     const escenario = request.headers.get("x-mock-scenario") || "";

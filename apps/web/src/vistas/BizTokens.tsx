@@ -32,6 +32,7 @@ import {
 } from "../componentes/Tabla";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { SolicitudConcesionModal } from "../componentes/SolicitudConcesionModal";
+import { ControlExportarReporte } from "../componentes/ControlExportarReporte";
 
 // ------------------------------------------------------------------ Interfaces de Datos
 export interface TokenPorTier {
@@ -396,7 +397,13 @@ export const BizTokens: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          <ControlExportarReporte
+            tipo="consumo"
+            etiquetaBoton="Exportar Informe"
+            formatosPermitidos={["csv", "xlsx", "pdf"]}
+            rolesPermitidos={["staff_negocio", "staff_admin"]}
+          />
           <Boton
             variante="secondary"
             tamano="sm"

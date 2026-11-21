@@ -14,3 +14,5 @@ export * from "./EstadoVacio";
 export * from "./ContenedorEstado";
 export * from "./SolicitudConcesionModal";
 export * from "./DetalleRelojSLA";
+export * from "./LogoKalliCode";
+export * from "./ControlExportarReporte";

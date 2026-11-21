@@ -10,6 +10,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth, RolStaff } from "../estado/auth";
 import { Badge } from "./Badge";
 import { Boton } from "./Boton";
+import { LogoKalliCode } from "./LogoKalliCode";
 
 export const AdminLayout: React.FC = () => {
   const { usuario, logout, cargando } = useAuth();
@@ -59,8 +60,8 @@ export const AdminLayout: React.FC = () => {
               gap: "0.5rem",
             }}
           >
-            <span style={{ color: "var(--accent, #38bdf8)" }}>⚙</span>
-            KalliCode Consola
+            <LogoKalliCode variante="isotipo" altura={24} />
+            <span>KalliCode Consola</span>
           </Link>
 
           {/* Menú de Escritorio (>= 900px) */}

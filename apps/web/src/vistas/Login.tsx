@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../estado/auth";
 import { Input } from "../componentes/Input";
 import { Boton } from "../componentes/Boton";
+import { LogoKalliCode } from "../componentes/LogoKalliCode";
 
 export const Login: React.FC = () => {
   const { login, estaAutenticado, cargando } = useAuth();
@@ -66,19 +67,19 @@ export const Login: React.FC = () => {
         }}
       >
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+          <div style={{ marginBottom: "0.75rem" }}>
+            <LogoKalliCode variante="completo" altura={108} />
+          </div>
           <h1
             style={{
-              fontSize: "1.5rem",
-              fontWeight: 700,
-              color: "var(--text, #f8fafc)",
-              marginBottom: "0.5rem",
+              fontSize: "0.9375rem",
+              fontWeight: 500,
+              color: "var(--muted, #94a3b8)",
+              margin: 0,
             }}
           >
-            KalliCode Admin
-          </h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--muted, #94a3b8)" }}>
             Consola de Administración de Personal
-          </p>
+          </h1>
         </div>
 
         {errorLocal && (
