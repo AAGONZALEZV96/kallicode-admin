@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../estado/auth";
 import { Input } from "../componentes/Input";
 import { Boton } from "../componentes/Boton";
+import { LogoKalliCode } from "../componentes/LogoKalliCode";
 
 export const MfaVerify: React.FC = () => {
   const { verificarMfa, mfaPendiente, estaAutenticado, cargando } = useAuth();
@@ -74,16 +75,10 @@ export const MfaVerify: React.FC = () => {
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "48px",
-              height: "48px",
-              borderRadius: "50%",
-              backgroundColor: "var(--accent-soft, rgba(56, 189, 248, 0.15))",
-              color: "var(--accent, #38bdf8)",
               marginBottom: "1rem",
-              fontSize: "1.25rem",
             }}
           >
-            🛡
+            <LogoKalliCode variante="isotipo" altura={42} />
           </div>
           <h1
             style={{
