@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 265">
+  <defs>
+    <linearGradient id="grad-vortex" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F2FE" />
+      <stop offset="100%" stop-color="#4FACFE" />
+    </linearGradient>
+    <linearGradient id="grad-pink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF0844" />
+      <stop offset="100%" stop-color="#FFB199" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(150, 82)">
+    <path d="M -40,-60 L -90,0 L -40,60" fill="none" stroke="url(#grad-vortex)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 40,-60 L 90,0 L 40,60" fill="none" stroke="url(#grad-pink)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M -20,-20 C 10,-20 10,20 -20,20" fill="none" stroke="url(#grad-vortex)" stroke-width="8" stroke-linecap="round" opacity="0.8" />
+    <path d="M 20,20 C -10,20 -10,-20 20,-20" fill="none" stroke="url(#grad-pink)" stroke-width="8" stroke-linecap="round" opacity="0.8" />
+  </g>
+  <text x="150" y="217" font-family="system-ui, sans-serif" font-weight="bold" font-size="32" fill="#FFFFFF" text-anchor="middle">kallicode</text>
+  <text x="150" y="242" font-family="system-ui, sans-serif" font-size="11" fill="#64748B" letter-spacing="4" text-anchor="middle">AUTOMATED SOFTWARE</text>
+</svg>
