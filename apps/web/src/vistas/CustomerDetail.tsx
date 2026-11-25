@@ -23,8 +23,11 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { useAuth } from "../estado/auth";
+import i18n from "../i18n";
+import { formatCurrencyEUR, formatDate, formatDecimal, formatNumber, formatPercent } from "../i18n/formatters";
 import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
@@ -136,56 +139,38 @@ export interface CustomerDetailResponse {
   grafo_actividad?: CustomerGrafoActividad;
 }
 
-// ------------------------------------------------------------------ Helpers
-function formatearNumero(num: number | undefined | null): string {
-  if (num === undefined || num === null) return "0";
-  return num.toLocaleString("es-ES");
-}
-
-function formatearFecha(fechaIso: string | undefined | null): string {
-  if (!fechaIso) return "—";
-  try {
-    const f = new Date(fechaIso);
-    return f.toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-    });
-  } catch {
-    return fechaIso;
-  }
-}
-
-function obtenerBadgeEstado(estado?: string) {
+function obtenerBadgeEstado(estado: string | undefined, t: (key: string) => string) {
   switch (estado?.toLowerCase()) {
     case "activa":
-      return <Badge variante="good">Activa</Badge>;
+      return <Badge variante="good">{t("common.statuses.activa")}</Badge>;
     case "periodo_gracia":
-      return <Badge variante="warn">Periodo de Gracia</Badge>;
+      return <Badge variante="warn">{t("common.statuses.periodo_gracia")}</Badge>;
     case "suspendida":
-      return <Badge variante="bad">Suspendida</Badge>;
+      return <Badge variante="bad">{t("common.statuses.suspendida")}</Badge>;
     case "finalizada":
-      return <Badge variante="neutro">Finalizada</Badge>;
+      return <Badge variante="neutro">{t("common.statuses.finalizada")}</Badge>;
     default:
-      return <Badge variante="neutro">{estado || "Desconocido"}</Badge>;
+      return <Badge variante="neutro">{estado || t("common.states.unknown")}</Badge>;
   }
 }
 
-function obtenerBadgePlan(plan?: string) {
+function obtenerBadgePlan(plan: string | undefined, t: (key: string) => string) {
   switch (plan?.toLowerCase()) {
     case "enterprise":
-      return <Badge variante="accent">Enterprise</Badge>;
+      return <Badge variante="accent">{t("common.plans.enterprise")}</Badge>;
     case "growth":
-      return <Badge variante="good">Growth</Badge>;
+      return <Badge variante="good">{t("common.plans.growth")}</Badge>;
     case "starter":
-      return <Badge variante="neutro">Starter</Badge>;
+      return <Badge variante="neutro">{t("common.plans.starter")}</Badge>;
     default:
-      return <Badge variante="neutro">{plan || "Sin plan"}</Badge>;
+      return <Badge variante="neutro">{plan || t("common.states.noPlan")}</Badge>;
   }
 }
 
 // ------------------------------------------------------------------ Componente Principal
 export const CustomerDetail: React.FC = () => {
+  const { t, i18n: i18nInstance } = useTranslation();
+  const lang = i18nInstance.resolvedLanguage || i18nInstance.language;
   const { tenant_id } = useParams<{ tenant_id: string }>();
   const { usuario } = useAuth();
 
@@ -204,7 +189,7 @@ export const CustomerDetail: React.FC = () => {
   } = useQuery<CustomerDetailResponse, ApiError>({
     queryKey: ["business-customer-detail", tenant_id],
     queryFn: async () => {
-      if (!tenant_id) throw new ApiError(400, "PARAMETRO_REQUERIDO", "Falta el identificador de cliente");
+      if (!tenant_id) throw new ApiError(400, "PARAMETRO_REQUERIDO", i18n.t("views.customerDetail.missingTenantError"));
       return peticionApi<CustomerDetailResponse>(`/admin/v1/business/customers/${tenant_id}`);
     },
     enabled: !!tenant_id && !esRolOperaciones,
@@ -238,15 +223,15 @@ export const CustomerDetail: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
             <span style={{ fontSize: "1.5rem" }} aria-hidden="true">🚫</span>
             <h2 style={{ fontSize: "var(--text-lg)", color: "var(--error)" }}>
-              Acceso Restringido (403 ROL_STAFF_INSUFICIENTE)
+              {t("common.errors.http403.title")}
             </h2>
           </div>
           <p style={{ color: "var(--text)", marginBottom: "var(--space-4)" }}>
-            El personal con rol <strong>staff_operaciones</strong> no tiene autorización para consultar la ficha 360° ni los datos comerciales de clientes.
+            {t("views.customerDetail.rbacDenied")}
           </p>
           <div style={{ display: "flex", gap: "var(--space-3)" }}>
             <Link to="/ops/agents" className="btn btn-secondary">
-              Ir a Operaciones de Agentes
+              {t("views.customerDetail.goToAgents")}
             </Link>
           </div>
         </div>
@@ -284,14 +269,14 @@ export const CustomerDetail: React.FC = () => {
       dataTestIdError="customer-detail-error"
       tituloError={
         error?.status === 404
-          ? "Organización Cliente No Encontrada (404)"
+          ? t("views.customerDetail.error404Title")
           : error?.status === 503
-          ? "Agregados Analíticos No Disponibles (503)"
+          ? t("views.customerDetail.error503Title")
           : undefined
       }
       accionSecundariaError={
         <Link to="/business/customers" className="btn btn-secondary">
-          Volver al Listado
+          {t("views.customerDetail.backToList")}
         </Link>
       }
       alReintentar={() => void refetch()}
@@ -340,7 +325,7 @@ export const CustomerDetail: React.FC = () => {
               onClick={() => setFeedbackConcesion(null)}
               className="btn btn-ghost"
               style={{ padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-xs)" }}
-              aria-label="Cerrar notificación"
+              aria-label={t("common.actions.closeNotification")}
             >
               ✕
             </button>
@@ -365,7 +350,7 @@ export const CustomerDetail: React.FC = () => {
               className="btn btn-secondary"
               style={{ display: "inline-flex", gap: "var(--space-2)", fontSize: "var(--text-xs)" }}
             >
-              ← Volver a Directorio de Clientes
+              {t("views.customerDetail.backToDirectory")}
             </Link>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
@@ -384,13 +369,14 @@ export const CustomerDetail: React.FC = () => {
             >
               {data.tenant_id}
             </span>
-            {obtenerBadgePlan(suscripcion?.plan_codigo)}
-            {obtenerBadgeEstado(suscripcion?.estado)}
+            {obtenerBadgePlan(suscripcion?.plan_codigo, t)}
+            {obtenerBadgeEstado(suscripcion?.estado, t)}
           </div>
           <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-1)" }}>
-            Dominio corporativo:{" "}
-            <strong className="mono">{identificacion?.dominio || data.dominio || "—"}</strong> · Alta el{" "}
-            {formatearFecha(identificacion?.alta_el)}
+            {t("views.customerDetail.metaLine", {
+              domain: identificacion?.dominio || data.dominio || t("common.states.noData"),
+              date: formatDate(identificacion?.alta_el, { year: "numeric", month: "short", day: "2-digit" }, lang),
+            })}
           </p>
         </div>
 
@@ -407,7 +393,7 @@ export const CustomerDetail: React.FC = () => {
                 fontWeight: "var(--font-semibold)",
               }}
             >
-               Solicitar Revelación de Datos
+              {t("views.customerDetail.requestReveal")}
             </Boton>
           ) : (
             <span
@@ -425,7 +411,7 @@ export const CustomerDetail: React.FC = () => {
                 fontWeight: "var(--font-medium)",
               }}
             >
-              ✓ Concesión Activa (Datos en Claro)
+              {t("views.customerDetail.activeGrantBadge")}
             </span>
           )}
         </div>
@@ -453,14 +439,15 @@ export const CustomerDetail: React.FC = () => {
               id="titulo-politica-privacidad"
               style={{ fontSize: "var(--text-base)", fontWeight: "var(--font-semibold)", color: "var(--text)" }}
             >
-              Protección de PII y Política de Privacidad y Enmascaramiento por Defecto
+              {t("views.customerDetail.privacyBanner.title")}
             </h2>
             <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", marginTop: "var(--space-1)" }}>
-              Para garantizar el principio de mínimo privilegio y auditoría inmutable, los bloques de identificación,
-              usuarios e integraciones se devuelven ofuscados sin una concesión temporal justificada.
+              {t("views.customerDetail.privacyBanner.description")}
             </p>
             <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Bloques protegidos:</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.privacyBanner.protectedBlocks")}
+              </span>
               {enmascarado.map((b) => (
                 <span
                   key={b}
@@ -483,7 +470,7 @@ export const CustomerDetail: React.FC = () => {
             data-testid="btn-revelar-banner"
             style={{ borderColor: "var(--warn)", color: "var(--text)" }}
           >
-            Desbloquear Ficha
+            {t("views.customerDetail.privacyBanner.unlockButton")}
           </Boton>
         </section>
       )}
@@ -500,55 +487,75 @@ export const CustomerDetail: React.FC = () => {
         <article className="card" data-testid="card-identificacion-suscripcion">
           <header style={{ marginBottom: "var(--space-4)" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
-              1. Identificación & Suscripción
+              {t("views.customerDetail.sections.identification")}
             </h2>
           </header>
           <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", rowGap: "var(--space-3)", columnGap: "var(--space-4)" }}>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Tenant ID</dt>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.tenantId")}
+              </dt>
               <dd className="mono" style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)" }}>
                 {identificacion?.tenant_id || data.tenant_id}
               </dd>
             </div>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Razón Social</dt>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.companyName")}
+              </dt>
               <dd style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)" }}>
                 {identificacion?.razon_social || data.razon_social}
               </dd>
             </div>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Dominio</dt>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.domain")}
+              </dt>
               <dd className="mono" style={{ fontSize: "var(--text-sm)" }}>
-                {identificacion?.dominio || data.dominio || "—"}
+                {identificacion?.dominio || data.dominio || t("common.states.noData")}
               </dd>
             </div>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Fecha de Alta</dt>
-              <dd style={{ fontSize: "var(--text-sm)" }}>{formatearFecha(identificacion?.alta_el)}</dd>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.createdAt")}
+              </dt>
+              <dd style={{ fontSize: "var(--text-sm)" }}>
+                {formatDate(identificacion?.alta_el, { year: "numeric", month: "short", day: "2-digit" }, lang)}
+              </dd>
             </div>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Plan Comercial</dt>
-              <dd style={{ marginTop: "4px" }}>{obtenerBadgePlan(suscripcion?.plan_codigo)}</dd>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.plan")}
+              </dt>
+              <dd style={{ marginTop: "4px" }}>{obtenerBadgePlan(suscripcion?.plan_codigo, t)}</dd>
             </div>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Estado Suscripción</dt>
-              <dd style={{ marginTop: "4px" }}>{obtenerBadgeEstado(suscripcion?.estado)}</dd>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.subscriptionStatus")}
+              </dt>
+              <dd style={{ marginTop: "4px" }}>{obtenerBadgeEstado(suscripcion?.estado, t)}</dd>
             </div>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Fecha de Renovación</dt>
-              <dd style={{ fontSize: "var(--text-sm)" }}>{formatearFecha(suscripcion?.renueva_el)}</dd>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.renewalDate")}
+              </dt>
+              <dd style={{ fontSize: "var(--text-sm)" }}>
+                {formatDate(suscripcion?.renueva_el, { year: "numeric", month: "short", day: "2-digit" }, lang)}
+              </dd>
             </div>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Importe Mensual</dt>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.monthlyAmount")}
+              </dt>
               <dd className="tabular" style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)" }}>
-                {formatearNumero(suscripcion?.importe_mes)} {suscripcion?.moneda || "EUR"}
+                {formatCurrencyEUR(suscripcion?.importe_mes, suscripcion?.moneda || "EUR", lang)}
               </dd>
             </div>
           </dl>
 
           <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
             <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block", marginBottom: "var(--space-1)" }}>
-              Solicitudes de Cambio de Plan Pendientes:
+              {t("views.customerDetail.fields.pendingPlanChanges")}
             </span>
             {suscripcion?.solicitudes_pendientes && suscripcion.solicitudes_pendientes.length > 0 ? (
               <ul style={{ paddingLeft: "var(--space-4)", fontSize: "var(--text-xs)", color: "var(--warn)" }}>
@@ -557,7 +564,9 @@ export const CustomerDetail: React.FC = () => {
                 ))}
               </ul>
             ) : (
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Sin solicitudes pendientes</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                {t("views.customerDetail.fields.noPendingRequests")}
+              </span>
             )}
           </div>
         </article>
@@ -566,28 +575,34 @@ export const CustomerDetail: React.FC = () => {
         <article className="card" data-testid="card-lineas-produccion">
           <header style={{ marginBottom: "var(--space-4)" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
-              2. Líneas de Producción
+              {t("views.customerDetail.sections.lines")}
             </h2>
           </header>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Líneas Contratadas</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.contractedLines")}
+              </span>
               <strong className="tabular" style={{ fontSize: "var(--text-xl)" }}>
-                {lineas?.contratadas || 0}
+                {formatNumber(lineas?.contratadas || 0, undefined, lang)}
               </strong>
             </div>
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Líneas Activas</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.activeLines")}
+              </span>
               <strong className="tabular" style={{ fontSize: "var(--text-xl)", color: "var(--good)" }}>
-                {lineas?.activas || 0}
+                {formatNumber(lineas?.activas || 0, undefined, lang)}
               </strong>
             </div>
           </div>
 
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", marginBottom: "var(--space-1)" }}>
-              <span style={{ color: "var(--muted)" }}>Utilización Media del Ciclo:</span>
-              <strong className="tabular">{lineas?.utilizacion_media_pct ?? 80.0}%</strong>
+              <span style={{ color: "var(--muted)" }}>{t("views.customerDetail.fields.avgUtilization")}</span>
+              <strong className="tabular">
+                {formatPercent(lineas?.utilizacion_media_pct ?? 80.0, { decimals: 1, lang })}
+              </strong>
             </div>
             <div
               style={{
@@ -611,7 +626,8 @@ export const CustomerDetail: React.FC = () => {
               />
             </div>
             <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "var(--space-2)", display: "block" }}>
-              LOC procesadas en el ciclo: <strong className="tabular">{formatearNumero(lineas?.loc_mes || 0)} LOC</strong>
+              {t("views.customerDetail.fields.cycleLocProcessed")}{" "}
+              <strong className="tabular">{formatNumber(lineas?.loc_mes || 0, undefined, lang)} LOC</strong>
             </span>
           </div>
         </article>
@@ -620,10 +636,11 @@ export const CustomerDetail: React.FC = () => {
         <article className="card" data-testid="card-consumo-historico" style={{ gridColumn: "1 / -1" }}>
           <header style={{ marginBottom: "var(--space-4)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
-              3. Consumo del Ciclo e Histórico (Últimos 6 Ciclos)
+              {t("views.customerDetail.sections.usage")}
             </h2>
             <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
-              Coste comercial acumulado: <strong className="tabular">{consumo?.coste || 0} EUR</strong>
+              {t("views.customerDetail.fields.accumulatedCost")}{" "}
+              <strong className="tabular">{formatCurrencyEUR(consumo?.coste || 0, "EUR", lang)}</strong>
             </span>
           </header>
 
@@ -636,19 +653,25 @@ export const CustomerDetail: React.FC = () => {
             }}
           >
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>LOC Consumidas</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.locConsumed")}
+              </span>
               <strong className="tabular" style={{ fontSize: "var(--text-lg)" }}>
-                {formatearNumero(consumo?.loc_consumidas)} LOC
+                {formatNumber(consumo?.loc_consumidas, undefined, lang)} LOC
               </strong>
             </div>
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Tokens Consumidos</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.tokensConsumed")}
+              </span>
               <strong className="tabular" style={{ fontSize: "var(--text-lg)" }}>
-                {formatearNumero(consumo?.tokens_total || (consumo?.tokens_in || 0) + (consumo?.tokens_out || 0))}
+                {formatNumber(consumo?.tokens_total || (consumo?.tokens_in || 0) + (consumo?.tokens_out || 0), undefined, lang)}
               </strong>
             </div>
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Cuota Utilizada</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.quotaUsed")}
+              </span>
               <strong
                 className="tabular"
                 style={{
@@ -656,21 +679,27 @@ export const CustomerDetail: React.FC = () => {
                   color: (consumo?.cuota_pct || 0) > 90 ? "var(--error)" : "var(--good)",
                 }}
               >
-                {consumo?.cuota_pct || 0}%
+                {formatPercent(consumo?.cuota_pct || 0, { decimals: 1, lang })}
               </strong>
             </div>
           </div>
 
           <h3 style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", color: "var(--muted)", marginBottom: "var(--space-2)" }}>
-            Histórico de los Últimos 6 Ciclos Comerciales
+            {t("views.customerDetail.fields.historyTitle")}
           </h3>
           <Tabla>
             <TablaEncabezado>
               <TablaFila>
-                <TablaCeldaEncabezado>Ciclo Comercial</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado style={{ textAlign: "right" }}>LOC Consumidas</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado style={{ textAlign: "right" }}>Tokens</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado style={{ textAlign: "right" }}>% Cuota</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colCycle")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado style={{ textAlign: "right" }}>
+                  {t("views.customerDetail.fields.colLoc")}
+                </TablaCeldaEncabezado>
+                <TablaCeldaEncabezado style={{ textAlign: "right" }}>
+                  {t("views.customerDetail.fields.colTokens")}
+                </TablaCeldaEncabezado>
+                <TablaCeldaEncabezado style={{ textAlign: "right" }}>
+                  {t("views.customerDetail.fields.colQuota")}
+                </TablaCeldaEncabezado>
               </TablaFila>
             </TablaEncabezado>
             <TablaCuerpo>
@@ -681,10 +710,10 @@ export const CustomerDetail: React.FC = () => {
                       <strong className="mono">{item.ciclo}</strong>
                     </TablaCelda>
                     <TablaCelda style={{ textAlign: "right" }}>
-                      <span className="tabular">{formatearNumero(item.loc)}</span>
+                      <span className="tabular">{formatNumber(item.loc, undefined, lang)}</span>
                     </TablaCelda>
                     <TablaCelda style={{ textAlign: "right" }}>
-                      <span className="tabular">{formatearNumero(item.tokens)}</span>
+                      <span className="tabular">{formatNumber(item.tokens, undefined, lang)}</span>
                     </TablaCelda>
                     <TablaCelda style={{ textAlign: "right" }}>
                       <span
@@ -694,7 +723,7 @@ export const CustomerDetail: React.FC = () => {
                           fontWeight: item.cuota_pct > 90 ? "bold" : "normal",
                         }}
                       >
-                        {item.cuota_pct}%
+                        {formatPercent(item.cuota_pct, { decimals: 1, lang })}
                       </span>
                     </TablaCelda>
                   </TablaFila>
@@ -702,7 +731,7 @@ export const CustomerDetail: React.FC = () => {
               ) : (
                 <TablaFila>
                   <TablaCelda colSpan={4} style={{ textAlign: "center", color: "var(--muted)" }}>
-                    No hay histórico de ciclos comerciales disponible.
+                    {t("views.customerDetail.fields.noHistory")}
                   </TablaCelda>
                 </TablaFila>
               )}
@@ -714,21 +743,21 @@ export const CustomerDetail: React.FC = () => {
         <article className="card" data-testid="card-usuarios-organizacion">
           <header style={{ marginBottom: "var(--space-3)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
-              4. Usuarios de la Organización ({usuarios.length})
+              {t("views.customerDetail.sections.users", { count: usuarios.length })}
             </h2>
             {tieneDatosEnmascarados && (
               <span className="mono" style={{ fontSize: "var(--text-xs)", color: "var(--warn)" }}>
-                [Emails Enmascarados]
+                {t("views.customerDetail.fields.maskedEmails")}
               </span>
             )}
           </header>
           <Tabla>
             <TablaEncabezado>
               <TablaFila>
-                <TablaCeldaEncabezado>Usuario / Email</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado>Rol</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado>Idioma</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado>Estado</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colUserEmail")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colRole")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colLanguage")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colStatus")}</TablaCeldaEncabezado>
               </TablaFila>
             </TablaEncabezado>
             <TablaCuerpo>
@@ -759,7 +788,7 @@ export const CustomerDetail: React.FC = () => {
               ) : (
                 <TablaFila>
                   <TablaCelda colSpan={4} style={{ textAlign: "center", color: "var(--muted)" }}>
-                    Sin usuarios registrados.
+                    {t("views.customerDetail.fields.noUsers")}
                   </TablaCelda>
                 </TablaFila>
               )}
@@ -771,20 +800,20 @@ export const CustomerDetail: React.FC = () => {
         <article className="card" data-testid="card-integraciones">
           <header style={{ marginBottom: "var(--space-3)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
-              5. Integraciones Conectadas ({integraciones.length})
+              {t("views.customerDetail.sections.integrations", { count: integraciones.length })}
             </h2>
             {tieneDatosEnmascarados && (
               <span className="mono" style={{ fontSize: "var(--text-xs)", color: "var(--warn)" }}>
-                [Rutas Enmascaradas]
+                {t("views.customerDetail.fields.maskedPaths")}
               </span>
             )}
           </header>
           <Tabla>
             <TablaEncabezado>
               <TablaFila>
-                <TablaCeldaEncabezado>Tipo</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado>Identificador / Nombre</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado>Estado</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colType")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colIdentifier")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colStatus")}</TablaCeldaEncabezado>
               </TablaFila>
             </TablaEncabezado>
             <TablaCuerpo>
@@ -809,7 +838,7 @@ export const CustomerDetail: React.FC = () => {
               ) : (
                 <TablaFila>
                   <TablaCelda colSpan={3} style={{ textAlign: "center", color: "var(--muted)" }}>
-                    Sin integraciones configuradas.
+                    {t("views.customerDetail.fields.noIntegrations")}
                   </TablaCelda>
                 </TablaFila>
               )}
@@ -821,7 +850,7 @@ export const CustomerDetail: React.FC = () => {
         <article className="card" data-testid="card-actividad-grafo" style={{ gridColumn: "1 / -1" }}>
           <header style={{ marginBottom: "var(--space-4)" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
-              6. Actividad de Pipeline y Estructura CodeMapping
+              {t("views.customerDetail.sections.pipelineGraph")}
             </h2>
           </header>
           <div
@@ -832,32 +861,42 @@ export const CustomerDetail: React.FC = () => {
             }}
           >
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Cobertura de Grafo</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.graphCoverage")}
+              </span>
               <strong className="tabular" style={{ fontSize: "var(--text-xl)", color: "var(--accent)" }}>
-                {coberturaPct}%
+                {formatPercent(coberturaPct, { decimals: 1, lang })}
               </strong>
             </div>
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Nodos Indexados</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.indexedNodes")}
+              </span>
               <strong className="tabular" style={{ fontSize: "var(--text-xl)" }}>
-                {formatearNumero(nodosTotal)}
+                {formatNumber(nodosTotal, undefined, lang)}
               </strong>
             </div>
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Aristas de Dependencia</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.dependencyEdges")}
+              </span>
               <strong className="tabular" style={{ fontSize: "var(--text-xl)" }}>
-                {formatearNumero(aristasTotal)}
+                {formatNumber(aristasTotal, undefined, lang)}
               </strong>
             </div>
             <div style={{ padding: "var(--space-3)", backgroundColor: "var(--surface2)", borderRadius: "var(--radius-md)" }}>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>Rendimiento End-to-End (p50)</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", display: "block" }}>
+                {t("views.customerDetail.fields.e2ePerformance")}
+              </span>
               <strong className="tabular" style={{ fontSize: "var(--text-xl)" }}>
-                {rendimientoHoras} h
+                {t("views.customerDetail.fields.hoursValue", {
+                  hours: formatDecimal(rendimientoHoras, 1, lang),
+                })}
               </strong>
             </div>
           </div>
           <p style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "var(--space-3)" }}>
-            * El grafo CodeMapping refleja relaciones de arquitectura sin exponer contenido de ficheros salvo concesión con alcance específico.
+            {t("views.customerDetail.fields.graphNote")}
           </p>
         </article>
       </div>
@@ -868,9 +907,9 @@ export const CustomerDetail: React.FC = () => {
         alCerrar={handleCerrarModal}
         tenantId={tenant_id}
         razonSocial={identificacion?.razon_social}
-        titulo="Solicitud de Concesión de Acceso a Datos de Cliente"
+        titulo={t("views.customerDetail.grantModalTitle")}
         onConcesionConcedida={() => {
-          setFeedbackConcesion("Concesión de acceso autorizada. Los datos sensibles han sido revelados en claro.");
+          setFeedbackConcesion(t("views.customerDetail.grantSuccessFeedback"));
           void refetch();
         }}
       />

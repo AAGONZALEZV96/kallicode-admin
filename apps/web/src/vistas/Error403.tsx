@@ -4,11 +4,13 @@
 
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../estado/auth";
 import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 
 export const Error403: React.FC = () => {
+  const { t } = useTranslation();
   const { usuario } = useAuth();
   const navigate = useNavigate();
 
@@ -58,7 +60,7 @@ export const Error403: React.FC = () => {
             marginBottom: "0.75rem",
           }}
         >
-          Acceso Restringido (403)
+          {t("auth.error403.title")}
         </h1>
         <p
           style={{
@@ -68,8 +70,7 @@ export const Error403: React.FC = () => {
             lineHeight: "1.5",
           }}
         >
-          Tu rol de personal actual no cuenta con las atribuciones suficientes
-          en la matriz de permisos para acceder a esta sección.
+          {t("auth.error403.description")}
         </p>
 
         {usuario && (
@@ -84,7 +85,7 @@ export const Error403: React.FC = () => {
               color: "var(--muted, #94a3b8)",
             }}
           >
-            <span>Rol asignado:</span>
+            <span>{t("auth.error403.assignedRole")}</span>
             <Badge variante="warn">{usuario.role}</Badge>
           </div>
         )}
@@ -94,7 +95,7 @@ export const Error403: React.FC = () => {
             variante="primary"
             onClick={() => navigate("/")}
           >
-            Volver al Inicio
+            {t("auth.error403.backHome")}
           </Boton>
         </div>
       </div>

@@ -6,19 +6,22 @@
  */
 
 import { Component, ErrorInfo, ReactNode } from "react";
+import { withTranslation, WithTranslation } from "react-i18next";
 import { Boton } from "./Boton";
 
-interface ErrorBoundaryProps {
+interface ErrorBoundaryOwnProps {
   children: ReactNode;
   fallback?: (error: Error, resetError: () => void) => ReactNode;
 }
+
+type ErrorBoundaryProps = ErrorBoundaryOwnProps & WithTranslation;
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundaryBase extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -47,6 +50,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   };
 
   render(): ReactNode {
+    const { t } = this.props;
+
     if (this.state.hasError && this.state.error) {
       if (this.props.fallback) {
         return this.props.fallback(this.state.error, this.resetError);
@@ -103,7 +108,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 color: "var(--text, #f8fafc)",
               }}
             >
-              Ha ocurrido un error inesperado
+              {t("common.errors.unexpectedTitle")}
             </h1>
             <p
               style={{
@@ -113,8 +118,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 lineHeight: "1.4",
               }}
             >
-              La consola ha detectado un fallo al renderizar la vista. Los datos de sesión y
-              auditoría se mantienen a salvo.
+              {t("common.errors.unexpectedDescription")}
             </p>
 
             <div
@@ -131,7 +135,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 wordBreak: "break-all",
               }}
             >
-              {this.state.error.message || "Error desconocido"}
+              {this.state.error.message || t("common.errors.unknown")}
             </div>
 
             <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
@@ -139,7 +143,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 variante="primary"
                 onClick={this.resetError}
               >
-                Reintentar
+                {t("common.actions.retry")}
               </Boton>
               <Boton
                 variante="secondary"
@@ -147,7 +151,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   window.location.href = "/";
                 }}
               >
-                Ir al inicio
+                {t("common.actions.backHome")}
               </Boton>
             </div>
           </div>
@@ -158,3 +162,5 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return this.props.children;
   }
 }
+
+export const ErrorBoundary = withTranslation()(ErrorBoundaryBase);

@@ -92,7 +92,7 @@ describe("OpsAgents — Estado de Agentes de Producción, Colas y Rendimiento", 
 
     const etapaBuild = screen.getByTestId("etapa-build");
     expect(etapaBuild.textContent).toContain("Alerta");
-    expect(etapaBuild.textContent).toContain("54.2 s");
+    expect(etapaBuild.textContent).toContain("54,2 s");
     expect(screen.getByTestId("lista-alertas-etapas").textContent).toContain(
       "1 agente sin latido en etapa build"
     );

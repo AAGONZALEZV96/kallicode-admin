@@ -10,6 +10,7 @@
  */
 
 import React, { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Skeleton } from "./Skeleton";
 
 export type TipoEstadoCarga = "kpis" | "tabla" | "detalle" | "formulario" | "lista" | "generico";
@@ -42,7 +43,7 @@ export const EstadoCarga: React.FC<EstadoCargaProps> = ({
   filas = 5,
   columnas = 4,
   tarjetas = 4,
-  mensaje = "Cargando datos...",
+  mensaje,
   tiempoLimiteMs,
   alExpirarTiempoLimite,
   className = "",
@@ -50,6 +51,8 @@ export const EstadoCarga: React.FC<EstadoCargaProps> = ({
   "data-testid": dataTestId = "estado-carga",
   ...props
 }) => {
+  const { t } = useTranslation();
+  const mensajeEfectivo = mensaje ?? t("common.states.loading");
   const alExpirarRef = useRef(alExpirarTiempoLimite);
   alExpirarRef.current = alExpirarTiempoLimite;
 
@@ -314,7 +317,7 @@ export const EstadoCarga: React.FC<EstadoCargaProps> = ({
       {...props}
     >
       <span className="sr-only" style={srOnlyStyle}>
-        {mensaje}
+        {mensajeEfectivo}
       </span>
       {renderContenido()}
     </div>

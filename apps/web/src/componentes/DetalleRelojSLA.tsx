@@ -9,7 +9,10 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi } from "../api/clienteApi";
+import i18n from "../i18n";
+import { formatDateTime, formatDecimal } from "../i18n/formatters";
 import { Modal } from "./Modal";
 import { Badge, BadgeVariante } from "./Badge";
 import { Boton } from "./Boton";
@@ -54,17 +57,20 @@ export interface DetalleRelojSLAProps {
   alCerrar: () => void;
 }
 
-const ETIQUETAS_CAUSA_PAUSA: Record<string, string> = {
-  espera_firma_cliente: "Espera de firma del cliente",
-  escalado_humano: "Escalado a revisión humana",
-  ventana_mantenimiento: "Ventana de mantenimiento programado",
-  indisponibilidad_proveedor_llm: "Indisponibilidad de proveedor LLM",
-  otro: "Otra pausa justificada",
-};
+const CAUSAS_PAUSA_CONOCIDAS = new Set([
+  "espera_firma_cliente",
+  "escalado_humano",
+  "ventana_mantenimiento",
+  "indisponibilidad_proveedor_llm",
+  "otro",
+]);
 
 export function traducirCausaPausa(causa: string | null | undefined): string {
-  if (!causa) return "Pausa justificada";
-  return ETIQUETAS_CAUSA_PAUSA[causa] ?? causa.replace(/_/g, " ");
+  if (!causa) return i18n.t("components.slaClock.pauseCauses.default");
+  if (CAUSAS_PAUSA_CONOCIDAS.has(causa)) {
+    return i18n.t(`components.slaClock.pauseCauses.${causa}`);
+  }
+  return causa.replace(/_/g, " ");
 }
 
 function obtenerVarianteResultado(resultado: SlaResultado): BadgeVariante {
@@ -82,20 +88,10 @@ function obtenerVarianteResultado(resultado: SlaResultado): BadgeVariante {
   }
 }
 
-function formatearFechaHora(iso: string | null | undefined): string {
-  if (!iso) return "En curso";
-  const fecha = new Date(iso);
-  if (isNaN(fecha.getTime())) return iso;
-  return fecha.toLocaleString("es-ES", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-}
-
-function sanitizarReglaTexto(texto: string): string {
+function sanitizarReglaTexto(texto: string, sanitizedTableLabel: string): string {
   return texto
     .replace(/§\d+(\.\d+)?/g, "")
-    .replace(/\badmin\.[a-z0-9_]+\b/gi, "registro interno de nivel de servicio")
+    .replace(/\badmin\.[a-z0-9_]+\b/gi, sanitizedTableLabel)
     .trim();
 }
 
@@ -104,6 +100,9 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
   abierto,
   alCerrar,
 }) => {
+  const { t, i18n: i18nInstance } = useTranslation();
+  const lang = i18nInstance.resolvedLanguage || i18nInstance.language;
+
   const {
     data,
     isLoading,
@@ -128,17 +127,23 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
   const pctComputado = totalBarra > 0 ? Math.min(100, (computado / totalBarra) * 100) : 0;
   const pctPausas = totalBarra > 0 ? Math.max(0, 100 - pctComputado) : 0;
 
+  const formatHours = (val: number, decimals = 2) => formatDecimal(val, decimals, lang);
+
   return (
     <Modal
       abierto={abierto}
       alCerrar={alCerrar}
-      titulo={jobId ? `Desglose del reloj de servicio: ${jobId}` : "Desglose del reloj de servicio"}
+      titulo={
+        jobId
+          ? t("components.slaClock.titleWithJob", { jobId })
+          : t("components.slaClock.title")
+      }
       idTitulo="detalle-reloj-sla-titulo"
       anchoMaximo="820px"
       pie={
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <Boton variante="secondary" onClick={alCerrar}>
-            Cerrar
+            {t("common.actions.close")}
           </Boton>
         </div>
       }
@@ -148,11 +153,11 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
         error={error}
         vacio={!data}
         tipoCarga="detalle"
-        mensajeCarga="Cargando tramos cronológicos del reloj SLA..."
+        mensajeCarga={t("components.slaClock.loading")}
         onReintentar={() => void refetch()}
-        tituloError="No se pudo obtener el desglose del reloj SLA"
-        tituloVacio="Sin datos de reloj para este caso"
-        descripcionVacio="No existen segmentos registrados para el identificador seleccionado."
+        tituloError={t("components.slaClock.errorTitle")}
+        tituloVacio={t("components.slaClock.emptyTitle")}
+        descripcionVacio={t("components.slaClock.emptyDescription")}
         dataTestIdCarga="detalle-reloj-loading"
         dataTestIdError="detalle-reloj-error"
         dataTestIdTrace="detalle-reloj-trace"
@@ -172,37 +177,47 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
               }}
             >
               <div>
-                <div style={{ fontSize: "11px", color: "var(--muted)" }}>Ticket</div>
+                <div style={{ fontSize: "11px", color: "var(--muted)" }}>{t("components.slaClock.fields.ticket")}</div>
                 <div className="mono" style={{ fontWeight: 600 }}>
-                  {data.ticket_numero || data.ticket_id || "—"}
+                  {data.ticket_numero || data.ticket_id || t("common.states.noData")}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11px", color: "var(--muted)" }}>Cliente / Tenant</div>
+                <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                  {t("components.slaClock.fields.customerTenant")}
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600 }}>
                     {data.razon_social || data.tenant_id}
                   </span>
                   <Badge variante={estaEnmascarado ? "masked" : "good"}>
-                    {estaEnmascarado ? "ENMASCARADO" : "EN CLARO"}
+                    {estaEnmascarado ? t("common.states.masked") : t("common.states.unmasked")}
                   </Badge>
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11px", color: "var(--muted)" }}>Plan y Objetivo</div>
+                <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                  {t("components.slaClock.fields.planAndTarget")}
+                </div>
                 <div style={{ fontWeight: 600, textTransform: "capitalize" }}>
-                  {data.plan || "—"} ·{" "}
-                  {data.objetivo_h != null ? `${data.objetivo_h.toFixed(1)} h` : "Sin objetivo"}
+                  {data.plan || t("common.states.noData")} ·{" "}
+                  {data.objetivo_h != null
+                    ? t("components.slaClock.fields.targetHours", { hours: formatHours(data.objetivo_h, 1) })
+                    : t("components.slaClock.fields.noTarget")}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11px", color: "var(--muted)" }}>Etapa y Resultado</div>
+                <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                  {t("components.slaClock.fields.stageAndResult")}
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
                   <span style={{ fontSize: "13px", textTransform: "uppercase" }}>
-                    {data.etapa_actual || "—"}
+                    {data.etapa_actual || t("common.states.noData")}
                   </span>
                   <Badge variante={obtenerVarianteResultado(data.resultado)} punto>
-                    {data.resultado.toUpperCase()}
+                    {t(`views.opsSla.results.${data.resultado}`, {
+                      defaultValue: data.resultado.toUpperCase(),
+                    })}
                   </Badge>
                 </div>
               </div>
@@ -210,7 +225,7 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
 
             {/* Ecuación de consistencia matemática */}
             <section
-              aria-label="Ecuación de consistencia del reloj SLA"
+              aria-label={t("components.slaClock.equation.regionLabel")}
               data-testid="ecuacion-reloj-sla"
               style={{
                 padding: "14px",
@@ -227,7 +242,7 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                   marginBottom: "10px",
                 }}
               >
-                Ecuación de consistencia: Tiempo Bruto = Tiempo Computado + Horas de Pausa Justificada
+                {t("components.slaClock.equation.formula")}
               </div>
 
               <div
@@ -246,9 +261,11 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                     backgroundColor: "var(--surface2, #1e293b)",
                   }}
                 >
-                  <div style={{ fontSize: "11px", color: "var(--muted)" }}>Tiempo Bruto</div>
+                  <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                    {t("components.slaClock.equation.gross")}
+                  </div>
                   <div className="mono" style={{ fontSize: "18px", fontWeight: 700 }}>
-                    {bruto.toFixed(2)} h
+                    {t("components.slaClock.fields.targetHours", { hours: formatHours(bruto, 2) })}
                   </div>
                 </div>
                 <div
@@ -260,13 +277,13 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                   }}
                 >
                   <div style={{ fontSize: "11px", color: "var(--accent, #38bdf8)" }}>
-                    Tiempo Computado (Neto)
+                    {t("components.slaClock.equation.computed")}
                   </div>
                   <div
                     className="mono"
                     style={{ fontSize: "18px", fontWeight: 700, color: "var(--accent, #38bdf8)" }}
                   >
-                    {computado.toFixed(2)} h
+                    {t("components.slaClock.fields.targetHours", { hours: formatHours(computado, 2) })}
                   </div>
                 </div>
                 <div
@@ -278,13 +295,13 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                   }}
                 >
                   <div style={{ fontSize: "11px", color: "var(--warn, #f59e0b)" }}>
-                    Horas de Pausa Justificada
+                    {t("components.slaClock.equation.paused")}
                   </div>
                   <div
                     className="mono"
                     style={{ fontSize: "18px", fontWeight: 700, color: "var(--warn, #f59e0b)" }}
                   >
-                    {pausas.toFixed(2)} h
+                    {t("components.slaClock.fields.targetHours", { hours: formatHours(pausas, 2) })}
                   </div>
                 </div>
               </div>
@@ -292,7 +309,10 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
               {/* Barra visual proporcional */}
               <div
                 role="img"
-                aria-label={`Distribución del reloj: ${computado.toFixed(2)} horas computables y ${pausas.toFixed(2)} horas en pausa justificada`}
+                aria-label={t("components.slaClock.equation.barAria", {
+                  computed: formatHours(computado, 2),
+                  paused: formatHours(pausas, 2),
+                })}
                 style={{
                   display: "flex",
                   height: "12px",
@@ -307,7 +327,9 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                     backgroundColor: "var(--accent, #38bdf8)",
                     transition: "width 0.25s ease",
                   }}
-                  title={`Computable: ${computado.toFixed(2)} h`}
+                  title={t("components.slaClock.equation.computableTitle", {
+                    hours: formatHours(computado, 2),
+                  })}
                 />
                 <div
                   style={{
@@ -315,19 +337,21 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                     backgroundColor: "var(--warn, #f59e0b)",
                     transition: "width 0.25s ease",
                   }}
-                  title={`Pausa justificada: ${pausas.toFixed(2)} h`}
+                  title={t("components.slaClock.equation.pausedTitle", {
+                    hours: formatHours(pausas, 2),
+                  })}
                 />
               </div>
             </section>
 
             {/* Línea de tiempo cronológica de tramos */}
-            <section aria-label="Línea de tiempo de tramos cronológicos" data-testid="timeline-tramos-sla">
+            <section aria-label={t("components.slaClock.timeline.regionLabel")} data-testid="timeline-tramos-sla">
               <h3 style={{ fontSize: "14px", fontWeight: 650, margin: "0 0 10px 0" }}>
-                Línea de tiempo cronológica de tramos
+                {t("components.slaClock.timeline.title")}
               </h3>
               {data.tramos.length === 0 ? (
                 <div style={{ fontSize: "13px", color: "var(--muted)" }}>
-                  No hay tramos registrados para este caso.
+                  {t("components.slaClock.timeline.empty")}
                 </div>
               ) : (
                 <ol
@@ -346,6 +370,10 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                     const colorBorde = esComputable
                       ? "var(--accent, #38bdf8)"
                       : "var(--warn, #f59e0b)";
+                    const inicioStr = formatDateTime(tramo.inicio, undefined, lang);
+                    const finStr = tramo.fin
+                      ? formatDateTime(tramo.fin, undefined, lang)
+                      : t("common.states.inProgress");
                     return (
                       <li
                         key={`${tramo.inicio}-${idx}`}
@@ -367,10 +395,12 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                             <span style={{ fontWeight: 600, textTransform: "uppercase", fontSize: "12px" }}>
-                              {tramo.etapa || "General"}
+                              {tramo.etapa || t("common.states.general")}
                             </span>
                             <Badge variante={esComputable ? "accent" : "warn"}>
-                              {esComputable ? "Computa al SLA" : "Pausa justificada"}
+                              {esComputable
+                                ? t("components.slaClock.timeline.computableBadge")
+                                : t("components.slaClock.timeline.pausedBadge")}
                             </Badge>
                             {!esComputable && tramo.causa_pausa && (
                               <span
@@ -385,12 +415,12 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                             )}
                           </div>
                           <div style={{ fontSize: "12px", color: "var(--muted)" }}>
-                            {formatearFechaHora(tramo.inicio)} — {formatearFechaHora(tramo.fin)}
+                            {inicioStr} — {finStr}
                           </div>
                         </div>
 
                         <div className="mono" style={{ fontWeight: 700, fontSize: "14px" }}>
-                          {duracion.toFixed(2)} h
+                          {t("components.slaClock.fields.targetHours", { hours: formatHours(duracion, 2) })}
                         </div>
                       </li>
                     );
@@ -402,7 +432,7 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
             {/* Reglas aplicadas ADR-003 */}
             {data.reglas_aplicadas && data.reglas_aplicadas.length > 0 && (
               <section
-                aria-label="Reglas aplicadas en el cómputo de nivel de servicio"
+                aria-label={t("components.slaClock.rules.regionLabel")}
                 data-testid="reglas-adr003-sla"
                 style={{
                   padding: "12px",
@@ -412,11 +442,13 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
                 }}
               >
                 <h3 style={{ fontSize: "13px", fontWeight: 650, margin: "0 0 8px 0" }}>
-                  Criterios y deducciones aplicadas en el reloj
+                  {t("components.slaClock.rules.title")}
                 </h3>
                 <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "13px", display: "grid", gap: "6px" }}>
                   {data.reglas_aplicadas.map((regla, idx) => (
-                    <li key={idx}>{sanitizarReglaTexto(regla)}</li>
+                    <li key={idx}>
+                      {sanitizarReglaTexto(regla, t("components.slaClock.rules.sanitizedTable"))}
+                    </li>
                   ))}
                 </ul>
               </section>

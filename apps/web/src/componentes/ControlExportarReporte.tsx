@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { clienteApi } from "../api/clienteApi";
 import { useOptionalAuth, RolStaff } from "../estado/auth";
 import { Boton } from "./Boton";
@@ -40,12 +41,6 @@ const ETIQUETAS_TIPO: Record<TipoReporteExportable, string> = {
   clientes: "Resumen de Clientes y Consumo",
   suscripciones: "Suscripciones y Renovaciones",
   sla: "Cumplimiento de SLA e Incidentes",
-};
-
-const ETIQUETAS_FORMATO: Record<FormatoReporteExportable, string> = {
-  csv: "CSV (Valores separados por comas)",
-  xlsx: "Excel (.xlsx)",
-  pdf: "PDF (Informe ejecutivo con sello SHA-256)",
 };
 
 function construirContenidoLocal(
@@ -154,12 +149,13 @@ function dispararDescargaNavegador(blob: Blob, filename: string): void {
 
 export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
   tipo,
-  etiquetaBoton = "Exportar Informe",
+  etiquetaBoton,
   tituloModal,
   formatosPermitidos = ["csv", "xlsx", "pdf"],
   rolesPermitidos = ["staff_negocio", "staff_admin"],
   tenantId = null,
 }) => {
+  const { t } = useTranslation();
   const auth = useOptionalAuth();
   const rolActual = auth?.usuario?.role;
 
@@ -181,9 +177,11 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
     return null;
   }
 
+  const etiquetaBotonEfectiva = etiquetaBoton ?? t("components.exportReport.button");
+  const tipoTraducido = t(`components.exportReport.types.${tipo}`);
   const opcionesFormato = formatosPermitidos.map((f) => ({
     valor: f,
-    etiqueta: ETIQUETAS_FORMATO[f],
+    etiqueta: t(`components.exportReport.formats.${f}`),
   }));
 
   const manejarGenerar = async (e: React.FormEvent) => {
@@ -192,7 +190,7 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
     setResultado(null);
 
     if (!desde || !hasta || desde > hasta) {
-      setErrorMsg("El rango de fechas seleccionado no es válido.");
+      setErrorMsg(t("components.exportReport.invalidRange"));
       return;
     }
 
@@ -239,7 +237,7 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
         formato,
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "No fue posible generar el informe.";
+      const msg = err instanceof Error ? err.message : t("components.exportReport.genericError");
       setErrorMsg(msg);
     } finally {
       setCargando(false);
@@ -270,24 +268,23 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
         }}
         data-testid={`btn-exportar-${tipo}`}
       >
-        {etiquetaBoton}
+        {etiquetaBotonEfectiva}
       </Boton>
 
       <Modal
         abierto={abierto}
         alCerrar={() => setAbierto(false)}
-        titulo={tituloModal || `Exportar Informe · ${ETIQUETAS_TIPO[tipo]}`}
+        titulo={tituloModal || t("components.exportReport.modalTitle", { type: tipoTraducido })}
         idTitulo={`modal-exportar-${tipo}`}
       >
         <form onSubmit={manejarGenerar} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--muted)", lineHeight: 1.5 }}>
-            Genera un archivo exportable determinista con sello de integridad SHA-256. Por política de
-            privacidad (ADM-G09), las razones sociales se exportan enmascaradas por defecto.
+            {t("components.exportReport.description")}
           </p>
 
           <Select
             id={`formato-reporte-${tipo}`}
-            etiqueta="Formato de exportación"
+            etiqueta={t("components.exportReport.formatLabel")}
             value={formato}
             onChange={(e) => setFormato(e.target.value as FormatoReporteExportable)}
             opciones={opcionesFormato}
@@ -304,7 +301,7 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
                   marginBottom: "0.25rem",
                 }}
               >
-                Desde
+                {t("components.exportReport.fromLabel")}
               </label>
               <Input
                 id={`desde-reporte-${tipo}`}
@@ -324,7 +321,7 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
                   marginBottom: "0.25rem",
                 }}
               >
-                Hasta
+                {t("components.exportReport.toLabel")}
               </label>
               <Input
                 id={`hasta-reporte-${tipo}`}
@@ -367,16 +364,16 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <strong>Informe generado y descargado</strong>
+                <strong>{t("components.exportReport.successTitle")}</strong>
                 <Badge variante="good">{resultado.formato.toUpperCase()}</Badge>
               </div>
               <div style={{ color: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>
-                <div>ID: {resultado.reportId}</div>
-                <div>SHA-256: {resultado.sha256.slice(0, 24)}...</div>
+                <div>{t("components.exportReport.idLabel", { id: resultado.reportId })}</div>
+                <div>{t("components.exportReport.shaLabel", { hash: resultado.sha256.slice(0, 24) })}</div>
               </div>
               <div>
                 <Boton type="button" variante="secondary" tamano="sm" onClick={manejarRedescarga}>
-                  Descargar nuevamente (.{resultado.formato})
+                  {t("components.exportReport.downloadAgain", { format: resultado.formato })}
                 </Boton>
               </div>
             </div>
@@ -384,7 +381,7 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
             <Boton type="button" variante="ghost" tamano="sm" onClick={() => setAbierto(false)}>
-              Cerrar
+              {t("common.actions.close")}
             </Boton>
             <Boton
               type="submit"
@@ -393,7 +390,9 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
               cargando={cargando}
               data-testid={`btn-confirmar-exportar-${tipo}`}
             >
-              {cargando ? "Generando..." : "Generar y Descargar"}
+              {cargando
+                ? t("components.exportReport.generating")
+                : t("components.exportReport.generateAndDownload")}
             </Boton>
           </div>
         </form>

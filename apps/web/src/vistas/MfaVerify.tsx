@@ -4,12 +4,14 @@
 
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../estado/auth";
 import { Input } from "../componentes/Input";
 import { Boton } from "../componentes/Boton";
 import { LogoKalliCode } from "../componentes/LogoKalliCode";
 
 export const MfaVerify: React.FC = () => {
+  const { t } = useTranslation();
   const { verificarMfa, mfaPendiente, estaAutenticado, cargando } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,7 +34,7 @@ export const MfaVerify: React.FC = () => {
 
     const limpio = codigo.trim();
     if (!limpio || limpio.length < 6) {
-      setErrorLocal("Ingresa el código TOTP de 6 dígitos.");
+      setErrorLocal(t("auth.mfa.errors.invalidLength"));
       return;
     }
 
@@ -42,7 +44,7 @@ export const MfaVerify: React.FC = () => {
       const origen = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
       navigate(origen, { replace: true });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Código de verificación no válido.";
+      const msg = err instanceof Error ? err.message : t("auth.mfa.errors.invalidCode");
       setErrorLocal(msg);
     }
   };
@@ -88,10 +90,10 @@ export const MfaVerify: React.FC = () => {
               marginBottom: "0.5rem",
             }}
           >
-            Verificación en Dos Pasos
+            {t("auth.mfa.title")}
           </h1>
           <p style={{ fontSize: "0.875rem", color: "var(--muted, #94a3b8)", lineHeight: "1.4" }}>
-            Ingresa el código de 6 dígitos de tu aplicación autenticadora (TOTP)
+            {t("auth.mfa.subtitle")}
           </p>
         </div>
 
@@ -125,7 +127,7 @@ export const MfaVerify: React.FC = () => {
                 textAlign: "center",
               }}
             >
-              Código de Verificación
+              {t("auth.mfa.codeLabel")}
             </label>
             <Input
               id="codigo"
@@ -134,7 +136,7 @@ export const MfaVerify: React.FC = () => {
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={8}
-              placeholder="123456"
+              placeholder={t("auth.mfa.codePlaceholder")}
               value={codigo}
               onChange={(e) => setCodigo(e.target.value)}
               autoFocus
@@ -150,7 +152,7 @@ export const MfaVerify: React.FC = () => {
               cargando={cargando}
               style={{ width: "100%", justifyContent: "center" }}
             >
-              Verificar e Ingresar
+              {t("auth.mfa.submit")}
             </Boton>
             <Boton
               type="button"
@@ -158,7 +160,7 @@ export const MfaVerify: React.FC = () => {
               onClick={() => navigate("/login")}
               style={{ width: "100%", justifyContent: "center" }}
             >
-              Volver al Login
+              {t("auth.mfa.backToLogin")}
             </Boton>
           </div>
         </form>
