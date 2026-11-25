@@ -25,7 +25,11 @@ from kallicode_core.ids import nuevo
 from kallicode_core.logging import log
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..audit import registrar_accion, verificar_cadena
+from ..audit import (
+    registrar_accion,
+    verificar_cadena,
+    verificar_cadena_central_tenant,
+)
 from ..db import admin_session, todos, uno
 from ..deps import ADMIN, Staff, exigir, limite_rl4
 from ..pagination import Pagina, paginacion, sobre
@@ -165,6 +169,15 @@ async def acciones(
         # La verificación se hace sobre el tramo consultado, no sobre toda la
         # cadena: el coste no debe crecer con la historia (lección de BE-F32).
         rupturas = await verificar_cadena(db, str(desde), str(hasta + timedelta(days=1)))
+        if tenant_id:
+            central = await verificar_cadena_central_tenant(
+                db,
+                tenant_id,
+                desde=str(desde),
+                hasta=str(hasta + timedelta(days=1)),
+            )
+            if not central.integra:
+                rupturas = [*rupturas, *central.roturas]
         integra = not rupturas
         for f in filas:
             f["verificado"] = integra
