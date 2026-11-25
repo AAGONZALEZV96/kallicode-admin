@@ -46,6 +46,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from . import db as dbmod
 from .deps import cerrar_redis
+from .metrics import obtener_ruta_normalizada, registrar_peticion_http
 from .settings import AdminSettings, get_admin_settings
 
 MAX_BODY_BYTES = 2 * 1024 * 1024  # 2 MB: la consola no recibe adjuntos
@@ -204,9 +205,16 @@ async def contexto_y_cabeceras(
     trace_id = request.headers.get("x-trace-id") or f"tr_{uuid.uuid4().hex[:24]}"
     request.state.trace_id = trace_id
     bind_contexto(trace_id=trace_id)
+    inicio = time.perf_counter()
 
     largo = request.headers.get("content-length")
     if largo and int(largo) > MAX_BODY_BYTES:
+        registrar_peticion_http(
+            request.method,
+            obtener_ruta_normalizada(request),
+            413,
+            time.perf_counter() - inicio,
+        )
         limpiar_contexto()
         return JSONResponse(
             status_code=413,
@@ -219,17 +227,30 @@ async def contexto_y_cabeceras(
             headers={"X-Trace-Id": trace_id},
         )
 
-    inicio = time.perf_counter()
     try:
         resp = await call_next(request)
     except Exception as exc:
-        latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+        duracion_s = time.perf_counter() - inicio
+        latencia_ms = round(duracion_s * 1000, 2)
+        registrar_peticion_http(
+            request.method,
+            obtener_ruta_normalizada(request),
+            500,
+            duracion_s,
+        )
         limpiar_contexto()
         return _respuesta_error_interno(request, exc, trace_id, latencia_ms=latencia_ms)
     finally:
         limpiar_contexto()
 
-    latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+    duracion_s = time.perf_counter() - inicio
+    latencia_ms = round(duracion_s * 1000, 2)
+    registrar_peticion_http(
+        request.method,
+        obtener_ruta_normalizada(request),
+        resp.status_code,
+        duracion_s,
+    )
     log.info("http", metodo=request.method, ruta=request.url.path, latencia_ms=latencia_ms)
     resp.headers["X-Trace-Id"] = trace_id
     return resp
@@ -328,9 +349,20 @@ def registrar_routers() -> None:
     Se hace en una función para que las pruebas puedan construir la aplicación
     sin arrancar el ciclo de vida completo.
     """
-    from .routers import admin_audit, audit, auth, business, grants, health, ops, staff
+    from .routers import (
+        admin_audit,
+        audit,
+        auth,
+        business,
+        grants,
+        health,
+        metrics,
+        ops,
+        staff,
+    )
 
     app.include_router(health.router)  # §18.31
+    app.include_router(metrics.router)  # KC-ADM-B6-08 · Observabilidad Prometheus
     app.include_router(auth.router)  # §18.1 – §18.8
     app.include_router(staff.router)  # §18.9 – §18.12
     app.include_router(grants.router)  # §18.13 – §18.15

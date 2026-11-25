@@ -30,6 +30,7 @@ from kallicode_core.logging import log
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import todos, uno
+from .metrics import registrar_accion_personal_metrica
 
 Accion = Literal[
     "grant_created",
@@ -484,6 +485,7 @@ async def registrar_accion(
     )
     assert fila is not None
     sello: str = fila["seal"]
+    registrar_accion_personal_metrica(staff_role, action)
 
     if tenant_id:
         await _conectar_evento_a_cadena_central(
