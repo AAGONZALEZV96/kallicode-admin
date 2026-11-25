@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { Modal } from "./Modal";
 import { Boton } from "./Boton";
@@ -31,10 +32,12 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
   alCerrar,
   tenantId: tenantIdProp = "",
   razonSocial = "",
-  titulo = "Solicitar Revelación de Datos de Cliente (E6)",
+  titulo,
   onConcesionConcedida,
 }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const tituloEfectivo = titulo ?? t("components.accessGrant.defaultTitle");
 
   const [tenantId, setTenantId] = useState<string>(tenantIdProp);
   const [motivo, setMotivo] = useState<string>("");
@@ -74,7 +77,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
 
       const targetTenant = tenantId.trim() || tenantIdProp.trim();
       if (!targetTenant) {
-        setError("Debe especificar el identificador de la organización (tenant_id).");
+        setError(t("components.accessGrant.validation.missingTenant"));
         return;
       }
 
@@ -82,12 +85,12 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
       const refEfectiva = referencia.trim() || (PATRON_TICKET.exec(motivoLimpio)?.[0] || "");
 
       if (motivoLimpio.length < 20) {
-        setError("El motivo debe contener al menos 20 caracteres justificando el acceso.");
+        setError(t("components.accessGrant.validation.minReason"));
         return;
       }
 
       if (!PATRON_TICKET.test(refEfectiva) && !PATRON_TICKET.test(motivoLimpio)) {
-        setError("Debe incluir una referencia obligatoria a un ticket válido (ej. KC-1234 o SUP-5678).");
+        setError(t("components.accessGrant.validation.missingTicket"));
         return;
       }
 
@@ -121,28 +124,27 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
         }, 800);
       } catch (err: unknown) {
         if (err instanceof ApiError) {
-          setError(err.message || "Error al procesar la solicitud de concesión.");
+          setError(err.message || t("components.accessGrant.validation.apiError"));
         } else {
-          setError("Error inesperado al conectar con el servidor.");
+          setError(t("components.accessGrant.validation.unexpectedError"));
         }
       } finally {
         setEnviando(false);
       }
     },
-    [tenantId, tenantIdProp, motivo, referencia, alcance, duracionMin, queryClient, onConcesionConcedida]
+    [tenantId, tenantIdProp, motivo, referencia, alcance, duracionMin, queryClient, onConcesionConcedida, handleCerrar, t]
   );
 
   return (
     <Modal
       abierto={abierto}
       alCerrar={handleCerrar}
-      titulo={titulo}
+      titulo={tituloEfectivo}
       idTitulo="titulo-solicitud-concesion"
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         <p style={{ color: "var(--muted)", margin: 0, fontSize: "0.875rem" }}>
-          Los datos comerciales y personales están enmascarados por defecto. Una solicitud de concesión aprobada permite revelar temporalmente los
-          campos protegidos. Toda consulta con concesión queda registrada de forma inmutable en la cadena de auditoría de la plataforma.
+          {t("components.accessGrant.notice")}
         </p>
 
         {exito && (
@@ -160,7 +162,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
               fontWeight: 500,
             }}
           >
-            ✓ Concesión autorizada y registrada. Actualizando datos en claro...
+            {t("components.accessGrant.success")}
           </div>
         )}
 
@@ -193,20 +195,20 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                 color: "var(--text)",
               }}
             >
-              Organización (tenant_id) *
+              {t("components.accessGrant.fields.tenantId")}
             </label>
             <Input
               id="concesion-tenant-id"
               data-testid="input-concesion-tenant"
               value={tenantId}
               onChange={(e) => setTenantId(e.target.value)}
-              placeholder="org_acme_corp"
+              placeholder={t("components.accessGrant.fields.tenantPlaceholder")}
               required
               disabled={Boolean(tenantIdProp)}
             />
             {razonSocial && (
               <span style={{ fontSize: "0.75rem", color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                Razón Social protegida: <strong>{razonSocial}</strong>
+                {t("components.accessGrant.fields.protectedName")} <strong>{razonSocial}</strong>
               </span>
             )}
           </div>
@@ -222,14 +224,14 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                 color: "var(--text)",
               }}
             >
-              Motivo Justificado (Mínimo 20 caracteres y referencia a ticket) *
+              {t("components.accessGrant.fields.reason")}
             </label>
             <textarea
               id="concesion-motivo"
               data-testid="input-concesion-motivo"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej: Revisión de consumo de tokens y auditoría de costes según ticket KC-1049..."
+              placeholder={t("components.accessGrant.fields.reasonPlaceholder")}
               rows={3}
               style={{
                 width: "100%",
@@ -253,7 +255,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                 marginTop: "2px",
               }}
             >
-              Caracteres: {motivo.trim().length}/20 mín. Debe referenciar KC-#### o SUP-####.
+              {t("components.accessGrant.fields.charCount", { count: motivo.trim().length })}
             </span>
           </div>
 
@@ -268,14 +270,14 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                 color: "var(--text)",
               }}
             >
-              Referencia a Ticket (Opcional si se incluye en el motivo)
+              {t("components.accessGrant.fields.reference")}
             </label>
             <Input
               id="concesion-referencia"
               data-testid="input-concesion-referencia"
               value={referencia}
               onChange={(e) => setReferencia(e.target.value)}
-              placeholder="Ej: KC-1049 o SUP-8821"
+              placeholder={t("components.accessGrant.fields.referencePlaceholder")}
             />
           </div>
 
@@ -291,7 +293,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                   color: "var(--text)",
                 }}
               >
-                Alcance Requerido *
+                {t("components.accessGrant.fields.scope")}
               </label>
               <Select
                 id="concesion-alcance"
@@ -299,9 +301,9 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                 value={alcance}
                 onChange={(e) => setAlcance(e.target.value)}
                 opciones={[
-                  { valor: "datos_negocio", etiqueta: "Datos de Negocio (Recomendado)" },
-                  { valor: "expediente", etiqueta: "Expediente Completo" },
-                  { valor: "contenido_codigo", etiqueta: "Contenido de Código" },
+                  { valor: "datos_negocio", etiqueta: t("components.accessGrant.scopes.datos_negocio") },
+                  { valor: "expediente", etiqueta: t("components.accessGrant.scopes.expediente") },
+                  { valor: "contenido_codigo", etiqueta: t("components.accessGrant.scopes.contenido_codigo") },
                 ]}
               />
             </div>
@@ -317,7 +319,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                   color: "var(--text)",
                 }}
               >
-                Duración de la Concesión *
+                {t("components.accessGrant.fields.duration")}
               </label>
               <Select
                 id="concesion-duracion"
@@ -325,11 +327,11 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
                 value={duracionMin}
                 onChange={(e) => setDuracionMin(e.target.value)}
                 opciones={[
-                  { valor: "15", etiqueta: "15 minutos" },
-                  { valor: "30", etiqueta: "30 minutos" },
-                  { valor: "60", etiqueta: "60 minutos (1 hora)" },
-                  { valor: "240", etiqueta: "240 minutos (4 horas)" },
-                  { valor: "480", etiqueta: "480 minutos (8 horas)" },
+                  { valor: "15", etiqueta: t("components.accessGrant.durations.15") },
+                  { valor: "30", etiqueta: t("components.accessGrant.durations.30") },
+                  { valor: "60", etiqueta: t("components.accessGrant.durations.60") },
+                  { valor: "240", etiqueta: t("components.accessGrant.durations.240") },
+                  { valor: "480", etiqueta: t("components.accessGrant.durations.480") },
                 ]}
               />
             </div>
@@ -350,7 +352,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
               onClick={handleCerrar}
               disabled={enviando}
             >
-              Cancelar
+              {t("common.actions.cancel")}
             </Boton>
             <Boton
               type="submit"
@@ -358,7 +360,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
               data-testid="btn-confirmar-concesion"
               disabled={enviando}
             >
-              {enviando ? "Registrando Concesión..." : "Confirmar y Revelar"}
+              {enviando ? t("components.accessGrant.submitting") : t("components.accessGrant.submit")}
             </Boton>
           </div>
         </form>

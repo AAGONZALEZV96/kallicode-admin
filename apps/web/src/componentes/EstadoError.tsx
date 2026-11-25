@@ -10,6 +10,7 @@
  */
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ApiError } from "../api/clienteApi";
 import { Boton } from "./Boton";
 
@@ -37,7 +38,7 @@ export const EstadoError: React.FC<EstadoErrorProps> = ({
   status: statusProp,
   traceId: traceIdProp,
   alReintentar,
-  textoBotonReintento = "Reintentar",
+  textoBotonReintento,
   reintentando = false,
   accionSecundaria,
   compacto = false,
@@ -47,6 +48,8 @@ export const EstadoError: React.FC<EstadoErrorProps> = ({
   "data-testid": dataTestId = "estado-error",
   ...props
 }) => {
+  const { t } = useTranslation();
+  const textoBotonReintentoEfectivo = textoBotonReintento ?? t("common.actions.retry");
   // 1. Extracción de metadatos del error
   let errorStatus = statusProp;
   let errorCodigo = codigoProp;
@@ -98,38 +101,28 @@ export const EstadoError: React.FC<EstadoErrorProps> = ({
   const codigoMayus = (errorCodigo || "").toUpperCase();
 
   if (errorStatus === 503 || codigoMayus === "AGREGADO_NO_DISPONIBLE") {
-    tituloFinal = tituloFinal ?? "Servicio Analítico en Refresco Temporal (503)";
-    mensajeFinal =
-      errorMensaje ??
-      "La capa de agregados analíticos está en proceso de refresco o cálculo. Los datos estarán disponibles en breve.";
+    tituloFinal = tituloFinal ?? t("common.errors.http503.title");
+    mensajeFinal = errorMensaje ?? t("common.errors.http503.message");
     icono = "⏳";
   } else if (errorStatus === 403 || codigoMayus === "ROL_STAFF_INSUFICIENTE") {
-    tituloFinal = tituloFinal ?? "Acceso Restringido (403 ROL_STAFF_INSUFICIENTE)";
-    mensajeFinal =
-      errorMensaje ??
-      "Tu rol de personal no cuenta con los permisos necesarios para consultar esta información.";
+    tituloFinal = tituloFinal ?? t("common.errors.http403.title");
+    mensajeFinal = errorMensaje ?? t("common.errors.http403.message");
     icono = "🚫";
   } else if (errorStatus === 404 || codigoMayus === "NO_ENCONTRADO") {
-    tituloFinal = tituloFinal ?? "Recurso No Encontrado (404)";
-    mensajeFinal =
-      errorMensaje ??
-      "El recurso u organización solicitada no existe o no se encuentra disponible.";
+    tituloFinal = tituloFinal ?? t("common.errors.http404.title");
+    mensajeFinal = errorMensaje ?? t("common.errors.http404.message");
     icono = "🔍";
   } else if (
     errorStatus === 0 ||
     codigoMayus === "ERROR_RED" ||
     (errorMensaje && errorMensaje.toLowerCase().includes("network"))
   ) {
-    tituloFinal = tituloFinal ?? "Error de Conexión de Red";
-    mensajeFinal =
-      errorMensaje ??
-      "No fue posible comunicar con el servidor API de administración. Por favor, comprueba tu conexión de red.";
+    tituloFinal = tituloFinal ?? t("common.errors.network.title");
+    mensajeFinal = errorMensaje ?? t("common.errors.network.message");
     icono = "📡";
   } else {
-    tituloFinal = tituloFinal ?? "Error al Cargar la Información";
-    mensajeFinal =
-      mensajeFinal ??
-      "Ha ocurrido un fallo inesperado al comunicarse con el servidor. Por favor, reintenta la operación.";
+    tituloFinal = tituloFinal ?? t("common.errors.generic.title");
+    mensajeFinal = mensajeFinal ?? t("common.errors.generic.message");
   }
 
   return (
@@ -197,7 +190,7 @@ export const EstadoError: React.FC<EstadoErrorProps> = ({
             width: "fit-content",
           }}
         >
-          <span>Trace ID:</span>
+          <span>{t("common.errors.traceId")}</span>
           <strong data-testid="error-trace-id" style={{ color: "var(--text, #f8fafc)" }}>
             {errorTraceId}
           </strong>
@@ -222,7 +215,7 @@ export const EstadoError: React.FC<EstadoErrorProps> = ({
               disabled={reintentando}
               data-testid="btn-reintentar"
             >
-              {reintentando ? "Reintentando..." : textoBotonReintento}
+              {reintentando ? t("common.actions.retrying") : textoBotonReintentoEfectivo}
             </Boton>
           )}
           {accionSecundaria}

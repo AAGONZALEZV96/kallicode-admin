@@ -75,7 +75,7 @@ describe("OpsSLA — Cumplimiento de Niveles de Servicio y Reloj de Incidencias"
 
     // KPIs principales (5 dentro / 7 evaluados = 71.4%)
     const kpiGlobal = screen.getByTestId("kpi-cumplimiento-global");
-    expect(kpiGlobal.textContent).toContain("71.4%");
+    expect(kpiGlobal.textContent).toMatch(/71,4\s*%/);
     expect(screen.getByTestId("kpi-casos-en-riesgo").textContent).toContain("2");
     expect(screen.getByTestId("kpi-casos-incumplidos").textContent).toContain("2");
     expect(screen.getByTestId("kpi-total-evaluados").textContent).toContain("7");
@@ -196,9 +196,9 @@ describe("OpsSLA — Cumplimiento de Niveles de Servicio y Reloj de Incidencias"
 
     // Ecuación: Tiempo Bruto (31.50 h) = Tiempo Computado (19.50 h) + Pausa Justificada (12.00 h)
     const ecuacion = screen.getByTestId("ecuacion-reloj-sla");
-    expect(ecuacion.textContent).toContain("31.50 h");
-    expect(ecuacion.textContent).toContain("19.50 h");
-    expect(ecuacion.textContent).toContain("12.00 h");
+    expect(ecuacion.textContent).toContain("31,50 h");
+    expect(ecuacion.textContent).toContain("19,50 h");
+    expect(ecuacion.textContent).toContain("12,00 h");
 
     // Línea de tiempo con tramos computables y pausas justificadas tipificadas
     const timeline = screen.getByTestId("timeline-tramos-sla");

@@ -16,8 +16,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { useAuth } from "../estado/auth";
+import { formatCurrencyEUR, formatNumber, formatPercent, formatTime } from "../i18n/formatters";
 import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 import { Select } from "../componentes/Select";
@@ -97,64 +99,44 @@ export interface UsageTokensResponse {
   alguna_enmascarada?: boolean;
 }
 
-// ------------------------------------------------------------------ Constantes y Opciones
-const OPCIONES_PERIODO = [
-  { valor: "mes_actual", etiqueta: "Mes actual (defecto)" },
-  { valor: "mes_anterior", etiqueta: "Mes anterior" },
-  { valor: "trimestre", etiqueta: "Último trimestre" },
-  { valor: "ano", etiqueta: "Año en curso" },
-];
-
-const OPCIONES_PLAN = [
-  { valor: "todos", etiqueta: "Todos los planes" },
-  { valor: "starter", etiqueta: "Starter" },
-  { valor: "growth", etiqueta: "Growth" },
-  { valor: "enterprise", etiqueta: "Enterprise" },
-];
-
-const OPCIONES_AGRUPACION = [
-  { valor: "cliente", etiqueta: "Por cliente (organización)" },
-  { valor: "tier", etiqueta: "Por tier de modelo" },
-  { valor: "dia", etiqueta: "Por serie diaria" },
-];
-
-const ALLOWLIST_ORDEN = [
-  { valor: "coste_desc", etiqueta: "Coste (Mayor a Menor)" },
-  { valor: "coste_asc", etiqueta: "Coste (Menor a Mayor)" },
-  { valor: "tokens_total_desc", etiqueta: "Tokens Totales (Mayor a Menor)" },
-  { valor: "tokens_total_asc", etiqueta: "Tokens Totales (Menor a Mayor)" },
-  { valor: "tokens_in_desc", etiqueta: "Tokens In (Mayor a Menor)" },
-  { valor: "tokens_out_desc", etiqueta: "Tokens Out (Mayor a Menor)" },
-  { valor: "cuota_pct_desc", etiqueta: "% Cuota (Mayor a Menor)" },
-  { valor: "cuota_pct_asc", etiqueta: "% Cuota (Menor a Mayor)" },
-  { valor: "loc_consumidas_desc", etiqueta: "Líneas de Código (Mayor a Menor)" },
-];
-
-// ------------------------------------------------------------------ Funciones Auxiliares
-function formatearNumero(val?: number | null): string {
-  if (val === undefined || val === null || isNaN(val)) return "0";
-  return new Intl.NumberFormat("es-ES").format(val);
-}
-
-function formatearMoneda(val?: number | null, moneda = "EUR"): string {
-  if (val === undefined || val === null || isNaN(val)) return "0,00 €";
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: moneda,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(val);
-}
-
-function formatearPorcentaje(val?: number | null): string {
-  if (val === undefined || val === null || isNaN(val)) return "0.0%";
-  return `${Number(val).toFixed(1)}%`;
-}
-
 // ------------------------------------------------------------------ Componente Principal
 export const BizTokens: React.FC = () => {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage || i18n.language;
   const { usuario } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const opcionesPeriodo = [
+    { valor: "mes_actual", etiqueta: t("views.bizTokens.filters.periods.mes_actual") },
+    { valor: "mes_anterior", etiqueta: t("views.bizTokens.filters.periods.mes_anterior") },
+    { valor: "trimestre", etiqueta: t("views.bizTokens.filters.periods.trimestre") },
+    { valor: "ano", etiqueta: t("views.bizTokens.filters.periods.ano") },
+  ];
+
+  const opcionesPlan = [
+    { valor: "todos", etiqueta: t("common.plans.all") },
+    { valor: "starter", etiqueta: t("common.plans.starter") },
+    { valor: "growth", etiqueta: t("common.plans.growth") },
+    { valor: "enterprise", etiqueta: t("common.plans.enterprise") },
+  ];
+
+  const opcionesAgrupacion = [
+    { valor: "cliente", etiqueta: t("views.bizTokens.filters.groupBy.cliente") },
+    { valor: "tier", etiqueta: t("views.bizTokens.filters.groupBy.tier") },
+    { valor: "dia", etiqueta: t("views.bizTokens.filters.groupBy.dia") },
+  ];
+
+  const allowlistOrden = [
+    { valor: "coste_desc", etiqueta: t("views.bizTokens.filters.sortOptions.coste_desc") },
+    { valor: "coste_asc", etiqueta: t("views.bizTokens.filters.sortOptions.coste_asc") },
+    { valor: "tokens_total_desc", etiqueta: t("views.bizTokens.filters.sortOptions.tokens_total_desc") },
+    { valor: "tokens_total_asc", etiqueta: t("views.bizTokens.filters.sortOptions.tokens_total_asc") },
+    { valor: "tokens_in_desc", etiqueta: t("views.bizTokens.filters.sortOptions.tokens_in_desc") },
+    { valor: "tokens_out_desc", etiqueta: t("views.bizTokens.filters.sortOptions.tokens_out_desc") },
+    { valor: "cuota_pct_desc", etiqueta: t("views.bizTokens.filters.sortOptions.cuota_pct_desc") },
+    { valor: "cuota_pct_asc", etiqueta: t("views.bizTokens.filters.sortOptions.cuota_pct_asc") },
+    { valor: "loc_consumidas_desc", etiqueta: t("views.bizTokens.filters.sortOptions.loc_consumidas_desc") },
+  ];
 
   // Control RBAC estricto
   const esRolAutorizado =
@@ -333,11 +315,11 @@ export const BizTokens: React.FC = () => {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Badge variante="error">ACCESO DENEGADO</Badge>
-          <strong style={{ fontSize: "1.1rem" }}>403 ROL_STAFF_INSUFICIENTE</strong>
+          <Badge variante="error">{t("common.errors.accessDeniedBadge")}</Badge>
+          <strong style={{ fontSize: "1.1rem" }}>{t("common.errors.accessDeniedCode")}</strong>
         </div>
         <p style={{ color: "var(--muted)", margin: "0.5rem 0" }}>
-          Acceso denegado para el rol {usuario?.role}. La supervisión analítica de consumo de tokens y costes de inferencia es exclusiva para personal de negocio o administración.
+          {t("views.bizTokens.rbacDenied", { role: usuario?.role })}
         </p>
       </main>
     );
@@ -376,11 +358,11 @@ export const BizTokens: React.FC = () => {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.25rem" }}>
             <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>
-              Consumo de Tokens y FinOps
+              {t("views.bizTokens.title")}
             </h1>
             {data?.frescura && (
               <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                Frescura: {new Date(data.frescura).toLocaleTimeString("es-ES")}
+                {t("views.bizTokens.freshness", { time: formatTime(data.frescura, lang) })}
               </span>
             )}
             {isFetching && (
@@ -388,19 +370,19 @@ export const BizTokens: React.FC = () => {
                 role="status"
                 style={{ fontSize: "0.75rem", color: "var(--accent)", fontStyle: "italic" }}
               >
-                Actualizando datos...
+                {t("views.bizTokens.updating")}
               </span>
             )}
           </div>
           <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted)" }}>
-            Supervisión económica de consumo de inferencia LLM, costes por tier, control de cuotas y cuadre con facturación.
+            {t("views.bizTokens.subtitle")}
           </p>
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
           <ControlExportarReporte
             tipo="consumo"
-            etiquetaBoton="Exportar Informe"
+            etiquetaBoton={t("components.exportReport.button")}
             formatosPermitidos={["csv", "xlsx", "pdf"]}
             rolesPermitidos={["staff_negocio", "staff_admin"]}
           />
@@ -411,7 +393,7 @@ export const BizTokens: React.FC = () => {
             disabled={isFetching}
             data-testid="btn-refetch-tokens"
           >
-            {isFetching ? "Refrescando..." : "Refrescar"}
+            {isFetching ? t("views.bizTokens.refreshing") : t("common.actions.refresh")}
           </Boton>
         </div>
       </header>
@@ -439,15 +421,17 @@ export const BizTokens: React.FC = () => {
             <span style={{ fontSize: "1.5rem" }}>🚨</span>
             <div>
               <strong style={{ display: "block", color: "var(--bad)" }}>
-                Alerta Crítica: Descuadre Detectado entre Consumo y Facturación
+                {t("views.bizTokens.discrepancyBanner.title")}
               </strong>
               <span style={{ fontSize: "0.875rem", color: "var(--muted)" }}>
-                Las líneas de código o tokens computados difieren de las unidades facturadas en el ciclo. Clientes afectados:{" "}
-                <strong>{data?.descuadres?.join(", ") || "Organizaciones auditadas"}</strong>.
+                {t("views.bizTokens.discrepancyBanner.description", {
+                  clients:
+                    data?.descuadres?.join(", ") || t("views.bizTokens.discrepancyBanner.defaultClients"),
+                })}
               </span>
             </div>
           </div>
-          <Badge variante="error">AUDITORÍA REQUERIDA</Badge>
+          <Badge variante="error">{t("views.bizTokens.discrepancyBanner.badge")}</Badge>
         </section>
       )}
 
@@ -467,12 +451,17 @@ export const BizTokens: React.FC = () => {
           border: 0,
         }}
       >
-        {`Filtros activos: Periodo ${periodo}, Plan ${plan}, Agrupación ${agruparPor}${qUrl ? `, Búsqueda ${qUrl}` : ""}`}
+        {t("views.bizTokens.liveFilterAnnouncement", {
+          period: periodo,
+          plan,
+          groupBy: agruparPor,
+          queryPart: qUrl ? t("views.bizTokens.liveFilterQueryPart", { query: qUrl }) : "",
+        })}
       </div>
 
       {/* Barra de Filtros y Controles Analíticos */}
       <section
-        aria-label="Controles y Filtros Analíticos"
+        aria-label={t("views.bizTokens.filters.regionLabel")}
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
@@ -488,14 +477,14 @@ export const BizTokens: React.FC = () => {
             htmlFor="filtro-periodo"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
           >
-            Periodo Temporal
+            {t("views.bizTokens.filters.periodLabel")}
           </label>
           <Select
             id="filtro-periodo"
             data-testid="select-periodo"
             value={periodo}
             onChange={(e) => handleCambioFiltro("periodo", e.target.value)}
-            opciones={OPCIONES_PERIODO}
+            opciones={opcionesPeriodo}
           />
         </div>
 
@@ -504,14 +493,14 @@ export const BizTokens: React.FC = () => {
             htmlFor="filtro-plan"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
           >
-            Plan Comercial
+            {t("views.bizTokens.filters.planLabel")}
           </label>
           <Select
             id="filtro-plan"
             data-testid="select-plan"
             value={plan}
             onChange={(e) => handleCambioFiltro("plan", e.target.value)}
-            opciones={OPCIONES_PLAN}
+            opciones={opcionesPlan}
           />
         </div>
 
@@ -520,14 +509,14 @@ export const BizTokens: React.FC = () => {
             htmlFor="filtro-agrupacion"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
           >
-            Agrupación Analítica
+            {t("views.bizTokens.filters.groupLabel")}
           </label>
           <Select
             id="filtro-agrupacion"
             data-testid="select-agrupacion"
             value={agruparPor}
             onChange={(e) => handleCambioFiltro("agrupar_por", e.target.value)}
-            opciones={OPCIONES_AGRUPACION}
+            opciones={opcionesAgrupacion}
           />
         </div>
 
@@ -536,12 +525,12 @@ export const BizTokens: React.FC = () => {
             htmlFor="filtro-busqueda-cliente"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
           >
-            Buscar Cliente / Organización
+            {t("views.bizTokens.filters.searchLabel")}
           </label>
           <Input
             id="filtro-busqueda-cliente"
             data-testid="input-busqueda-cliente"
-            placeholder="Buscar por tenant_id o nombre..."
+            placeholder={t("views.bizTokens.filters.searchPlaceholder")}
             value={busquedaInput}
             onChange={(e) => setBusquedaInput(e.target.value)}
           />
@@ -552,14 +541,14 @@ export const BizTokens: React.FC = () => {
             htmlFor="filtro-ordenacion"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
           >
-            Criterio de Ordenación
+            {t("views.bizTokens.filters.sortLabel")}
           </label>
           <Select
             id="filtro-ordenacion"
             data-testid="select-ordenacion"
             value={orden}
             onChange={(e) => handleCambioFiltro("order_by", e.target.value)}
-            opciones={ALLOWLIST_ORDEN}
+            opciones={allowlistOrden}
           />
         </div>
       </section>
@@ -575,24 +564,24 @@ export const BizTokens: React.FC = () => {
         alReintentar={() => refetch()}
         tituloError={
           apiErr?.status === 503
-            ? "Agregados analíticos en refresco"
-            : "Error al cargar consumo de tokens"
+            ? t("views.bizTokens.errors.title503")
+            : t("views.bizTokens.errors.titleGeneric")
         }
         mensajeError={
           apiErr?.status === 503
-            ? `Los agregados de cómputo están recalculándose. Traza: ${traceId}`
-            : `No se pudo obtener el informe de tokens. ${apiErr?.message || ""}`
+            ? t("views.bizTokens.errors.msg503", { traceId })
+            : t("views.bizTokens.errors.msgGeneric", { message: apiErr?.message || "" })
         }
-        tituloVacio="Sin datos de consumo de tokens"
-        descripcionVacio="No existen registros de consumo de inferencia para los filtros y periodo seleccionados."
-        textoAccionVacio="Limpiar Filtros"
+        tituloVacio={t("views.bizTokens.empty.title")}
+        descripcionVacio={t("views.bizTokens.empty.description")}
+        textoAccionVacio={t("views.bizTokens.empty.action")}
         alAccionarVacio={() => setSearchParams({ periodo: "mes_actual", agrupar_por: "cliente" })}
       >
         {data && (
           <>
             {/* Tarjetas de Resumen Ejecutivo (FinOps) */}
             <section
-              aria-label="Resumen Ejecutivo FinOps"
+              aria-label={t("views.bizTokens.kpis.regionLabel")}
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
@@ -613,13 +602,13 @@ export const BizTokens: React.FC = () => {
                 }}
               >
                 <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                  Total Tokens Consumidos
+                  {t("views.bizTokens.kpis.totalTokens")}
                 </span>
                 <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--text)" }}>
-                  {formatearNumero(resumen.total_tokens || resumen.tokens_total)}
+                  {formatNumber(resumen.total_tokens || resumen.tokens_total, undefined, lang)}
                 </div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                  Inferencia LLM acumulada en el periodo ({periodo})
+                  {t("views.bizTokens.kpis.totalTokensSub", { period: periodo })}
                 </span>
               </div>
 
@@ -637,13 +626,13 @@ export const BizTokens: React.FC = () => {
                 }}
               >
                 <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                  Coste Consolidado
+                  {t("views.bizTokens.kpis.consolidatedCost")}
                 </span>
                 <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--accent)" }}>
-                  {formatearMoneda(resumen.coste_consolidado || resumen.coste_total_eur, resumen.moneda)}
+                  {formatCurrencyEUR(resumen.coste_consolidado || resumen.coste_total_eur, resumen.moneda, lang)}
                 </div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                  Coste monetario de cómputo estimado
+                  {t("views.bizTokens.kpis.consolidatedCostSub")}
                 </span>
               </div>
 
@@ -662,21 +651,24 @@ export const BizTokens: React.FC = () => {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                    Consumo Medio de Cuota
+                    {t("views.bizTokens.kpis.avgQuota")}
                   </span>
                   {resumen.porcentaje_medio_cuota > 100 ? (
-                    <Badge variante="error">SATURADA (&gt;100%)</Badge>
+                    <Badge variante="error">{t("views.bizTokens.kpis.quotaSaturated")}</Badge>
                   ) : resumen.porcentaje_medio_cuota > 80 ? (
-                    <Badge variante="warn">AVISO (&gt;80%)</Badge>
+                    <Badge variante="warn">{t("views.bizTokens.kpis.quotaWarn")}</Badge>
                   ) : (
-                    <Badge variante="good">NORMAL</Badge>
+                    <Badge variante="good">{t("views.bizTokens.kpis.quotaNormal")}</Badge>
                   )}
                 </div>
                 <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--text)" }}>
-                  {formatearPorcentaje(resumen.porcentaje_medio_cuota || resumen.cuota_consumo_media_pct)}
+                  {formatPercent(resumen.porcentaje_medio_cuota || resumen.cuota_consumo_media_pct, {
+                    decimals: 1,
+                    lang,
+                  })}
                 </div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                  Media sobre capacidad contratada por organización
+                  {t("views.bizTokens.kpis.avgQuotaSub")}
                 </span>
               </div>
 
@@ -695,12 +687,12 @@ export const BizTokens: React.FC = () => {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-                    Cuadre Facturación
+                    {t("views.bizTokens.kpis.billingMatch")}
                   </span>
                   {hayDescuadreFacturacion ? (
-                    <Badge variante="error">DESCUADRE</Badge>
+                    <Badge variante="error">{t("views.bizTokens.kpis.billingMismatchBadge")}</Badge>
                   ) : (
-                    <Badge variante="good">CONCILIADO</Badge>
+                    <Badge variante="good">{t("views.bizTokens.kpis.billingMatchedBadge")}</Badge>
                   )}
                 </div>
                 <div
@@ -710,12 +702,14 @@ export const BizTokens: React.FC = () => {
                     color: hayDescuadreFacturacion ? "var(--bad)" : "var(--good)",
                   }}
                 >
-                  {hayDescuadreFacturacion ? "Discrepancia Activa" : "100% Conciliado"}
+                  {hayDescuadreFacturacion
+                    ? t("views.bizTokens.kpis.billingMismatchValue")
+                    : t("views.bizTokens.kpis.billingMatchedValue")}
                 </div>
                 <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
                   {hayDescuadreFacturacion
-                    ? "Inconsistencia entre agregados y ciclos facturados"
-                    : "Consumo validado contra ciclos de facturación"}
+                    ? t("views.bizTokens.kpis.billingMismatchSub")
+                    : t("views.bizTokens.kpis.billingMatchedSub")}
                 </span>
               </div>
             </section>
@@ -724,7 +718,7 @@ export const BizTokens: React.FC = () => {
             <section
               role="region"
               aria-labelledby="titulo-panel-tiers"
-              aria-label="Panel de tendencias y desglose por tier de modelo"
+              aria-label={t("views.bizTokens.tiersPanel.regionLabel")}
               data-testid="panel-graficos-tendencias"
               style={{
                 padding: "1.25rem",
@@ -739,20 +733,24 @@ export const BizTokens: React.FC = () => {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
                 <div>
                   <h2 id="titulo-panel-tiers" style={{ margin: 0, fontSize: "1.125rem", fontWeight: 600, color: "var(--text)" }}>
-                    Desglose Analítico por Tier de Inferencia LLM
+                    {t("views.bizTokens.tiersPanel.title")}
                   </h2>
                   <p style={{ margin: "2px 0 0", fontSize: "0.8125rem", color: "var(--muted)" }}>
-                    Auditoría de volumen de tokens por categoría arquitectónica. El tier <strong>fable</strong> se desglosa por separado de <strong>pro</strong> por divergencia de coste y modelo.
+                    {t("views.bizTokens.tiersPanel.description")}
                   </p>
                 </div>
-                <Badge variante="accent">Separación Fable vs Pro Requerida</Badge>
+                <Badge variante="accent">{t("views.bizTokens.tiersPanel.badge")}</Badge>
               </div>
 
               {/* Barra de Distribución Proporcional */}
               <div
                 role="img"
                 data-testid="barra-distribucion-proporcional"
-                aria-label={`Distribución por tier: Flash ${totalesPorTier.pctFlash}%, Pro ${totalesPorTier.pctPro}%, Fable ${totalesPorTier.pctFable}%`}
+                aria-label={t("views.bizTokens.tiersPanel.barAria", {
+                  flash: totalesPorTier.pctFlash,
+                  pro: totalesPorTier.pctPro,
+                  fable: totalesPorTier.pctFable,
+                })}
                 style={{
                   height: "12px",
                   borderRadius: "6px",
@@ -763,17 +761,17 @@ export const BizTokens: React.FC = () => {
               >
                 <div
                   data-testid="segmento-flash"
-                  title={`Flash: ${totalesPorTier.pctFlash}%`}
+                  title={`Flash: ${formatPercent(totalesPorTier.pctFlash, { decimals: 0, lang })}`}
                   style={{ width: `${totalesPorTier.pctFlash}%`, backgroundColor: "var(--accent)" }}
                 />
                 <div
                   data-testid="segmento-pro"
-                  title={`Pro: ${totalesPorTier.pctPro}%`}
+                  title={`Pro: ${formatPercent(totalesPorTier.pctPro, { decimals: 0, lang })}`}
                   style={{ width: `${totalesPorTier.pctPro}%`, backgroundColor: "var(--purple)" }}
                 />
                 <div
                   data-testid="segmento-fable"
-                  title={`Fable: ${totalesPorTier.pctFable}%`}
+                  title={`Fable: ${formatPercent(totalesPorTier.pctFable, { decimals: 0, lang })}`}
                   style={{ width: `${totalesPorTier.pctFable}%`, backgroundColor: "var(--warn)" }}
                 />
               </div>
@@ -797,14 +795,18 @@ export const BizTokens: React.FC = () => {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <strong style={{ fontSize: "0.875rem", color: "var(--text)" }}>Tier Flash</strong>
-                    <Badge variante="accent">Alta Velocidad</Badge>
+                    <strong style={{ fontSize: "0.875rem", color: "var(--text)" }}>
+                      {t("views.bizTokens.tiersPanel.flashTitle")}
+                    </strong>
+                    <Badge variante="accent">{t("views.bizTokens.tiersPanel.flashBadge")}</Badge>
                   </div>
                   <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text)" }}>
-                    {formatearNumero(totalesPorTier.flash)}
+                    {formatNumber(totalesPorTier.flash, undefined, lang)}
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "2px" }}>
-                    {totalesPorTier.pctFlash}% del volumen de tokens
+                    {t("views.bizTokens.tiersPanel.volumePct", {
+                      pct: formatPercent(totalesPorTier.pctFlash, { decimals: 0, lang }),
+                    })}
                   </div>
                 </div>
 
@@ -819,14 +821,18 @@ export const BizTokens: React.FC = () => {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <strong style={{ fontSize: "0.875rem", color: "var(--text)" }}>Tier Pro</strong>
-                    <Badge variante="accent">Capacidad Estándar</Badge>
+                    <strong style={{ fontSize: "0.875rem", color: "var(--text)" }}>
+                      {t("views.bizTokens.tiersPanel.proTitle")}
+                    </strong>
+                    <Badge variante="accent">{t("views.bizTokens.tiersPanel.proBadge")}</Badge>
                   </div>
                   <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text)" }}>
-                    {formatearNumero(totalesPorTier.pro)}
+                    {formatNumber(totalesPorTier.pro, undefined, lang)}
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "2px" }}>
-                    {totalesPorTier.pctPro}% del volumen de tokens
+                    {t("views.bizTokens.tiersPanel.volumePct", {
+                      pct: formatPercent(totalesPorTier.pctPro, { decimals: 0, lang }),
+                    })}
                   </div>
                 </div>
 
@@ -841,14 +847,18 @@ export const BizTokens: React.FC = () => {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <strong style={{ fontSize: "0.875rem", color: "var(--text)" }}>Tier Fable</strong>
-                    <Badge variante="warn">Razonamiento Avanzado</Badge>
+                    <strong style={{ fontSize: "0.875rem", color: "var(--text)" }}>
+                      {t("views.bizTokens.tiersPanel.fableTitle")}
+                    </strong>
+                    <Badge variante="warn">{t("views.bizTokens.tiersPanel.fableBadge")}</Badge>
                   </div>
                   <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--warn)" }}>
-                    {formatearNumero(totalesPorTier.fable)}
+                    {formatNumber(totalesPorTier.fable, undefined, lang)}
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "2px" }}>
-                    {totalesPorTier.pctFable}% del volumen de tokens (cómputo especializado)
+                    {t("views.bizTokens.tiersPanel.volumePctSpecialized", {
+                      pct: formatPercent(totalesPorTier.pctFable, { decimals: 0, lang }),
+                    })}
                   </div>
                 </div>
               </div>
@@ -866,34 +876,52 @@ export const BizTokens: React.FC = () => {
                 <table
                   data-testid="tabla-accesible-tiers"
                   style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}
-                  summary="Tabla de resumen accesible de tokens consumidos por tier de modelo"
+                  summary={t("views.bizTokens.tiersPanel.a11yTableSummary")}
                 >
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                      <th style={{ padding: "4px 8px" }}>Tier</th>
-                      <th style={{ padding: "4px 8px" }}>Categoría</th>
-                      <th style={{ padding: "4px 8px", textAlign: "right" }}>Tokens</th>
-                      <th style={{ padding: "4px 8px", textAlign: "right" }}>Porcentaje</th>
+                      <th style={{ padding: "4px 8px" }}>{t("views.bizTokens.tiersPanel.a11yColTier")}</th>
+                      <th style={{ padding: "4px 8px" }}>{t("views.bizTokens.tiersPanel.a11yColCategory")}</th>
+                      <th style={{ padding: "4px 8px", textAlign: "right" }}>
+                        {t("views.bizTokens.tiersPanel.a11yColTokens")}
+                      </th>
+                      <th style={{ padding: "4px 8px", textAlign: "right" }}>
+                        {t("views.bizTokens.tiersPanel.a11yColPercent")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
                       <td style={{ padding: "4px 8px", fontWeight: 600 }}>Flash</td>
-                      <td style={{ padding: "4px 8px" }}>Inferencia Ligera</td>
-                      <td style={{ padding: "4px 8px", textAlign: "right" }}>{formatearNumero(totalesPorTier.flash)}</td>
-                      <td style={{ padding: "4px 8px", textAlign: "right" }}>{totalesPorTier.pctFlash}%</td>
+                      <td style={{ padding: "4px 8px" }}>{t("views.bizTokens.tiersPanel.catFlash")}</td>
+                      <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                        {formatNumber(totalesPorTier.flash, undefined, lang)}
+                      </td>
+                      <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                        {formatPercent(totalesPorTier.pctFlash, { decimals: 0, lang })}
+                      </td>
                     </tr>
                     <tr>
                       <td style={{ padding: "4px 8px", fontWeight: 600 }}>Pro</td>
-                      <td style={{ padding: "4px 8px" }}>Inferencia General</td>
-                      <td style={{ padding: "4px 8px", textAlign: "right" }}>{formatearNumero(totalesPorTier.pro)}</td>
-                      <td style={{ padding: "4px 8px", textAlign: "right" }}>{totalesPorTier.pctPro}%</td>
+                      <td style={{ padding: "4px 8px" }}>{t("views.bizTokens.tiersPanel.catPro")}</td>
+                      <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                        {formatNumber(totalesPorTier.pro, undefined, lang)}
+                      </td>
+                      <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                        {formatPercent(totalesPorTier.pctPro, { decimals: 0, lang })}
+                      </td>
                     </tr>
                     <tr>
                       <td style={{ padding: "4px 8px", fontWeight: 600, color: "var(--warn)" }}>Fable</td>
-                      <td style={{ padding: "4px 8px", color: "var(--warn)" }}>Razonamiento Agéntico</td>
-                      <td style={{ padding: "4px 8px", textAlign: "right", color: "var(--warn)" }}>{formatearNumero(totalesPorTier.fable)}</td>
-                      <td style={{ padding: "4px 8px", textAlign: "right", color: "var(--warn)" }}>{totalesPorTier.pctFable}%</td>
+                      <td style={{ padding: "4px 8px", color: "var(--warn)" }}>
+                        {t("views.bizTokens.tiersPanel.catFable")}
+                      </td>
+                      <td style={{ padding: "4px 8px", textAlign: "right", color: "var(--warn)" }}>
+                        {formatNumber(totalesPorTier.fable, undefined, lang)}
+                      </td>
+                      <td style={{ padding: "4px 8px", textAlign: "right", color: "var(--warn)" }}>
+                        {formatPercent(totalesPorTier.pctFable, { decimals: 0, lang })}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -924,24 +952,27 @@ export const BizTokens: React.FC = () => {
                 <div>
                   <h2 id="titulo-tabla-consumo" style={{ margin: 0, fontSize: "1rem", fontWeight: 600, color: "var(--text)" }}>
                     {agruparPor === "cliente"
-                      ? "Consumo de Tokens por Organización Cliente"
+                      ? t("views.bizTokens.table.titleByClient")
                       : agruparPor === "tier"
-                      ? "Agregado Consolidado por Tier de Modelo"
-                      : "Serie Temporal de Consumo Diario"}
+                      ? t("views.bizTokens.table.titleByTier")
+                      : t("views.bizTokens.table.titleByDay")}
                   </h2>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.25rem", flexWrap: "wrap" }}>
                     <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                      Mostrando {data.items.length} de {data.total} registros
+                      {t("views.bizTokens.table.showingRecords", {
+                        count: data.items.length,
+                        total: data.total,
+                      })}
                     </span>
                     <Badge variante="neutro" style={{ fontSize: "0.75rem" }}>
-                      Ciclo: {data.ciclo || periodo}
+                      {t("views.bizTokens.table.cycleBadge", { cycle: data.ciclo || periodo })}
                     </Badge>
                   </div>
                 </div>
 
                 {data.alguna_enmascarada && (
                   <Badge variante="warn">
-                    DATOS ENMASCARADOS BAJO POLÍTICA DE PRIVACIDAD
+                    {t("views.bizTokens.table.maskedBanner")}
                   </Badge>
                 )}
               </div>
@@ -953,35 +984,67 @@ export const BizTokens: React.FC = () => {
                     <TablaFila>
                       {agruparPor === "cliente" ? (
                         <>
-                          <TablaCeldaEncabezado scope="col">Organización / Cliente</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col">Plan</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens In</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens Out</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens Total</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col">Desglose Tiers</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Coste Est.</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col">Cuota de Uso</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>Facturación</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>Privacidad</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colClient")}</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colPlan")}</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensIn")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensOut")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensTotal")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colTiers")}</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colEstCost")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colUsageQuota")}</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>
+                            {t("views.bizTokens.table.colBilling")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>
+                            {t("views.bizTokens.table.colPrivacy")}
+                          </TablaCeldaEncabezado>
                         </>
                       ) : agruparPor === "tier" ? (
                         <>
-                          <TablaCeldaEncabezado scope="col">Tier de Modelo</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens In</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens Out</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens Total</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Coste Estimado</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>Facturación</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colTierModel")}</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensIn")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensOut")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensTotal")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colEstimatedCost")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>
+                            {t("views.bizTokens.table.colBilling")}
+                          </TablaCeldaEncabezado>
                         </>
                       ) : (
                         <>
-                          <TablaCeldaEncabezado scope="col">Fecha / Día</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens In</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens Out</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Tokens Total</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col">Desglose Tiers</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>Coste Estimado</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>Facturación</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colDate")}</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensIn")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensOut")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colTokensTotal")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colTiers")}</TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                            {t("views.bizTokens.table.colEstimatedCost")}
+                          </TablaCeldaEncabezado>
+                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>
+                            {t("views.bizTokens.table.colBilling")}
+                          </TablaCeldaEncabezado>
                         </>
                       )}
                     </TablaFila>
@@ -1025,42 +1088,52 @@ export const BizTokens: React.FC = () => {
 
                             {/* Tokens In */}
                             <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontSize: "0.8125rem" }}>
-                              {formatearNumero(item.tokens_input ?? item.tokens_in)}
+                              {formatNumber(item.tokens_input ?? item.tokens_in, undefined, lang)}
                             </TablaCelda>
 
                             {/* Tokens Out */}
                             <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontSize: "0.8125rem" }}>
-                              {formatearNumero(item.tokens_output ?? item.tokens_out)}
+                              {formatNumber(item.tokens_output ?? item.tokens_out, undefined, lang)}
                             </TablaCelda>
 
                             {/* Tokens Total */}
                             <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "0.875rem" }}>
-                              {formatearNumero(item.tokens_total)}
+                              {formatNumber(item.tokens_total, undefined, lang)}
                             </TablaCelda>
 
                             {/* Desglose por Tier */}
                             <TablaCelda>
                               <div style={{ display: "flex", flexDirection: "column", gap: "2px", fontSize: "0.75rem" }}>
-                                <span>Flash: <strong>{formatearNumero(item.por_tier?.flash)}</strong></span>
-                                <span>Pro: <strong>{formatearNumero(item.por_tier?.pro)}</strong></span>
-                                <span style={{ color: "var(--warn)" }}>Fable: <strong>{formatearNumero(item.por_tier?.fable)}</strong></span>
+                                <span>
+                                  Flash: <strong>{formatNumber(item.por_tier?.flash ?? 0, undefined, lang)}</strong>
+                                </span>
+                                <span>
+                                  Pro: <strong>{formatNumber(item.por_tier?.pro ?? 0, undefined, lang)}</strong>
+                                </span>
+                                <span style={{ color: "var(--warn)" }}>
+                                  Fable: <strong>{formatNumber(item.por_tier?.fable ?? 0, undefined, lang)}</strong>
+                                </span>
                               </div>
                             </TablaCelda>
 
                             {/* Coste Estimado EUR */}
                             <TablaCelda style={{ textAlign: "right", fontWeight: 600, color: "var(--accent)" }}>
-                              {formatearMoneda(item.coste_estimado_eur ?? item.coste)}
+                              {formatCurrencyEUR(item.coste_estimado_eur ?? item.coste, "EUR", lang)}
                             </TablaCelda>
 
                             {/* Cuota de Uso */}
                             <TablaCelda>
                               <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "100px" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                                  <span>{formatearPorcentaje(cuota)}</span>
+                                  <span>{formatPercent(cuota, { decimals: 1, lang })}</span>
                                   {cuota > 100 ? (
-                                    <span style={{ color: "var(--bad)", fontWeight: 700 }}>Excedida</span>
+                                    <span style={{ color: "var(--bad)", fontWeight: 700 }}>
+                                      {t("views.bizTokens.table.quotaExceeded")}
+                                    </span>
                                   ) : cuota > 80 ? (
-                                    <span style={{ color: "var(--warn)", fontWeight: 700 }}>Alerta</span>
+                                    <span style={{ color: "var(--warn)", fontWeight: 700 }}>
+                                      {t("views.bizTokens.table.quotaAlert")}
+                                    </span>
                                   ) : null}
                                 </div>
                                 <div
@@ -1090,12 +1163,12 @@ export const BizTokens: React.FC = () => {
                             {/* Cuadre Facturación */}
                             <TablaCelda style={{ textAlign: "center" }}>
                               {cuadra ? (
-                                <Badge variante="good" title="Consumo cuadra con la facturación emitida">
-                                  ✅ Cuadra
+                                <Badge variante="good" title={t("views.bizTokens.table.matchOkTitle")}>
+                                  {t("views.bizTokens.table.matchOk")}
                                 </Badge>
                               ) : (
-                                <Badge variante="error" title="Descuadre detectado entre consumo y facturación">
-                                  🚨 Descuadre
+                                <Badge variante="error" title={t("views.bizTokens.table.matchErrTitle")}>
+                                  {t("views.bizTokens.table.matchErr")}
                                 </Badge>
                               )}
                             </TablaCelda>
@@ -1104,7 +1177,7 @@ export const BizTokens: React.FC = () => {
                             <TablaCelda style={{ textAlign: "center" }}>
                               {esEnmascarado ? (
                                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-                                  <Badge variante="neutro">ENMASCARADO</Badge>
+                                  <Badge variante="neutro">{t("common.states.masked")}</Badge>
                                   <Boton
                                     variante="secondary"
                                     tamano="sm"
@@ -1112,11 +1185,11 @@ export const BizTokens: React.FC = () => {
                                     data-testid={`btn-concesion-${tenantId}`}
                                     style={{ fontSize: "0.6875rem", padding: "2px 6px" }}
                                   >
-                                    Solicitar acceso
+                                    {t("common.actions.requestAccess")}
                                   </Boton>
                                 </div>
                               ) : (
-                                <Badge variante="good">EN CLARO</Badge>
+                                <Badge variante="good">{t("common.states.unmasked")}</Badge>
                               )}
                             </TablaCelda>
                           </TablaFila>
@@ -1134,25 +1207,25 @@ export const BizTokens: React.FC = () => {
                                 <Badge variante={esFable ? "warn" : "accent"}>{nombreTier}</Badge>
                                 {esFable && (
                                   <span style={{ fontSize: "0.75rem", color: "var(--warn)" }}>
-                                    (Razonamiento Agéntico Especializado)
+                                    {t("views.bizTokens.table.fableNote")}
                                   </span>
                                 )}
                               </div>
                             </TablaCelda>
                             <TablaCelda style={{ textAlign: "right", fontFamily: "monospace" }}>
-                              {formatearNumero(item.tokens_input ?? item.tokens_in)}
+                              {formatNumber(item.tokens_input ?? item.tokens_in, undefined, lang)}
                             </TablaCelda>
                             <TablaCelda style={{ textAlign: "right", fontFamily: "monospace" }}>
-                              {formatearNumero(item.tokens_output ?? item.tokens_out)}
+                              {formatNumber(item.tokens_output ?? item.tokens_out, undefined, lang)}
                             </TablaCelda>
                             <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>
-                              {formatearNumero(item.tokens_total)}
+                              {formatNumber(item.tokens_total, undefined, lang)}
                             </TablaCelda>
                             <TablaCelda style={{ textAlign: "right", fontWeight: 600, color: "var(--accent)" }}>
-                              {formatearMoneda(item.coste_estimado_eur ?? item.coste)}
+                              {formatCurrencyEUR(item.coste_estimado_eur ?? item.coste, "EUR", lang)}
                             </TablaCelda>
                             <TablaCelda style={{ textAlign: "center" }}>
-                              <Badge variante="good">✅ Conciliado</Badge>
+                              <Badge variante="good">{t("views.bizTokens.table.reconciledBadge")}</Badge>
                             </TablaCelda>
                           </TablaFila>
                         );
@@ -1164,26 +1237,32 @@ export const BizTokens: React.FC = () => {
                         <TablaFila key={diaStr} data-testid={`fila-dia-${diaStr}`}>
                           <TablaCelda style={{ fontWeight: 600 }}>{diaStr}</TablaCelda>
                           <TablaCelda style={{ textAlign: "right", fontFamily: "monospace" }}>
-                            {formatearNumero(item.tokens_input ?? item.tokens_in)}
+                            {formatNumber(item.tokens_input ?? item.tokens_in, undefined, lang)}
                           </TablaCelda>
                           <TablaCelda style={{ textAlign: "right", fontFamily: "monospace" }}>
-                            {formatearNumero(item.tokens_output ?? item.tokens_out)}
+                            {formatNumber(item.tokens_output ?? item.tokens_out, undefined, lang)}
                           </TablaCelda>
                           <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>
-                            {formatearNumero(item.tokens_total)}
+                            {formatNumber(item.tokens_total, undefined, lang)}
                           </TablaCelda>
                           <TablaCelda>
                             <div style={{ display: "flex", gap: "0.5rem", fontSize: "0.75rem" }}>
-                              <span>F: <strong>{formatearNumero(item.por_tier?.flash)}</strong></span>
-                              <span>P: <strong>{formatearNumero(item.por_tier?.pro)}</strong></span>
-                              <span style={{ color: "var(--warn)" }}>Fa: <strong>{formatearNumero(item.por_tier?.fable)}</strong></span>
+                              <span>
+                                F: <strong>{formatNumber(item.por_tier?.flash ?? 0, undefined, lang)}</strong>
+                              </span>
+                              <span>
+                                P: <strong>{formatNumber(item.por_tier?.pro ?? 0, undefined, lang)}</strong>
+                              </span>
+                              <span style={{ color: "var(--warn)" }}>
+                                Fa: <strong>{formatNumber(item.por_tier?.fable ?? 0, undefined, lang)}</strong>
+                              </span>
                             </div>
                           </TablaCelda>
                           <TablaCelda style={{ textAlign: "right", fontWeight: 600, color: "var(--accent)" }}>
-                            {formatearMoneda(item.coste_estimado_eur ?? item.coste)}
+                            {formatCurrencyEUR(item.coste_estimado_eur ?? item.coste, "EUR", lang)}
                           </TablaCelda>
                           <TablaCelda style={{ textAlign: "center" }}>
-                            <Badge variante="good">✅ Conciliado</Badge>
+                            <Badge variante="good">{t("views.bizTokens.table.reconciledBadge")}</Badge>
                           </TablaCelda>
                         </TablaFila>
                       );
@@ -1207,9 +1286,10 @@ export const BizTokens: React.FC = () => {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span>Filas por página:</span>
+                  <span>{t("common.pagination.rowsPerPage")}</span>
                   <select
                     data-testid="select-page-size"
+                    aria-label={t("common.pagination.recordsPerPage")}
                     value={pageSize}
                     onChange={(e) => handleCambioFiltro("page_size", e.target.value)}
                     style={{
@@ -1227,7 +1307,10 @@ export const BizTokens: React.FC = () => {
                     <option value="100">100</option>
                   </select>
                   <span>
-                    (Página {data.page} de {Math.max(data.pages, 1)})
+                    {t("common.pagination.pageOfParens", {
+                      page: data.page,
+                      pages: Math.max(data.pages, 1),
+                    })}
                   </span>
                 </div>
 
@@ -1239,7 +1322,7 @@ export const BizTokens: React.FC = () => {
                     onClick={() => handleCambioFiltro("page", (data.page - 1).toString())}
                     data-testid="btn-pagina-anterior"
                   >
-                    Anterior
+                    {t("common.pagination.previous")}
                   </Boton>
                   <Boton
                     variante="secondary"
@@ -1248,7 +1331,7 @@ export const BizTokens: React.FC = () => {
                     onClick={() => handleCambioFiltro("page", (data.page + 1).toString())}
                     data-testid="btn-pagina-siguiente"
                   >
-                    Siguiente
+                    {t("common.pagination.next")}
                   </Boton>
                 </div>
               </div>

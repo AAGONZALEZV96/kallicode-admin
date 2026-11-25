@@ -1,0 +1,905 @@
+{
+  "common": {
+    "brand": "KalliCode",
+    "actions": {
+      "retry": "Reintentar",
+      "retrying": "Reintentando...",
+      "retryQuery": "Reintentar consulta",
+      "close": "Cerrar",
+      "closeModal": "Cerrar modal",
+      "closeNotification": "Cerrar notificación",
+      "cancel": "Cancelar",
+      "refresh": "Refrescar",
+      "refreshing": "Actualizando...",
+      "clearFilters": "Limpiar filtros",
+      "resetFilters": "Restablecer filtros",
+      "backHome": "Ir al inicio",
+      "export": "Exportar",
+      "understood": "Entendido",
+      "requestAccess": "Solicitar acceso",
+      "requestJustifiedAccess": "Solicitar acceso justificado",
+      "view360": "Ver 360°"
+    },
+    "states": {
+      "loading": "Cargando datos...",
+      "emptyTitle": "Sin datos disponibles",
+      "emptyDescription": "No se encontraron registros que coincidan con la consulta o los filtros aplicados.",
+      "noData": "—",
+      "notApplicable": "N/A",
+      "masked": "ENMASCARADO",
+      "unmasked": "EN CLARO",
+      "unknown": "Desconocido",
+      "noPlan": "Sin plan",
+      "inProgress": "En curso",
+      "general": "General"
+    },
+    "errors": {
+      "unexpectedTitle": "Ha ocurrido un error inesperado",
+      "unexpectedDescription": "La consola ha detectado un fallo al renderizar la vista. Los datos de sesión y auditoría se mantienen a salvo.",
+      "unknown": "Error desconocido",
+      "traceId": "Trace ID:",
+      "accessDeniedBadge": "ACCESO DENEGADO",
+      "accessDeniedCode": "403 ROL_STAFF_INSUFICIENTE",
+      "aggregatesRefreshing": "AGREGADOS EN REFRESCO",
+      "http503": {
+        "title": "Servicio Analítico en Refresco Temporal (503)",
+        "message": "La capa de agregados analíticos está en proceso de refresco o cálculo. Los datos estarán disponibles en breve."
+      },
+      "http403": {
+        "title": "Acceso Restringido (403 ROL_STAFF_INSUFICIENTE)",
+        "message": "Tu rol de personal no cuenta con los permisos necesarios para consultar esta información."
+      },
+      "http404": {
+        "title": "Recurso No Encontrado (404)",
+        "message": "El recurso u organización solicitada no existe o no se encuentra disponible."
+      },
+      "network": {
+        "title": "Error de Conexión de Red",
+        "message": "No fue posible comunicar con el servidor API de administración. Por favor, comprueba tu conexión de red."
+      },
+      "generic": {
+        "title": "Error al Cargar la Información",
+        "message": "Ha ocurrido un fallo inesperado al comunicarse con el servidor. Por favor, reintenta la operación."
+      }
+    },
+    "pagination": {
+      "recordsPerPage": "Registros por página",
+      "itemsPerPage": "Elementos por página",
+      "rowsPerPage": "Filas por página:",
+      "perPageOption": "{{count}} por pág.",
+      "perPageOptionLong": "{{count}} por página",
+      "pageOf": "Página {{page}} de {{pages}}",
+      "pageOfParens": "(Página {{page}} de {{pages}})",
+      "showingRange": "Mostrando {{from}} a {{to}} de {{total}} organizaciones",
+      "firstPage": "Primera página",
+      "previous": "Anterior",
+      "previousPage": "Página anterior",
+      "next": "Siguiente",
+      "nextPage": "Página siguiente",
+      "lastPage": "Última página"
+    },
+    "plans": {
+      "all": "Todos los planes",
+      "starter": "Starter",
+      "growth": "Growth",
+      "enterprise": "Enterprise"
+    },
+    "statuses": {
+      "all": "Todos los estados",
+      "activa": "Activa",
+      "periodo_gracia": "Periodo de Gracia",
+      "periodo_gracia_moroso": "Periodo de gracia / Moroso",
+      "suspendida": "Suspendida",
+      "finalizada": "Finalizada",
+      "finalizada_baja": "Finalizada / Baja",
+      "pendiente": "Pendiente",
+      "atendida": "Atendida",
+      "rechazada": "Rechazada"
+    }
+  },
+  "layout": {
+    "consoleTitle": "KalliCode Consola",
+    "nav": {
+      "overview": "Panel Negocio",
+      "subscriptions": "Suscripciones",
+      "tokens": "Consumo Tokens",
+      "customers": "Clientes",
+      "agents": "Agentes",
+      "models": "Modelos",
+      "sla": "SLA"
+    },
+    "mobile": {
+      "openMenu": "Abrir menú de navegación",
+      "closeMenu": "Cerrar menú de navegación",
+      "drawerLabel": "Navegación móvil"
+    },
+    "language": {
+      "label": "Idioma",
+      "ariaLabel": "Seleccionar idioma de la consola",
+      "es": "Español",
+      "en": "English"
+    },
+    "logout": "Cerrar Sesión"
+  },
+  "components": {
+    "liveRefresh": {
+      "regionLabel": "Controles de refresco en vivo",
+      "live": "EN VIVO",
+      "paused": "PAUSADO",
+      "pausedHidden": "PAUSADO (Pestaña oculta)",
+      "pause": "Pausar",
+      "resume": "Reanudar",
+      "pauseAria": "Pausar refresco automático",
+      "resumeAria": "Reanudar refresco automático",
+      "frequencyAria": "Frecuencia de auto-refresco",
+      "refreshNow": "Refrescar ahora",
+      "refreshNowAria": "Refrescar datos manualmente ahora",
+      "updating": "Actualizando...",
+      "pausedByVisibility": "En pausa por pestaña oculta",
+      "pending": "Pendiente de actualización",
+      "updatedNow": "Actualizado ahora",
+      "lastAgo": "Última: hace {{seconds}}s",
+      "nextIn": "Próximo en {{seconds}}s · {{freshness}}",
+      "frequencies": {
+        "s15": "Cada 15 segundos (Recomendado)",
+        "s30": "Cada 30 segundos",
+        "s60": "Cada 60 segundos",
+        "manual": "Pausado / Manual"
+      }
+    },
+    "exportReport": {
+      "button": "Exportar Informe",
+      "modalTitle": "Exportar Informe · {{type}}",
+      "description": "Genera un archivo exportable determinista con sello de integridad SHA-256. Por política de privacidad (ADM-G09), las razones sociales se exportan enmascaradas por defecto.",
+      "formatLabel": "Formato de exportación",
+      "fromLabel": "Desde",
+      "toLabel": "Hasta",
+      "invalidRange": "El rango de fechas seleccionado no es válido.",
+      "genericError": "No fue posible generar el informe.",
+      "successTitle": "Informe generado y descargado",
+      "idLabel": "ID: {{id}}",
+      "shaLabel": "SHA-256: {{hash}}...",
+      "downloadAgain": "Descargar nuevamente (.{{format}})",
+      "generating": "Generando...",
+      "generateAndDownload": "Generar y Descargar",
+      "types": {
+        "consumo": "Consumo de Tokens y Costes LLM",
+        "clientes": "Resumen de Clientes y Consumo",
+        "suscripciones": "Suscripciones y Renovaciones",
+        "sla": "Cumplimiento de SLA e Incidentes"
+      },
+      "formats": {
+        "csv": "CSV (Valores separados por comas)",
+        "xlsx": "Excel (.xlsx)",
+        "pdf": "PDF (Informe ejecutivo con sello SHA-256)"
+      }
+    },
+    "accessGrant": {
+      "defaultTitle": "Solicitar Revelación de Datos de Cliente (E6)",
+      "notice": "Los datos comerciales y personales están enmascarados por defecto. Una solicitud de concesión aprobada permite revelar temporalmente los campos protegidos. Toda consulta con concesión queda registrada de forma inmutable en la cadena de auditoría de la plataforma.",
+      "success": "✓ Concesión autorizada y registrada. Actualizando datos en claro...",
+      "fields": {
+        "tenantId": "Organización (tenant_id) *",
+        "tenantPlaceholder": "org_acme_corp",
+        "protectedName": "Razón Social protegida:",
+        "reason": "Motivo Justificado (Mínimo 20 caracteres y referencia a ticket) *",
+        "reasonPlaceholder": "Ej: Revisión de consumo de tokens y auditoría de costes según ticket KC-1049...",
+        "charCount": "Caracteres: {{count}}/20 mín. Debe referenciar KC-#### o SUP-####.",
+        "reference": "Referencia a Ticket (Opcional si se incluye en el motivo)",
+        "referencePlaceholder": "Ej: KC-1049 o SUP-8821",
+        "scope": "Alcance Requerido *",
+        "duration": "Duración de la Concesión *"
+      },
+      "scopes": {
+        "datos_negocio": "Datos de Negocio (Recomendado)",
+        "expediente": "Expediente Completo",
+        "contenido_codigo": "Contenido de Código"
+      },
+      "durations": {
+        "15": "15 minutos",
+        "30": "30 minutos",
+        "60": "60 minutos (1 hora)",
+        "240": "240 minutos (4 horas)",
+        "480": "480 minutos (8 horas)"
+      },
+      "validation": {
+        "missingTenant": "Debe especificar el identificador de la organización (tenant_id).",
+        "minReason": "El motivo debe contener al menos 20 caracteres justificando el acceso.",
+        "missingTicket": "Debe incluir una referencia obligatoria a un ticket válido (ej. KC-1234 o SUP-5678).",
+        "apiError": "Error al procesar la solicitud de concesión.",
+        "unexpectedError": "Error inesperado al conectar con el servidor."
+      },
+      "submitting": "Registrando Concesión...",
+      "submit": "Confirmar y Revelar"
+    },
+    "slaClock": {
+      "title": "Desglose del reloj de servicio",
+      "titleWithJob": "Desglose del reloj de servicio: {{jobId}}",
+      "loading": "Cargando tramos cronológicos del reloj SLA...",
+      "errorTitle": "No se pudo obtener el desglose del reloj SLA",
+      "emptyTitle": "Sin datos de reloj para este caso",
+      "emptyDescription": "No existen segmentos registrados para el identificador seleccionado.",
+      "fields": {
+        "ticket": "Ticket",
+        "customerTenant": "Cliente / Tenant",
+        "planAndTarget": "Plan y Objetivo",
+        "stageAndResult": "Etapa y Resultado",
+        "noTarget": "Sin objetivo",
+        "targetHours": "{{hours}} h"
+      },
+      "equation": {
+        "regionLabel": "Ecuación de consistencia del reloj SLA",
+        "formula": "Ecuación de consistencia: Tiempo Bruto = Tiempo Computado + Horas de Pausa Justificada",
+        "gross": "Tiempo Bruto",
+        "computed": "Tiempo Computado (Neto)",
+        "paused": "Horas de Pausa Justificada",
+        "barAria": "Distribución del reloj: {{computed}} horas computables y {{paused}} horas en pausa justificada",
+        "computableTitle": "Computable: {{hours}} h",
+        "pausedTitle": "Pausa justificada: {{hours}} h"
+      },
+      "timeline": {
+        "regionLabel": "Línea de tiempo de tramos cronológicos",
+        "title": "Línea de tiempo cronológica de tramos",
+        "empty": "No hay tramos registrados para este caso.",
+        "computableBadge": "Computa al SLA",
+        "pausedBadge": "Pausa justificada"
+      },
+      "rules": {
+        "regionLabel": "Reglas aplicadas en el cómputo de nivel de servicio",
+        "title": "Criterios y deducciones aplicadas en el reloj",
+        "sanitizedTable": "registro interno de nivel de servicio"
+      },
+      "pauseCauses": {
+        "default": "Pausa justificada",
+        "espera_firma_cliente": "Espera de firma del cliente",
+        "escalado_humano": "Escalado a revisión humana",
+        "ventana_mantenimiento": "Ventana de mantenimiento programado",
+        "indisponibilidad_proveedor_llm": "Indisponibilidad de proveedor LLM",
+        "otro": "Otra pausa justificada"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "subtitle": "Consola de Administración de Personal",
+      "emailLabel": "Correo Electrónico (@kallicode.com)",
+      "emailPlaceholder": "nombre@kallicode.com",
+      "passwordLabel": "Contraseña",
+      "passwordPlaceholder": "••••••••••••",
+      "submit": "Continuar al Segundo Factor",
+      "errors": {
+        "missingFields": "Por favor ingresa tu correo electrónico y contraseña.",
+        "invalidCredentials": "Credenciales no válidas."
+      }
+    },
+    "mfa": {
+      "title": "Verificación en Dos Pasos",
+      "subtitle": "Ingresa el código de 6 dígitos de tu aplicación autenticadora (TOTP)",
+      "codeLabel": "Código de Verificación",
+      "codePlaceholder": "123456",
+      "submit": "Verificar e Ingresar",
+      "backToLogin": "Volver al Login",
+      "errors": {
+        "invalidLength": "Ingresa el código TOTP de 6 dígitos.",
+        "invalidCode": "Código de verificación no válido."
+      }
+    },
+    "error403": {
+      "title": "Acceso Restringido (403)",
+      "description": "Tu rol de personal actual no cuenta con las atribuciones suficientes en la matriz de permisos para acceder a esta sección.",
+      "assignedRole": "Rol asignado:",
+      "backHome": "Volver al Inicio"
+    },
+    "error404": {
+      "title": "Página No Encontrada",
+      "description": "La ruta que intentas consultar no existe o ha sido reubicada dentro de la consola.",
+      "backPanel": "Volver al Panel"
+    }
+  },
+  "views": {
+    "bizOverview": {
+      "title": "Panel General de Negocio",
+      "subtitle": "Métricas ejecutivas consolidadas desde la capa de agregados en PostgreSQL.",
+      "rbacDenied": "Acceso denegado para el rol {{role}}. Esta pantalla es de visualización exclusiva para personal de negocio o administración.",
+      "errorTitle": "ERROR EN DATOS DE NEGOCIO",
+      "error503Message": "Los agregados de negocio están recalculándose en PostgreSQL.",
+      "freshness": {
+        "staleBadge": "Datos desactualizados (> 6h)",
+        "activeBadge": "ACTIVO",
+        "exactTitle": "Frescura exacta: {{date}}",
+        "updating": "(Actualizando...)",
+        "unavailable": "Fecha no disponible",
+        "secondsAgo": "Actualizado hace unos segundos",
+        "minutesAgo": "Actualizado hace {{count}} min",
+        "hoursAgo": "Actualizado hace {{count}} h",
+        "daysAgo": "Actualizado hace {{count}} d"
+      },
+      "filters": {
+        "regionLabel": "Controles de rango temporal y comparación",
+        "periodLabel": "Periodo",
+        "compareLabel": "Comparar con",
+        "refreshButton": "Refrescar métricas",
+        "refreshAria": "Refrescar métricas de negocio",
+        "periods": {
+          "mes_actual": "Mes actual",
+          "mes_anterior": "Mes anterior",
+          "trimestre": "Trimestre en curso",
+          "ano": "Año en curso"
+        },
+        "comparisons": {
+          "periodo_anterior": "Periodo anterior",
+          "mismo_periodo_ano_anterior": "Mismo periodo año anterior"
+        }
+      },
+      "kpis": {
+        "regionLabel": "Tarjetas principales de indicadores de negocio",
+        "mrrTitle": "Ingreso Recurrente Mensual",
+        "currency": "Moneda: {{currency}}",
+        "activeCustomersTitle": "Clientes Activos",
+        "signups": "+{{count}} altas",
+        "cancellations": "-{{count}} cancelaciones",
+        "tokensTitle": "Consumo de Tokens (Ciclo)",
+        "locCount": "{{count}} LOC",
+        "estimatedCost": "Coste: {{cost}}",
+        "deliveredTicketsTitle": "Tickets Entregados",
+        "humanEscalation": "Escalado humano: {{pct}}",
+        "p50Time": "Tiempo p50: {{hours}}h"
+      },
+      "plansBreakdown": {
+        "regionLabel": "Desglose por plan de suscripción",
+        "title": "Distribución de Organizaciones por Plan"
+      }
+    },
+    "bizCustomers": {
+      "title": "Directorio de Clientes y Organizaciones",
+      "subtitle": "Supervisión cross-tenant de suscripciones, consumo y actividad operativa.",
+      "rbacDenied": "Acceso denegado para el rol {{role}}. El directorio de clientes y organizaciones es exclusivo para personal de soporte, negocio y administración.",
+      "error503Message": "La capa de agregados analíticos está en refresco en PostgreSQL.",
+      "exportButton": "Exportar Clientes",
+      "privacyPolicyButton": "Política de Privacidad y Enmascaramiento",
+      "privacyPolicyAria": "Ver información sobre política de enmascaramiento",
+      "refreshAria": "Refrescar listado de clientes",
+      "maskingBanner": {
+        "badge": "ENMASCARADO ACTIVO",
+        "text": "Los datos sensibles de clientes están protegidos por defecto bajo la política de privacidad. Para ver en claro se requiere una solicitud de concesión aprobada."
+      },
+      "filters": {
+        "regionLabel": "Controles de búsqueda y filtros de organizaciones",
+        "searchLabel": "Buscar por ID u organización",
+        "searchPlaceholder": "org_acme, Acme...",
+        "planLabel": "Plan comercial",
+        "statusLabel": "Estado"
+      },
+      "empty": {
+        "title": "No se encontraron organizaciones",
+        "description": "Prueba a ajustar los criterios de búsqueda o filtros seleccionados."
+      },
+      "table": {
+        "regionLabel": "Listado de organizaciones cliente",
+        "colTenant": "Tenant ID",
+        "colName": "Razón Social",
+        "colPlan": "Plan",
+        "colStatus": "Estado",
+        "colLines": "Líneas",
+        "colUsage": "Consumo (Ciclo)",
+        "colLastActivity": "Última Actividad",
+        "colPrivacy": "Privacidad",
+        "colActions": "Acciones",
+        "viewDetailsAria": "Ver detalles de {{tenantId}}",
+        "maskedTitle": "Dato enmascarado por política de privacidad y enmascaramiento",
+        "activeLines": "({{count}} act.)",
+        "locLabel": "{{count}} LOC",
+        "tokensQuota": "{{tokens}} tok ({{pct}})"
+      },
+      "privacyModal": {
+        "title": "Política de Privacidad y Acceso Justificado",
+        "intro": "Bajo las directivas de seguridad de la Consola de Administración de KalliCode, la razón social, correos y datos sensibles de clientes se muestran enmascarados por defecto para todo el personal.",
+        "conditionsTitle": "Condiciones para revelación en claro:",
+        "cond1": "Debe existir una solicitud de concesión aprobada autorizada con justificación operativa.",
+        "cond2": "Toda consulta sobre datos revelados queda registrada en la cadena de auditoría inmutable de la plataforma.",
+        "cond3": "Las concesiones son temporales y expiran automáticamente tras su ventana de validez."
+      }
+    },
+    "customerDetail": {
+      "missingTenantError": "Falta el identificador de cliente",
+      "rbacDenied": "El personal con rol staff_operaciones no tiene autorización para consultar la ficha 360° ni los datos comerciales de clientes.",
+      "goToAgents": "Ir a Operaciones de Agentes",
+      "error404Title": "Organización Cliente No Encontrada (404)",
+      "error503Title": "Agregados Analíticos No Disponibles (503)",
+      "backToList": "Volver al Listado",
+      "backToDirectory": "← Volver a Directorio de Clientes",
+      "metaLine": "Dominio corporativo: {{domain}} · Alta el {{date}}",
+      "requestReveal": "Solicitar Revelación de Datos",
+      "activeGrantBadge": "✓ Concesión Activa (Datos en Claro)",
+      "grantModalTitle": "Solicitud de Concesión de Acceso a Datos de Cliente",
+      "grantSuccessFeedback": "Concesión de acceso autorizada. Los datos sensibles han sido revelados en claro.",
+      "privacyBanner": {
+        "title": "Protección de PII y Política de Privacidad y Enmascaramiento por Defecto",
+        "description": "Para garantizar el principio de mínimo privilegio y auditoría inmutable, los bloques de identificación, usuarios e integraciones se devuelven ofuscados sin una concesión temporal justificada.",
+        "protectedBlocks": "Bloques protegidos:",
+        "unlockButton": "Desbloquear Ficha"
+      },
+      "sections": {
+        "identification": "1. Identificación & Suscripción",
+        "lines": "2. Líneas de Producción",
+        "usage": "3. Consumo del Ciclo e Histórico (Últimos 6 Ciclos)",
+        "users": "4. Usuarios de la Organización ({{count}})",
+        "integrations": "5. Integraciones Conectadas ({{count}})",
+        "pipelineGraph": "6. Actividad de Pipeline y Estructura CodeMapping"
+      },
+      "fields": {
+        "tenantId": "Tenant ID",
+        "companyName": "Razón Social",
+        "domain": "Dominio",
+        "createdAt": "Fecha de Alta",
+        "plan": "Plan Comercial",
+        "subscriptionStatus": "Estado Suscripción",
+        "renewalDate": "Fecha de Renovación",
+        "monthlyAmount": "Importe Mensual",
+        "pendingPlanChanges": "Solicitudes de Cambio de Plan Pendientes:",
+        "noPendingRequests": "Sin solicitudes pendientes",
+        "contractedLines": "Líneas Contratadas",
+        "activeLines": "Líneas Activas",
+        "avgUtilization": "Utilización Media del Ciclo:",
+        "cycleLocProcessed": "LOC procesadas en el ciclo:",
+        "accumulatedCost": "Coste comercial acumulado:",
+        "locConsumed": "LOC Consumidas",
+        "tokensConsumed": "Tokens Consumidos",
+        "quotaUsed": "Cuota Utilizada",
+        "historyTitle": "Histórico de los Últimos 6 Ciclos Comerciales",
+        "colCycle": "Ciclo Comercial",
+        "colLoc": "LOC Consumidas",
+        "colTokens": "Tokens",
+        "colQuota": "% Cuota",
+        "noHistory": "No hay histórico de ciclos comerciales disponible.",
+        "maskedEmails": "[Emails Enmascarados]",
+        "colUserEmail": "Usuario / Email",
+        "colRole": "Rol",
+        "colLanguage": "Idioma",
+        "colStatus": "Estado",
+        "noUsers": "Sin usuarios registrados.",
+        "maskedPaths": "[Rutas Enmascaradas]",
+        "colType": "Tipo",
+        "colIdentifier": "Identificador / Nombre",
+        "noIntegrations": "Sin integraciones configuradas.",
+        "graphCoverage": "Cobertura de Grafo",
+        "indexedNodes": "Nodos Indexados",
+        "dependencyEdges": "Aristas de Dependencia",
+        "e2ePerformance": "Rendimiento End-to-End (p50)",
+        "hoursValue": "{{hours}} h",
+        "graphNote": "* El grafo CodeMapping refleja relaciones de arquitectura sin exponer contenido de ficheros salvo concesión con alcance específico."
+      }
+    },
+    "bizSubscriptions": {
+      "title": "Gestión de Suscripciones y Renovaciones",
+      "subtitle": "Supervisión del ciclo comercial, radar de renovaciones y tramitación de solicitudes de cambio de plan.",
+      "rbacDenied": "La gestión comercial de suscripciones y solicitudes de cambio de plan está restringida exclusivamente a staff_negocio y staff_admin.",
+      "goToOps": "Ir a Operaciones",
+      "tabsAria": "Vistas de suscripciones",
+      "tabRenewals": "Radar de Renovaciones",
+      "tabUpgrades": "Cola de Upgrades",
+      "maskedTooltip": "Dato enmascarado por política de privacidad. Clic para solicitar revelación justificada.",
+      "renewals": {
+        "regionLabel": "Directorio y Radar de Renovaciones",
+        "searchPlaceholder": "Buscar tenant o cliente...",
+        "searchAria": "Buscar suscripciones",
+        "planAria": "Filtrar por plan",
+        "statusAria": "Filtrar por estado",
+        "windowAria": "Filtrar por plazo de renovación",
+        "refreshAria": "Refrescar datos de suscripciones",
+        "refreshLabel": "↻ Refrescar",
+        "emptyTitle": "No se encontraron suscripciones",
+        "emptyDescription": "No existen contratos que coincidan con los filtros comerciales aplicados.",
+        "tableAria": "Listado de suscripciones y radar de renovaciones",
+        "colTenant": "Organización (Tenant)",
+        "colName": "Razón Social",
+        "colPlan": "Plan",
+        "colStatus": "Estado",
+        "colStart": "Inicia El",
+        "colRenew": "Renueva El",
+        "colDays": "Días Renovación",
+        "colAmount": "Importe / Mes",
+        "colQuota": "% Cuota Uso",
+        "daysShort": "{{days}}d",
+        "critical15": "≤ 15 días",
+        "warning30": "≤ 30 días",
+        "showing": "Mostrando {{count}} de {{total}} suscripciones (Pág. {{page}} de {{pages}})",
+        "windows": {
+          "all": "Cualquier plazo",
+          "d15": "Próximos 15 días (Crítico)",
+          "d30": "Próximos 30 días",
+          "d60": "Próximos 60 días",
+          "d90": "Próximos 90 días"
+        }
+      },
+      "upgrades": {
+        "regionLabel": "Cola de Solicitudes de Upgrade",
+        "statusAria": "Filtrar solicitudes por estado",
+        "desiredPlanAria": "Filtrar por plan deseado",
+        "autoOrderHint": "Orden automático: más antiguas primero (antigüedad descendente).",
+        "refreshAria": "Refrescar solicitudes",
+        "emptyTitle": "No hay solicitudes de upgrade",
+        "emptyDescription": "No constan peticiones de cambio de plan pendientes o con los filtros seleccionados.",
+        "emptyAction": "Ver todas las solicitudes",
+        "tableAria": "Cola de solicitudes de upgrade y cambio de plan",
+        "colId": "ID Solicitud",
+        "colTenant": "Organización",
+        "colName": "Razón Social",
+        "colTransition": "Transición de Plan",
+        "colRequested": "Solicitado El",
+        "colAge": "Antigüedad",
+        "colPriority": "Prioridad",
+        "colStatus": "Estado",
+        "ageHours": "{{hours}}h",
+        "urgent": "🔥 Urgente",
+        "normal": "Normal",
+        "showing": "Mostrando {{count}} de {{total}} solicitudes (Pág. {{page}} de {{pages}})",
+        "prevAria": "Página anterior de solicitudes",
+        "nextAria": "Página siguiente de solicitudes",
+        "statuses": {
+          "pendiente": "Pendientes (Por defecto)",
+          "todos": "Todos los estados",
+          "atendida": "Atendidas",
+          "rechazada": "Rechazadas"
+        }
+      }
+    },
+    "bizTokens": {
+      "title": "Consumo de Tokens y FinOps",
+      "subtitle": "Supervisión económica de consumo de inferencia LLM, costes por tier, control de cuotas y cuadre con facturación.",
+      "rbacDenied": "Acceso denegado para el rol {{role}}. La supervisión analítica de consumo de tokens y costes de inferencia es exclusiva para personal de negocio o administración.",
+      "freshness": "Frescura: {{time}}",
+      "updating": "Actualizando datos...",
+      "refreshing": "Refrescando...",
+      "discrepancyBanner": {
+        "title": "Alerta Crítica: Descuadre Detectado entre Consumo y Facturación",
+        "description": "Las líneas de código o tokens computados difieren de las unidades facturadas en el ciclo. Clientes afectados: {{clients}}.",
+        "defaultClients": "Organizaciones auditadas",
+        "badge": "AUDITORÍA REQUERIDA"
+      },
+      "liveFilterAnnouncement": "Filtros activos: Periodo {{period}}, Plan {{plan}}, Agrupación {{groupBy}}{{queryPart}}",
+      "liveFilterQueryPart": ", Búsqueda {{query}}",
+      "filters": {
+        "regionLabel": "Controles y Filtros Analíticos",
+        "periodLabel": "Periodo Temporal",
+        "planLabel": "Plan Comercial",
+        "groupLabel": "Agrupación Analítica",
+        "searchLabel": "Buscar Cliente / Organización",
+        "searchPlaceholder": "Buscar por tenant_id o nombre...",
+        "sortLabel": "Criterio de Ordenación",
+        "periods": {
+          "mes_actual": "Mes actual (defecto)",
+          "mes_anterior": "Mes anterior",
+          "trimestre": "Último trimestre",
+          "ano": "Año en curso"
+        },
+        "groupBy": {
+          "cliente": "Por cliente (organización)",
+          "tier": "Por tier de modelo",
+          "dia": "Por serie diaria"
+        },
+        "sortOptions": {
+          "coste_desc": "Coste (Mayor a Menor)",
+          "coste_asc": "Coste (Menor a Mayor)",
+          "tokens_total_desc": "Tokens Totales (Mayor a Menor)",
+          "tokens_total_asc": "Tokens Totales (Menor a Mayor)",
+          "tokens_in_desc": "Tokens In (Mayor a Menor)",
+          "tokens_out_desc": "Tokens Out (Mayor a Menor)",
+          "cuota_pct_desc": "% Cuota (Mayor a Menor)",
+          "cuota_pct_asc": "% Cuota (Menor a Mayor)",
+          "loc_consumidas_desc": "Líneas de Código (Mayor a Menor)"
+        }
+      },
+      "errors": {
+        "title503": "Agregados analíticos en refresco",
+        "titleGeneric": "Error al cargar consumo de tokens",
+        "msg503": "Los agregados de cómputo están recalculándose. Traza: {{traceId}}",
+        "msgGeneric": "No se pudo obtener el informe de tokens. {{message}}"
+      },
+      "empty": {
+        "title": "Sin datos de consumo de tokens",
+        "description": "No existen registros de consumo de inferencia para los filtros y periodo seleccionados.",
+        "action": "Limpiar Filtros"
+      },
+      "kpis": {
+        "regionLabel": "Resumen Ejecutivo FinOps",
+        "totalTokens": "Total Tokens Consumidos",
+        "totalTokensSub": "Inferencia LLM acumulada en el periodo ({{period}})",
+        "consolidatedCost": "Coste Consolidado",
+        "consolidatedCostSub": "Coste monetario de cómputo estimado",
+        "avgQuota": "Consumo Medio de Cuota",
+        "avgQuotaSub": "Media sobre capacidad contratada por organización",
+        "quotaSaturated": "SATURADA (>100%)",
+        "quotaWarn": "AVISO (>80%)",
+        "quotaNormal": "NORMAL",
+        "billingMatch": "Cuadre Facturación",
+        "billingMismatchBadge": "DESCUADRE",
+        "billingMatchedBadge": "CONCILIADO",
+        "billingMismatchValue": "Discrepancia Activa",
+        "billingMatchedValue": "100% Conciliado",
+        "billingMismatchSub": "Inconsistencia entre agregados y ciclos facturados",
+        "billingMatchedSub": "Consumo validado contra ciclos de facturación"
+      },
+      "tiersPanel": {
+        "regionLabel": "Panel de tendencias y desglose por tier de modelo",
+        "title": "Desglose Analítico por Tier de Inferencia LLM",
+        "description": "Auditoría de volumen de tokens por categoría arquitectónica. El tier fable se desglosa por separado de pro por divergencia de coste y modelo.",
+        "badge": "Separación Fable vs Pro Requerida",
+        "barAria": "Distribución por tier: Flash {{flash}}%, Pro {{pro}}%, Fable {{fable}}%",
+        "volumePct": "{{pct}}% del volumen de tokens",
+        "volumePctSpecialized": "{{pct}}% del volumen de tokens (cómputo especializado)",
+        "flashTitle": "Tier Flash",
+        "flashBadge": "Alta Velocidad",
+        "proTitle": "Tier Pro",
+        "proBadge": "Capacidad Estándar",
+        "fableTitle": "Tier Fable",
+        "fableBadge": "Razonamiento Avanzado",
+        "a11yTableSummary": "Tabla de resumen accesible de tokens consumidos por tier de modelo",
+        "a11yColTier": "Tier",
+        "a11yColCategory": "Categoría",
+        "a11yColTokens": "Tokens",
+        "a11yColPercent": "Porcentaje",
+        "catFlash": "Inferencia Ligera",
+        "catPro": "Inferencia General",
+        "catFable": "Razonamiento Agéntico"
+      },
+      "table": {
+        "titleByClient": "Consumo de Tokens por Organización Cliente",
+        "titleByTier": "Agregado Consolidado por Tier de Modelo",
+        "titleByDay": "Serie Temporal de Consumo Diario",
+        "showingRecords": "Mostrando {{count}} de {{total}} registros",
+        "cycleBadge": "Ciclo: {{cycle}}",
+        "maskedBanner": "DATOS ENMASCARADOS BAJO POLÍTICA DE PRIVACIDAD",
+        "colClient": "Organización / Cliente",
+        "colPlan": "Plan",
+        "colTokensIn": "Tokens In",
+        "colTokensOut": "Tokens Out",
+        "colTokensTotal": "Tokens Total",
+        "colTiers": "Desglose Tiers",
+        "colEstCost": "Coste Est.",
+        "colEstimatedCost": "Coste Estimado",
+        "colUsageQuota": "Cuota de Uso",
+        "colBilling": "Facturación",
+        "colPrivacy": "Privacidad",
+        "colTierModel": "Tier de Modelo",
+        "colDate": "Fecha / Día",
+        "quotaExceeded": "Excedida",
+        "quotaAlert": "Alerta",
+        "matchOkTitle": "Consumo cuadra con la facturación emitida",
+        "matchOk": "✅ Cuadra",
+        "matchErrTitle": "Descuadre detectado entre consumo y facturación",
+        "matchErr": "🚨 Descuadre",
+        "reconciledBadge": "✅ Conciliado",
+        "fableNote": "(Razonamiento Agéntico Especializado)"
+      }
+    },
+    "opsAgents": {
+      "title": "Estado de Agentes y Colas de Producción",
+      "subtitle": "Monitorización agregada de líneas de producción, capacidad por etapa y profundidad de colas",
+      "rbacDenied": "El rol {{role}} no tiene autorización para consultar el estado operativo de agentes y colas.",
+      "windowGroupAria": "Ventana temporal",
+      "loadingMessage": "Consultando telemetría de agentes y colas...",
+      "errorTitle": "Telemetría operativa no disponible",
+      "telemetry": {
+        "regionLabel": "Estado de telemetría",
+        "down": "Telemetría caída",
+        "stale": "Telemetría desactualizada",
+        "available": "Telemetría disponible",
+        "noTelemetry": "Sin telemetría",
+        "secondsAgo": "Actualizado hace {{count}} s",
+        "minutesAgo": "Actualizado hace {{count}} min",
+        "hoursAgo": "Actualizado hace {{count}} h",
+        "windowSuffix": "{{relative}} · Ventana {{window}}",
+        "activeAlertsCount": "{{count}} alerta(s) activa(s)",
+        "bannerTitle": "Sin telemetría disponible: contadores de agentes y etapas sin señal reciente",
+        "bannerSubtitle": "Los indicadores se muestran sin valores para distinguir la pérdida de señal de la ausencia de carga.",
+        "staleBannerPrefix": "Atención de frescura operativa:",
+        "staleBannerBody": "la última lectura supera los 5 minutos de antigüedad ({{relative}})."
+      },
+      "summary": {
+        "regionLabel": "Resumen operativo agregado",
+        "linesTitle": "Líneas de Producción",
+        "linesActive": "{{count}} activas",
+        "linesMaintenance": "Mantenimiento:",
+        "linesFree": "Libres:",
+        "agentsTitle": "Resumen de Agentes",
+        "agentsBusy": "{{busy}} / {{total}} ocupados",
+        "agentsTotal": "Total:",
+        "agentsDown": "Caídos:",
+        "queuesTitle": "Resumen de Colas",
+        "queuesPending": "{{count}} pendientes",
+        "queuesFailed": "Fallidos (DLQ):",
+        "queuesAttention": "En atención/críticas:"
+      },
+      "alerts": {
+        "regionLabel": "Alertas activas del pipeline",
+        "title": "Alertas activas en etapas del pipeline",
+        "thresholdExceeded": "Umbral superado ({{type}})",
+        "defaultType": "operativa"
+      },
+      "stages": {
+        "regionLabel": "Etapas del pipeline de software",
+        "title": "Rendimiento por Etapa del Pipeline",
+        "noTelemetryBadge": "Sin telemetría en etapas",
+        "badgeAlert": "Alerta",
+        "badgeNoTelemetry": "Sin telemetría",
+        "badgeOperational": "Operativa",
+        "totalAgents": "Agentes totales",
+        "busy": "Ocupados",
+        "down": "Caídos",
+        "completedJobs": "Jobs completados",
+        "p95Duration": "Duración p95",
+        "secondsValue": "{{seconds}} s"
+      },
+      "queues": {
+        "regionLabel": "Colas del pipeline",
+        "title": "Colas del Pipeline y Dead Letter Queues",
+        "includeDlq": "Incluir Dead Letter Queues (DLQ)",
+        "errorTitle": "No se pudo obtener la telemetría de colas",
+        "emptyTitle": "Sin colas activas",
+        "emptyDescription": "No hay colas registradas para los criterios seleccionados.",
+        "colQueue": "Cola",
+        "colPending": "Pendientes",
+        "colClaimed": "Reclamados",
+        "colFailed": "Fallidos (DLQ)",
+        "colMaxAge": "Antigüedad máxima",
+        "colStatus": "Estado",
+        "secondsValue": "{{seconds}} s",
+        "statuses": {
+          "critico": "CRITICO",
+          "atencion": "ATENCION",
+          "normal": "NORMAL"
+        }
+      }
+    },
+    "opsModels": {
+      "title": "Métricas de Modelos LLM y Servicios Core",
+      "subtitle": "Disponibilidad, latencia, tasa de error, escalados entre tiers y segregación financiera",
+      "rbacDenied": "El rol {{role}} no tiene autorización para consultar la telemetría de modelos LLM y proveedores.",
+      "loadingMessage": "Consultando métricas de modelos LLM y proveedores...",
+      "errorTitle": "Telemetría de modelos no disponible",
+      "emptyTitle": "Sin métricas de modelos para el filtro aplicado",
+      "emptyDescription": "Ajusta el proveedor, el tier o la ventana temporal para visualizar resultados.",
+      "filters": {
+        "regionLabel": "Filtros de telemetría de modelos",
+        "windowLabel": "Ventana temporal",
+        "windowAria": "Ventana temporal de modelos",
+        "providerLabel": "Proveedor",
+        "tierLabel": "Tier",
+        "all": "Todos",
+        "comparePrevious": "Comparar con período anterior"
+      },
+      "health": {
+        "regionLabel": "Salud de dependencias e infraestructura",
+        "title": "Salud de Servicios y Dependencias Core",
+        "operational": "OPERATIVO",
+        "degraded": "DEGRADADO",
+        "services": {
+          "postgres": "Postgres",
+          "blob": "Blob Storage",
+          "telemetria": "Telemetría",
+          "agregados": "Agregados"
+        }
+      },
+      "availabilityAlert": {
+        "title": "Alerta crítica de disponibilidad (< 99% en ventana de 1 hora):",
+        "item": "{{availability}} de disponibilidad"
+      },
+      "escalations": {
+        "regionLabel": "Escalados entre tiers LLM",
+        "flashToPro": "Escalados Flash -> Pro",
+        "proToFable": "Escalados Pro -> Fable",
+        "toHuman": "Escalados a Humano (Fallback)",
+        "vsPrevious": "vs anterior: {{delta}}",
+        "noChange": "sin cambio"
+      },
+      "tiers": {
+        "regionLabel": "Tokens y coste estimado por tier",
+        "flashTitle": "Consumo Tier Flash",
+        "proTitle": "Consumo Tier Pro",
+        "fableTitle": "Consumo Tier Fable (Segregado)",
+        "tokensSuffix": "{{tokens}} tokens",
+        "estimatedCost": "Coste estimado:",
+        "independentCost": "Coste independiente:"
+      },
+      "tables": {
+        "standardTitle": "Rendimiento por Modelo y Proveedor — Tiers Estándar (Flash y Pro)",
+        "standardSubtitle": "Ejecución operativa estándar agregada por ventana seleccionada, sin mezcla con Fable.",
+        "fableTitle": "Tier Fable — Razonamiento Avanzado (Segregación Estricta)",
+        "fableSubtitle": "Reportado de forma independiente: sus llamadas, latencias y tarifas no se promedian con Flash ni Pro.",
+        "colProvider": "Proveedor",
+        "colModel": "Modelo",
+        "colTier": "Tier",
+        "colCalls": "Llamadas",
+        "colAvailability": "Disponibilidad %",
+        "colLatencyP50": "Latencia P50 (ms)",
+        "colLatencyP95": "Latencia P95 (ms)",
+        "colErrorRate": "Tasa de Error %",
+        "colDelta": "Delta vs período anterior",
+        "msValue": "{{ms}} ms",
+        "deltaCalls": "Llamadas {{delta}}",
+        "deltaP95": "P95 {{delta}}"
+      }
+    },
+    "opsSla": {
+      "title": "Cumplimiento de SLA e Incidentes de Servicio",
+      "subtitle": "Observabilidad operativa de acuerdos de nivel de servicio, pausas justificadas y reloj por caso.",
+      "rbacDenied": "El rol {{role}} no tiene autorización para consultar el cumplimiento de acuerdos de servicio.",
+      "exportButton": "Exportar SLA",
+      "loadingMessage": "Cargando métricas y casos de cumplimiento SLA...",
+      "errorTitle": "Error al cargar el cumplimiento de acuerdos de servicio",
+      "emptyTitle": "Sin casos de SLA para los filtros seleccionados",
+      "emptyDescription": "No se registran ejecuciones ni incidencias de nivel de servicio en el ciclo o plan elegido.",
+      "emptyAction": "Ver ciclo actual completo",
+      "freshness": {
+        "staleBadge": "Datos desactualizados (> 6 h)",
+        "okBadge": "Frescura operativa",
+        "recent": "Actualización reciente",
+        "syncing": "Sincronizando actualización...",
+        "unavailable": "Fecha de actualización no disponible",
+        "secondsAgo": "Actualizado hace unos segundos",
+        "minutesAgo": "Actualizado hace {{count}} min",
+        "hoursAgo": "Actualizado hace {{count}} h",
+        "daysAgo": "Actualizado hace {{count}} d"
+      },
+      "filters": {
+        "regionLabel": "Filtros de cumplimiento SLA",
+        "cycleLabel": "Ciclo comercial (AAAA-MM)",
+        "currentCycleOption": "{{cycle}} (Ciclo actual)",
+        "planLabel": "Plan comercial",
+        "planWithHours": "{{plan}} ({{hours}} h)",
+        "onlyRiskOrBreached": "Solo casos en riesgo o incumplidos"
+      },
+      "kpis": {
+        "regionLabel": "Resumen ejecutivo de SLA",
+        "globalCompliance": "Cumplimiento Global",
+        "insufficientSample": "Muestra insuficiente (mínimo 5 casos evaluados)",
+        "withinTarget": "{{within}} dentro de objetivo sobre {{evaluated}} evaluados",
+        "atRisk": "Casos en Riesgo",
+        "atRiskBadge": "Alerta > 75%",
+        "atRiskSub": "Ejecuciones activas que superan el 75% del objetivo",
+        "breached": "Casos Incumplidos",
+        "breachedTickets": "Tickets: {{tickets}}",
+        "noBreachedTickets": "Sin tickets incumplidos en la vista actual",
+        "totalEvaluated": "Total Evaluados",
+        "cycleVolume": "Volumen total del ciclo: {{total}} casos"
+      },
+      "planBreakdown": {
+        "regionLabel": "Desglose de cumplimiento por plan comercial",
+        "title": "Desglose por Plan Comercial",
+        "planHours": "{{plan}} ({{hours}} horas)",
+        "casesCount": "{{count}} casos",
+        "complianceLabel": "Cumplimiento:",
+        "p95Value": "p95: {{value}}",
+        "hoursValue": "{{hours}} h",
+        "progressAria": "Cumplimiento plan {{plan}}"
+      },
+      "table": {
+        "regionLabel": "Tabla de casos y reloj SLA",
+        "title": "Seguimiento de Reloj por Caso ({{count}})",
+        "hint": "Selecciona un Job ID para inspeccionar el desglose cronológico y las pausas justificadas.",
+        "emptyFiltered": "No hay casos individuales que coincidan con el filtro aplicado.",
+        "tableAria": "Casos de cumplimiento SLA y seguimiento del reloj",
+        "colJobId": "Job ID",
+        "colTicket": "Ticket",
+        "colCustomerTenant": "Cliente / Tenant",
+        "colPlan": "Plan",
+        "colTarget": "Objetivo SLA (h)",
+        "colElapsed": "Transcurrido (h)",
+        "colGross": "Bruto (h)",
+        "colPaused": "Pausas (h)",
+        "colResult": "Resultado",
+        "inspectClockAria": "Ver desglose del reloj SLA para {{jobId}}",
+        "hoursValue": "{{hours}} h",
+        "showingPage": "Mostrando página {{page}} de {{pages}} · Total: {{total}} casos"
+      },
+      "results": {
+        "dentro": "DENTRO",
+        "en_riesgo": "EN RIESGO",
+        "incumplido": "INCUMPLIDO",
+        "en_curso": "EN CURSO",
+        "sin_objetivo": "SIN OBJETIVO"
+      }
+    }
+  }
+}

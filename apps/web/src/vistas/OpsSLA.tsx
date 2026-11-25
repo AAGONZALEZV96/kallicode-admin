@@ -7,9 +7,11 @@
 
 import React, { useState, useCallback, useContext, useMemo } from "react";
 import { QueryClient, QueryClientContext, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi } from "../api/clienteApi";
 import { useOptionalAuth } from "../estado/auth";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
+import { formatDecimal, formatNumber, formatPercent } from "../i18n/formatters";
 import { ControlesLiveRefresh } from "../componentes/ControlesLiveRefresh";
 import {
   Tabla,
@@ -109,26 +111,11 @@ const ROLES_SLA_PERMITIDOS = new Set(["staff_operaciones", "staff_negocio", "sta
 
 const PLANES_CANONICOS: Array<{
   clave: "starter" | "growth" | "enterprise";
-  titulo: string;
   objetivoDefectoH: number;
 }> = [
-  { clave: "starter", titulo: "Starter", objetivoDefectoH: 72 },
-  { clave: "growth", titulo: "Growth", objetivoDefectoH: 24 },
-  { clave: "enterprise", titulo: "Enterprise", objetivoDefectoH: 8 },
-];
-
-const OPCIONES_PLAN = [
-  { valor: "todos", etiqueta: "Todos los planes" },
-  { valor: "starter", etiqueta: "Starter (72 h)" },
-  { valor: "growth", etiqueta: "Growth (24 h)" },
-  { valor: "enterprise", etiqueta: "Enterprise (8 h)" },
-];
-
-const OPCIONES_TAMANO_PAGINA = [
-  { valor: "5", etiqueta: "5 por página" },
-  { valor: "10", etiqueta: "10 por página" },
-  { valor: "25", etiqueta: "25 por página" },
-  { valor: "50", etiqueta: "50 por página" },
+  { clave: "starter", objetivoDefectoH: 72 },
+  { clave: "growth", objetivoDefectoH: 24 },
+  { clave: "enterprise", objetivoDefectoH: 8 },
 ];
 
 function obtenerCicloActual(): string {
@@ -138,7 +125,10 @@ function obtenerCicloActual(): string {
   return `${anio}-${mes}`;
 }
 
-function generarOpcionesCiclo(cicloActivo: string): Array<{ valor: string; etiqueta: string }> {
+function generarOpcionesCiclo(
+  cicloActivo: string,
+  currentLabel: (cycle: string) => string
+): Array<{ valor: string; etiqueta: string }> {
   const opciones: Array<{ valor: string; etiqueta: string }> = [];
   const vistos = new Set<string>();
   const base = new Date();
@@ -147,40 +137,13 @@ function generarOpcionesCiclo(cicloActivo: string): Array<{ valor: string; etiqu
     const val = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
     if (!vistos.has(val)) {
       vistos.add(val);
-      opciones.push({ valor: val, etiqueta: i === 0 ? `${val} (Ciclo actual)` : val });
+      opciones.push({ valor: val, etiqueta: i === 0 ? currentLabel(val) : val });
     }
   }
   if (!vistos.has(cicloActivo)) {
     opciones.unshift({ valor: cicloActivo, etiqueta: cicloActivo });
   }
   return opciones;
-}
-
-function formatearFrescuraRelativa(fechaIso?: string): { texto: string; obsoleta: boolean } {
-  if (!fechaIso) {
-    return { texto: "Actualización reciente", obsoleta: false };
-  }
-  const timestamp = new Date(fechaIso).getTime();
-  if (isNaN(timestamp)) {
-    return { texto: "Fecha de actualización no disponible", obsoleta: false };
-  }
-  const diffMs = Math.max(0, Date.now() - timestamp);
-  const obsoleta = diffMs > LIMITE_FRESCURA_MS;
-  const diffSegundos = Math.floor(diffMs / 1000);
-
-  if (diffSegundos < 60) {
-    return { texto: "Actualizado hace unos segundos", obsoleta };
-  }
-  const diffMinutos = Math.floor(diffSegundos / 60);
-  if (diffMinutos < 60) {
-    return { texto: `Actualizado hace ${diffMinutos} min`, obsoleta };
-  }
-  const diffHoras = Math.floor(diffMinutos / 60);
-  if (diffHoras < 24) {
-    return { texto: `Actualizado hace ${diffHoras} h`, obsoleta };
-  }
-  const diffDias = Math.floor(diffHoras / 24);
-  return { texto: `Actualizado hace ${diffDias} d`, obsoleta };
 }
 
 function varianteResultado(resultado: SlaResultado): BadgeVariante {
@@ -291,8 +254,60 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
   datosIniciales,
   usarFallbackLocal = false,
 }) => {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage || i18n.language;
   const auth = useOptionalAuth();
   const usuario = auth?.usuario ?? null;
+
+  const opcionesPlan = [
+    { valor: "todos", etiqueta: t("common.plans.all") },
+    {
+      valor: "starter",
+      etiqueta: t("views.opsSla.filters.planWithHours", { plan: t("common.plans.starter"), hours: 72 }),
+    },
+    {
+      valor: "growth",
+      etiqueta: t("views.opsSla.filters.planWithHours", { plan: t("common.plans.growth"), hours: 24 }),
+    },
+    {
+      valor: "enterprise",
+      etiqueta: t("views.opsSla.filters.planWithHours", { plan: t("common.plans.enterprise"), hours: 8 }),
+    },
+  ];
+
+  const opcionesTamanoPagina = [
+    { valor: "5", etiqueta: t("common.pagination.perPageOptionLong", { count: 5 }) },
+    { valor: "10", etiqueta: t("common.pagination.perPageOptionLong", { count: 10 }) },
+    { valor: "25", etiqueta: t("common.pagination.perPageOptionLong", { count: 25 }) },
+    { valor: "50", etiqueta: t("common.pagination.perPageOptionLong", { count: 50 }) },
+  ];
+
+  const formatearFrescuraRelativa = (fechaIso?: string): { texto: string; obsoleta: boolean } => {
+    if (!fechaIso) {
+      return { texto: t("views.opsSla.freshness.recent"), obsoleta: false };
+    }
+    const timestamp = new Date(fechaIso).getTime();
+    if (isNaN(timestamp)) {
+      return { texto: t("views.opsSla.freshness.unavailable"), obsoleta: false };
+    }
+    const diffMs = Math.max(0, Date.now() - timestamp);
+    const obsoleta = diffMs > LIMITE_FRESCURA_MS;
+    const diffSegundos = Math.floor(diffMs / 1000);
+
+    if (diffSegundos < 60) {
+      return { texto: t("views.opsSla.freshness.secondsAgo"), obsoleta };
+    }
+    const diffMinutos = Math.floor(diffSegundos / 60);
+    if (diffMinutos < 60) {
+      return { texto: t("views.opsSla.freshness.minutesAgo", { count: diffMinutos }), obsoleta };
+    }
+    const diffHoras = Math.floor(diffMinutos / 60);
+    if (diffHoras < 24) {
+      return { texto: t("views.opsSla.freshness.hoursAgo", { count: diffHoras }), obsoleta };
+    }
+    const diffDias = Math.floor(diffHoras / 24);
+    return { texto: t("views.opsSla.freshness.daysAgo", { count: diffDias }), obsoleta };
+  };
 
   const [ciclo, setCiclo] = useState<string>(obtenerCicloActual);
   const [planFiltro, setPlanFiltro] = useState<string>("todos");
@@ -355,7 +370,13 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
     pausarEnPerdidaFoco: true,
   });
 
-  const opcionesCiclo = useMemo(() => generarOpcionesCiclo(ciclo), [ciclo]);
+  const opcionesCiclo = useMemo(
+    () =>
+      generarOpcionesCiclo(ciclo, (c) =>
+        t("views.opsSla.filters.currentCycleOption", { cycle: c })
+      ),
+    [ciclo, t]
+  );
 
   if (rolNoAutorizado) {
     return (
@@ -372,11 +393,11 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Badge variante="error">ACCESO DENEGADO</Badge>
-          <strong>403 ROL_STAFF_INSUFICIENTE</strong>
+          <Badge variante="error">{t("common.errors.accessDeniedBadge")}</Badge>
+          <strong>{t("common.errors.accessDeniedCode")}</strong>
         </div>
         <p style={{ color: "var(--muted)", margin: 0 }}>
-          El rol {usuario?.role} no tiene autorización para consultar el cumplimiento de acuerdos de servicio.
+          {t("views.opsSla.rbacDenied", { role: usuario?.role })}
         </p>
       </main>
     );
@@ -384,7 +405,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
 
   const frescuraInfo = data
     ? formatearFrescuraRelativa(data.frescura)
-    : { texto: "Sincronizando actualización...", obsoleta: false };
+    : { texto: t("views.opsSla.freshness.syncing"), obsoleta: false };
   const resumen = data?.resumen;
   const casosEvaluados =
     resumen?.casos_evaluados ?? resumen?.evaluados ?? resumen?.total_evaluados ?? 0;
@@ -449,10 +470,10 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
       >
         <div>
           <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>
-            Cumplimiento de SLA e Incidentes de Servicio
+            {t("views.opsSla.title")}
           </h1>
           <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "4px 0 0 0" }}>
-            Observabilidad operativa de acuerdos de nivel de servicio, pausas justificadas y reloj por caso.
+            {t("views.opsSla.subtitle")}
           </p>
         </div>
 
@@ -475,7 +496,9 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
             }}
           >
             <Badge variante={frescuraInfo.obsoleta ? "warn" : "good"} punto>
-              {frescuraInfo.obsoleta ? "Datos desactualizados (> 6 h)" : "Frescura operativa"}
+              {frescuraInfo.obsoleta
+                ? t("views.opsSla.freshness.staleBadge")
+                : t("views.opsSla.freshness.okBadge")}
             </Badge>
             <span style={{ color: frescuraInfo.obsoleta ? "var(--warn, #f59e0b)" : "var(--muted)" }}>
               {frescuraInfo.texto}
@@ -484,7 +507,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
 
           <ControlExportarReporte
             tipo="sla"
-            etiquetaBoton="Exportar SLA"
+            etiquetaBoton={t("views.opsSla.exportButton")}
             formatosPermitidos={["pdf", "csv"]}
             rolesPermitidos={["staff_operaciones", "staff_negocio", "staff_admin"]}
           />
@@ -494,7 +517,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
 
       {/* Barra de filtros dinámicos */}
       <section
-        aria-label="Filtros de cumplimiento SLA"
+        aria-label={t("views.opsSla.filters.regionLabel")}
         className="card"
         style={{
           display: "flex",
@@ -508,7 +531,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
           <div style={{ minWidth: "180px" }}>
             <Select
               id="filtro-ciclo-sla"
-              etiqueta="Ciclo comercial (AAAA-MM)"
+              etiqueta={t("views.opsSla.filters.cycleLabel")}
               value={ciclo}
               onChange={(e) => {
                 setCiclo(e.target.value);
@@ -521,13 +544,13 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
           <div style={{ minWidth: "190px" }}>
             <Select
               id="filtro-plan-sla"
-              etiqueta="Plan comercial"
+              etiqueta={t("views.opsSla.filters.planLabel")}
               value={planFiltro}
               onChange={(e) => {
                 setPlanFiltro(e.target.value);
                 setPage(1);
               }}
-              opciones={OPCIONES_PLAN}
+              opciones={opcionesPlan}
             />
           </div>
 
@@ -554,7 +577,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                 setPage(1);
               }}
             />
-            <span>Solo casos en riesgo o incumplidos</span>
+            <span>{t("views.opsSla.filters.onlyRiskOrBreached")}</span>
           </label>
         </div>
 
@@ -568,7 +591,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
               setPage(1);
             }}
           >
-            Restablecer filtros
+            {t("common.actions.resetFilters")}
           </Boton>
         )}
       </section>
@@ -581,18 +604,18 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
         tipoCarga="tabla"
         filasCarga={5}
         columnasCarga={9}
-        mensajeCarga="Cargando métricas y casos de cumplimiento SLA..."
+        mensajeCarga={t("views.opsSla.loadingMessage")}
         onReintentar={() => void refetch()}
-        tituloError="Error al cargar el cumplimiento de acuerdos de servicio"
-        tituloVacio="Sin casos de SLA para los filtros seleccionados"
-        descripcionVacio="No se registran ejecuciones ni incidencias de nivel de servicio en el ciclo o plan elegido."
+        tituloError={t("views.opsSla.errorTitle")}
+        tituloVacio={t("views.opsSla.emptyTitle")}
+        descripcionVacio={t("views.opsSla.emptyDescription")}
         alAccionarVacio={() => {
           setPlanFiltro("todos");
           setSoloRiesgoOIncumplidos(false);
           setCiclo(obtenerCicloActual());
           setPage(1);
         }}
-        textoAccionVacio="Ver ciclo actual completo"
+        textoAccionVacio={t("views.opsSla.emptyAction")}
         dataTestIdCarga="ops-sla-loading"
         dataTestIdError="ops-sla-error"
         dataTestIdTrace="ops-sla-trace-id"
@@ -601,7 +624,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Tarjetas KPI de cabecera */}
             <section
-              aria-label="Resumen ejecutivo de SLA"
+              aria-label={t("views.opsSla.kpis.regionLabel")}
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
@@ -609,7 +632,9 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
               }}
             >
               <div className="card" data-testid="kpi-cumplimiento-global">
-                <div style={{ fontSize: "12px", color: "var(--muted)" }}>Cumplimiento Global</div>
+                <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                  {t("views.opsSla.kpis.globalCompliance")}
+                </div>
                 <div
                   style={{
                     fontSize: "26px",
@@ -620,13 +645,16 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                   }}
                 >
                   {muestraInsuficiente || resumen?.cumplimiento_pct == null
-                    ? "N/A"
-                    : `${resumen.cumplimiento_pct.toFixed(1)}%`}
+                    ? t("common.states.notApplicable")
+                    : formatPercent(resumen.cumplimiento_pct, { decimals: 1, lang })}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>
                   {muestraInsuficiente
-                    ? "Muestra insuficiente (mínimo 5 casos evaluados)"
-                    : `${resumen?.casos_dentro ?? 0} dentro de objetivo sobre ${casosEvaluados} evaluados`}
+                    ? t("views.opsSla.kpis.insufficientSample")
+                    : t("views.opsSla.kpis.withinTarget", {
+                        within: formatNumber(resumen?.casos_dentro ?? 0, undefined, lang),
+                        evaluated: formatNumber(casosEvaluados, undefined, lang),
+                      })}
                 </div>
               </div>
 
@@ -641,14 +669,18 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>Casos en Riesgo</span>
-                  {casosEnRiesgoCount > 0 && <Badge variante="warn">Alerta &gt; 75%</Badge>}
+                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                    {t("views.opsSla.kpis.atRisk")}
+                  </span>
+                  {casosEnRiesgoCount > 0 && (
+                    <Badge variante="warn">{t("views.opsSla.kpis.atRiskBadge")}</Badge>
+                  )}
                 </div>
                 <div style={{ fontSize: "26px", fontWeight: 700, color: "var(--warn, #f59e0b)" }}>
-                  {casosEnRiesgoCount}
+                  {formatNumber(casosEnRiesgoCount, undefined, lang)}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>
-                  Ejecuciones activas que superan el 75% del objetivo
+                  {t("views.opsSla.kpis.atRiskSub")}
                 </div>
               </div>
 
@@ -660,32 +692,40 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                     casosIncumplidosCount > 0 ? "var(--bad, #ef4444)" : "var(--border, #334155)",
                 }}
               >
-                <div style={{ fontSize: "12px", color: "var(--muted)" }}>Casos Incumplidos</div>
+                <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                  {t("views.opsSla.kpis.breached")}
+                </div>
                 <div style={{ fontSize: "26px", fontWeight: 700, color: "var(--bad, #ef4444)" }}>
-                  {casosIncumplidosCount}
+                  {formatNumber(casosIncumplidosCount, undefined, lang)}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>
                   {ticketsIncumplidos.length > 0
-                    ? `Tickets: ${ticketsIncumplidos.join(", ")}`
-                    : "Sin tickets incumplidos en la vista actual"}
+                    ? t("views.opsSla.kpis.breachedTickets", {
+                        tickets: ticketsIncumplidos.join(", "),
+                      })
+                    : t("views.opsSla.kpis.noBreachedTickets")}
                 </div>
               </div>
 
               <div className="card" data-testid="kpi-total-evaluados">
-                <div style={{ fontSize: "12px", color: "var(--muted)" }}>Total Evaluados</div>
+                <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                  {t("views.opsSla.kpis.totalEvaluated")}
+                </div>
                 <div style={{ fontSize: "26px", fontWeight: 700, color: "var(--text)" }}>
-                  {casosEvaluados}
+                  {formatNumber(casosEvaluados, undefined, lang)}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>
-                  Volumen total del ciclo: {casosTotales} casos
+                  {t("views.opsSla.kpis.cycleVolume", {
+                    total: formatNumber(casosTotales, undefined, lang),
+                  })}
                 </div>
               </div>
             </section>
 
             {/* Panel superior: Desglose por plan comercial */}
-            <section aria-label="Desglose de cumplimiento por plan comercial">
+            <section aria-label={t("views.opsSla.planBreakdown.regionLabel")}>
               <h2 style={{ fontSize: "14px", fontWeight: 650, margin: "0 0 10px 0" }}>
-                Desglose por Plan Comercial
+                {t("views.opsSla.planBreakdown.title")}
               </h2>
               <div
                 style={{
@@ -694,7 +734,8 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                   gap: "14px",
                 }}
               >
-                {PLANES_CANONICOS.map(({ clave, titulo, objetivoDefectoH }) => {
+                {PLANES_CANONICOS.map(({ clave, objetivoDefectoH }) => {
+                  const titulo = t(`common.plans.${clave}`);
                   const info = data.por_plan?.[clave];
                   const objetivo = info?.objetivo_h ?? objetivoDefectoH;
                   const pct = info?.cumplimiento_pct ?? null;
@@ -712,26 +753,39 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <strong>
-                          {titulo} ({objetivo} horas)
+                          {t("views.opsSla.planBreakdown.planHours", { plan: titulo, hours: objetivo })}
                         </strong>
-                        <Badge variante="neutro">{casosPlan} casos</Badge>
+                        <Badge variante="neutro">
+                          {t("views.opsSla.planBreakdown.casesCount", {
+                            count: formatNumber(casosPlan, undefined, lang),
+                          })}
+                        </Badge>
                       </div>
 
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
                         <span>
-                          Cumplimiento:{" "}
+                          {t("views.opsSla.planBreakdown.complianceLabel")}{" "}
                           <strong style={{ color: colorProgreso }}>
-                            {pct !== null ? `${pct.toFixed(1)}%` : "N/A"}
+                            {pct !== null
+                              ? formatPercent(pct, { decimals: 1, lang })
+                              : t("common.states.notApplicable")}
                           </strong>
                         </span>
                         <span className="mono" style={{ color: "var(--muted)" }}>
-                          p95: {p95 !== null ? `${p95.toFixed(1)} h` : "—"}
+                          {t("views.opsSla.planBreakdown.p95Value", {
+                            value:
+                              p95 !== null
+                                ? t("views.opsSla.planBreakdown.hoursValue", {
+                                    hours: formatDecimal(p95, 1, lang),
+                                  })
+                                : t("common.states.noData"),
+                          })}
                         </span>
                       </div>
 
                       <div
                         role="progressbar"
-                        aria-label={`Cumplimiento plan ${titulo}`}
+                        aria-label={t("views.opsSla.planBreakdown.progressAria", { plan: titulo })}
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={pct ?? 0}
@@ -758,7 +812,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
             </section>
 
             {/* Tabla densa de casos y seguimiento de reloj */}
-            <section className="card" aria-label="Tabla de casos y reloj SLA">
+            <section className="card" aria-label={t("views.opsSla.table.regionLabel")}>
               <div
                 style={{
                   display: "flex",
@@ -770,41 +824,43 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                 }}
               >
                 <h2 style={{ fontSize: "14px", fontWeight: 650, margin: 0 }}>
-                  Seguimiento de Reloj por Caso ({totalRegistros})
+                  {t("views.opsSla.table.title", { count: totalRegistros })}
                 </h2>
                 <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-                  Selecciona un Job ID para inspeccionar el desglose cronológico y las pausas justificadas.
+                  {t("views.opsSla.table.hint")}
                 </span>
               </div>
 
               {filasCasos.length === 0 ? (
                 <div style={{ padding: "24px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
-                  No hay casos individuales que coincidan con el filtro aplicado.
+                  {t("views.opsSla.table.emptyFiltered")}
                 </div>
               ) : (
                 <Tabla
                   densidad="alta"
-                  aria-label="Casos de cumplimiento SLA y seguimiento del reloj"
+                  aria-label={t("views.opsSla.table.tableAria")}
                 >
                   <TablaEncabezado>
                     <TablaFila>
-                      <TablaCeldaEncabezado scope="col">Job ID</TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col">Ticket</TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col">Cliente / Tenant</TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col">Plan</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado scope="col">{t("views.opsSla.table.colJobId")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado scope="col">{t("views.opsSla.table.colTicket")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado scope="col">
+                        {t("views.opsSla.table.colCustomerTenant")}
+                      </TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado scope="col">{t("views.opsSla.table.colPlan")}</TablaCeldaEncabezado>
                       <TablaCeldaEncabezado scope="col" numerico>
-                        Objetivo SLA (h)
+                        {t("views.opsSla.table.colTarget")}
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado scope="col" numerico>
-                        Transcurrido (h)
+                        {t("views.opsSla.table.colElapsed")}
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado scope="col" numerico>
-                        Bruto (h)
+                        {t("views.opsSla.table.colGross")}
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado scope="col" numerico>
-                        Pausas (h)
+                        {t("views.opsSla.table.colPaused")}
                       </TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col">Resultado</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado scope="col">{t("views.opsSla.table.colResult")}</TablaCeldaEncabezado>
                     </TablaFila>
                   </TablaEncabezado>
                   <TablaCuerpo>
@@ -835,19 +891,19 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                                 cursor: "pointer",
                                 fontWeight: 600,
                               }}
-                              aria-label={`Ver desglose del reloj SLA para ${c.job_id}`}
+                              aria-label={t("views.opsSla.table.inspectClockAria", { jobId: c.job_id })}
                             >
                               {c.job_id}
                             </button>
                           </TablaCelda>
                           <TablaCelda>
-                            <span className="mono">{c.ticket_numero || c.ticket_id || "—"}</span>
+                            <span className="mono">{c.ticket_numero || c.ticket_id || t("common.states.noData")}</span>
                           </TablaCelda>
                           <TablaCelda>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                               <span>{c.razon_social || c.tenant_id}</span>
                               <Badge variante={estaEnmascarado ? "masked" : "good"}>
-                                {estaEnmascarado ? "ENMASCARADO" : "EN CLARO"}
+                                {estaEnmascarado ? t("common.states.masked") : t("common.states.unmasked")}
                               </Badge>
                             </div>
                           </TablaCelda>
@@ -855,11 +911,19 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                             <span style={{ textTransform: "capitalize", fontWeight: 500 }}>{c.plan}</span>
                           </TablaCelda>
                           <TablaCelda numerico>
-                            {c.objetivo_h != null ? `${c.objetivo_h.toFixed(1)} h` : "—"}
+                            {c.objetivo_h != null
+                              ? t("views.opsSla.table.hoursValue", {
+                                  hours: formatDecimal(c.objetivo_h, 1, lang),
+                                })
+                              : t("common.states.noData")}
                           </TablaCelda>
                           <TablaCelda numerico>
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                              <span>{c.transcurrido_h.toFixed(1)} h</span>
+                              <span>
+                                {t("views.opsSla.table.hoursValue", {
+                                  hours: formatDecimal(c.transcurrido_h, 1, lang),
+                                })}
+                              </span>
                               <div
                                 aria-hidden="true"
                                 style={{
@@ -880,11 +944,21 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                               </div>
                             </div>
                           </TablaCelda>
-                          <TablaCelda numerico>{bruto.toFixed(1)} h</TablaCelda>
-                          <TablaCelda numerico>{pausas.toFixed(1)} h</TablaCelda>
+                          <TablaCelda numerico>
+                            {t("views.opsSla.table.hoursValue", {
+                              hours: formatDecimal(bruto, 1, lang),
+                            })}
+                          </TablaCelda>
+                          <TablaCelda numerico>
+                            {t("views.opsSla.table.hoursValue", {
+                              hours: formatDecimal(pausas, 1, lang),
+                            })}
+                          </TablaCelda>
                           <TablaCelda>
                             <Badge variante={varianteResultado(c.resultado)} punto>
-                              {c.resultado.toUpperCase()}
+                              {t(`views.opsSla.results.${c.resultado}`, {
+                                defaultValue: c.resultado.toUpperCase(),
+                              })}
                             </Badge>
                           </TablaCelda>
                         </TablaFila>
@@ -910,21 +984,24 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                 }}
               >
                 <div style={{ color: "var(--muted)" }}>
-                  Mostrando página <strong>{page}</strong> de <strong>{totalPaginas}</strong> ·{" "}
-                  <span>Total: {totalRegistros} casos</span>
+                  {t("views.opsSla.table.showingPage", {
+                    page,
+                    pages: totalPaginas,
+                    total: totalRegistros,
+                  })}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                   <div style={{ width: "140px" }}>
                     <Select
                       id="paginacion-tamano-sla"
-                      aria-label="Registros por página"
+                      aria-label={t("common.pagination.recordsPerPage")}
                       value={String(pageSize)}
                       onChange={(e) => {
                         setPageSize(Number(e.target.value));
                         setPage(1);
                       }}
-                      opciones={OPCIONES_TAMANO_PAGINA}
+                      opciones={opcionesTamanoPagina}
                     />
                   </div>
                   <Boton
@@ -933,7 +1010,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                     disabled={page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                   >
-                    Anterior
+                    {t("common.pagination.previous")}
                   </Boton>
                   <Boton
                     variante="secondary"
@@ -941,7 +1018,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                     disabled={page >= totalPaginas}
                     onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
                   >
-                    Siguiente
+                    {t("common.pagination.next")}
                   </Boton>
                 </div>
               </div>

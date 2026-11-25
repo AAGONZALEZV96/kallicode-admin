@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface ModalProps {
   abierto: boolean;
@@ -23,6 +24,7 @@ export const Modal: React.FC<ModalProps> = ({
   cerrarConOverlay = true,
   idTitulo = "modal-titulo",
 }) => {
+  const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
   const alCerrarRef = useRef(alCerrar);
   alCerrarRef.current = alCerrar;
@@ -81,7 +83,7 @@ export const Modal: React.FC<ModalProps> = ({
               type="button"
               className="modal-close"
               onClick={alCerrar}
-              aria-label="Cerrar modal"
+              aria-label={t("common.actions.closeModal")}
             >
               ✕
             </button>

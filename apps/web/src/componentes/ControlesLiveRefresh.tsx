@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Boton } from "./Boton";
 import { Badge } from "./Badge";
 import { Select } from "./Select";
@@ -11,19 +12,13 @@ export interface ControlesLiveRefreshProps {
   className?: string;
 }
 
-const OPCIONES_FRECUENCIA = [
-  { valor: 15_000, etiqueta: "Cada 15 segundos (Recomendado)" },
-  { valor: 30_000, etiqueta: "Cada 30 segundos" },
-  { valor: 60_000, etiqueta: "Cada 60 segundos" },
-  { valor: 0, etiqueta: "Pausado / Manual" },
-];
-
 export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
   hook,
   mostrarSelector = true,
   mostrarManual = true,
   className = "",
 }) => {
+  const { t } = useTranslation();
   const {
     activo,
     alternarActivo,
@@ -37,27 +32,37 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
     pausadoPorVisibilidad,
   } = hook;
 
+  const opcionesFrecuencia = [
+    { valor: 15_000, etiqueta: t("components.liveRefresh.frequencies.s15") },
+    { valor: 30_000, etiqueta: t("components.liveRefresh.frequencies.s30") },
+    { valor: 60_000, etiqueta: t("components.liveRefresh.frequencies.s60") },
+    { valor: 0, etiqueta: t("components.liveRefresh.frequencies.manual") },
+  ];
+
   const enVivo = activo && !pausadoPorVisibilidad && intervaloMs > 0;
 
   const textoFrescura = (() => {
     if (!ultimaActualizacion) {
-      return "Pendiente de actualización";
+      return t("components.liveRefresh.pending");
     }
     if (segundosDesdeUltimaActualizacion < 3) {
-      return "Actualizado ahora";
+      return t("components.liveRefresh.updatedNow");
     }
-    return `Última: hace ${segundosDesdeUltimaActualizacion}s`;
+    return t("components.liveRefresh.lastAgo", { seconds: segundosDesdeUltimaActualizacion });
   })();
 
   const textoEstado = (() => {
     if (refrescando) {
-      return "Actualizando...";
+      return t("components.liveRefresh.updating");
     }
     if (pausadoPorVisibilidad) {
-      return "En pausa por pestaña oculta";
+      return t("components.liveRefresh.pausedByVisibility");
     }
     if (enVivo && tiempoRestanteSegundos > 0) {
-      return `Próximo en ${tiempoRestanteSegundos}s · ${textoFrescura}`;
+      return t("components.liveRefresh.nextIn", {
+        seconds: tiempoRestanteSegundos,
+        freshness: textoFrescura,
+      });
     }
     return textoFrescura;
   })();
@@ -76,21 +81,21 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
         borderRadius: "var(--radius-md)",
       }}
       role="region"
-      aria-label="Controles de refresco en vivo"
+      aria-label={t("components.liveRefresh.regionLabel")}
     >
       {/* Indicador visual de actividad */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         {enVivo ? (
           <Badge variante="good" punto data-testid="live-badge-activo">
-            <span style={{ fontWeight: 600 }}>EN VIVO</span>
+            <span style={{ fontWeight: 600 }}>{t("components.liveRefresh.live")}</span>
           </Badge>
         ) : pausadoPorVisibilidad ? (
           <Badge variante="warn" punto data-testid="live-badge-segundo-plano">
-            <span style={{ fontWeight: 600 }}>PAUSADO (Pestaña oculta)</span>
+            <span style={{ fontWeight: 600 }}>{t("components.liveRefresh.pausedHidden")}</span>
           </Badge>
         ) : (
           <Badge variante="mut" data-testid="live-badge-pausado">
-            <span>PAUSADO</span>
+            <span>{t("components.liveRefresh.paused")}</span>
           </Badge>
         )}
       </div>
@@ -100,7 +105,9 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
         tamano="sm"
         variante={enVivo ? "secondary" : "primary"}
         onClick={alternarActivo}
-        aria-label={enVivo ? "Pausar refresco automático" : "Reanudar refresco automático"}
+        aria-label={
+          enVivo ? t("components.liveRefresh.pauseAria") : t("components.liveRefresh.resumeAria")
+        }
         data-testid="live-btn-toggle"
       >
         <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
@@ -114,7 +121,7 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
               <polygon points="3,2 10,6 3,10" />
             </svg>
           )}
-          <span>{enVivo ? "Pausar" : "Reanudar"}</span>
+          <span>{enVivo ? t("components.liveRefresh.pause") : t("components.liveRefresh.resume")}</span>
         </span>
       </Boton>
 
@@ -132,8 +139,8 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
                 setIntervaloMs(nuevoMs);
               }
             }}
-            opciones={OPCIONES_FRECUENCIA}
-            aria-label="Frecuencia de auto-refresco"
+            opciones={opcionesFrecuencia}
+            aria-label={t("components.liveRefresh.frequencyAria")}
             data-testid="live-select-intervalo"
             style={{ padding: "4px 8px", fontSize: "12px" }}
           />
@@ -147,7 +154,7 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
           variante="ghost"
           cargando={refrescando}
           onClick={() => void refrescarAhora()}
-          aria-label="Refrescar datos manualmente ahora"
+          aria-label={t("components.liveRefresh.refreshNowAria")}
           data-testid="live-btn-manual"
         >
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
@@ -165,7 +172,7 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
               <path d="M13.5 8a5.5 5.5 0 1 1-1.35-3.6" />
               <polyline points="13.5 2.5 13.5 5.5 10.5 5.5" />
             </svg>
-            <span>Refrescar ahora</span>
+            <span>{t("components.liveRefresh.refreshNow")}</span>
           </span>
         </Boton>
       )}

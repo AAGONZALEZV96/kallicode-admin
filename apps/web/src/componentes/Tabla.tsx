@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export type DensidadTabla = "normal" | "alta";
 
@@ -20,12 +21,14 @@ export const Tabla: React.FC<TablaProps> = ({
   envoltura = true,
   envolturaClassName = "",
   cargando = false,
-  textoCarga = "Cargando datos...",
+  textoCarga,
   estadoVacio,
   className = "",
   children,
   ...props
 }) => {
+  const { t } = useTranslation();
+  const textoCargaEfectivo = textoCarga ?? t("common.states.loading");
   const clasesTabla = [
     "kc-table",
     cabeceraFija && "sticky-header",
@@ -58,7 +61,7 @@ export const Tabla: React.FC<TablaProps> = ({
           aria-live="polite"
         >
           <span className="btn-spinner" aria-hidden="true" />
-          <span>{textoCarga}</span>
+          <span>{textoCargaEfectivo}</span>
         </div>
       )}
       {!cargando && estadoVacio && (

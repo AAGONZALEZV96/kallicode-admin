@@ -13,9 +13,11 @@ import {
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi } from "../api/clienteApi";
 import { useOptionalAuth } from "../estado/auth";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
+import { formatDecimal, formatNumber } from "../i18n/formatters";
 import { ControlesLiveRefresh } from "../componentes/ControlesLiveRefresh";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { EstadoError } from "../componentes/EstadoError";
@@ -223,24 +225,15 @@ function calcularAntiguedadEfectiva(telemetria?: TelemetriaEstado): number | nul
   return null;
 }
 
-function formatearAntiguedadRelativa(segundos: number | null): string {
-  if (segundos === null) return "Sin telemetría";
-  if (segundos < 60) return `Actualizado hace ${segundos} s`;
-  const minutos = Math.round(segundos / 60);
-  if (minutos < 60) return `Actualizado hace ${minutos} min`;
-  const horas = Math.round(minutos / 60);
-  return `Actualizado hace ${horas} h`;
-}
-
 function valorMetrica(
   telemetriaActiva: boolean,
   valor: number | null | undefined,
-  sufijo = ""
+  lang?: string
 ): string {
   if (!telemetriaActiva || valor === null || valor === undefined || !Number.isFinite(valor)) {
     return "—";
   }
-  return sufijo ? `${valor}${sufijo}` : String(valor);
+  return formatNumber(valor, undefined, lang);
 }
 
 function prioridadEstadoCola(estado: string): number {
@@ -250,15 +243,18 @@ function prioridadEstadoCola(estado: string): number {
   return 1;
 }
 
-function badgeEstadoCola(estado: string): { variante: BadgeVariante; etiqueta: string } {
+function badgeEstadoCola(
+  estado: string,
+  t: (key: string) => string
+): { variante: BadgeVariante; etiqueta: string } {
   const normalizado = estado.toLowerCase();
   if (normalizado === "critico") {
-    return { variante: "error", etiqueta: "CRITICO" };
+    return { variante: "error", etiqueta: t("views.opsAgents.queues.statuses.critico") };
   }
   if (normalizado === "atencion") {
-    return { variante: "advertencia", etiqueta: "ATENCION" };
+    return { variante: "advertencia", etiqueta: t("views.opsAgents.queues.statuses.atencion") };
   }
-  return { variante: "exito", etiqueta: "NORMAL" };
+  return { variante: "exito", etiqueta: t("views.opsAgents.queues.statuses.normal") };
 }
 
 interface EtapaNormalizada {
@@ -325,8 +321,19 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
   obtenerColas,
   usarFallbackLocal = false,
 }) => {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage || i18n.language;
   const auth = useOptionalAuth();
   const usuario = auth?.usuario ?? null;
+
+  const formatearAntiguedadRelativa = (segundos: number | null): string => {
+    if (segundos === null) return t("views.opsAgents.telemetry.noTelemetry");
+    if (segundos < 60) return t("views.opsAgents.telemetry.secondsAgo", { count: segundos });
+    const minutos = Math.round(segundos / 60);
+    if (minutos < 60) return t("views.opsAgents.telemetry.minutesAgo", { count: minutos });
+    const horas = Math.round(minutos / 60);
+    return t("views.opsAgents.telemetry.hoursAgo", { count: horas });
+  };
 
   const [ventana, setVentana] = useState<VentanaAgentes>(
     datosIniciales?.ventana ?? "1h"
@@ -521,11 +528,11 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Badge variante="error">ACCESO DENEGADO</Badge>
-          <strong>403 ROL_STAFF_INSUFICIENTE</strong>
+          <Badge variante="error">{t("common.errors.accessDeniedBadge")}</Badge>
+          <strong>{t("common.errors.accessDeniedCode")}</strong>
         </div>
         <p style={{ color: "var(--muted)", margin: 0 }}>
-          El rol {usuario?.role} no tiene autorización para consultar el estado operativo de agentes y colas.
+          {t("views.opsAgents.rbacDenied", { role: usuario?.role })}
         </p>
       </main>
     );
@@ -545,17 +552,17 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
       >
         <div>
           <h1 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "var(--text)" }}>
-            Estado de Agentes y Colas de Producción
+            {t("views.opsAgents.title")}
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: "var(--muted)" }}>
-            Monitorización agregada de líneas de producción, capacidad por etapa y profundidad de colas
+            {t("views.opsAgents.subtitle")}
           </p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
           <div
             role="group"
-            aria-label="Ventana temporal"
+            aria-label={t("views.opsAgents.windowGroupAria")}
             data-testid="selector-ventana-agents"
             style={{
               display: "inline-flex",
@@ -600,8 +607,8 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
         vacio={false}
         tipoCarga="kpis"
         tarjetasCarga={4}
-        mensajeCarga="Consultando telemetría de agentes y colas..."
-        tituloError="Telemetría operativa no disponible"
+        mensajeCarga={t("views.opsAgents.loadingMessage")}
+        tituloError={t("views.opsAgents.errorTitle")}
         dataTestIdCarga="ops-agents-loading"
         dataTestIdError="ops-agents-error"
         dataTestIdTrace="ops-agents-trace-id"
@@ -610,7 +617,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
       >
         {/* Indicador de estado y frescura de telemetría */}
         <section
-          aria-label="Estado de telemetría"
+          aria-label={t("views.opsAgents.telemetry.regionLabel")}
           data-testid="indicador-telemetria"
           style={{
             display: "flex",
@@ -627,25 +634,30 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             {!telemetriaDisponible ? (
               <Badge variante="error" punto>
-                Telemetría caída
+                {t("views.opsAgents.telemetry.down")}
               </Badge>
             ) : telemetriaObsoleta ? (
               <Badge variante="advertencia" punto>
-                Telemetría desactualizada
+                {t("views.opsAgents.telemetry.stale")}
               </Badge>
             ) : (
               <Badge variante="exito" punto>
-                Telemetría disponible
+                {t("views.opsAgents.telemetry.available")}
               </Badge>
             )}
             <span style={{ fontSize: "13px", color: "var(--muted)" }}>
-              {formatearAntiguedadRelativa(antiguedadS)} · Ventana {ventana}
+              {t("views.opsAgents.telemetry.windowSuffix", {
+                relative: formatearAntiguedadRelativa(antiguedadS),
+                window: ventana,
+              })}
             </span>
           </div>
 
           {(agentesData?.alertas?.length ?? 0) > 0 && telemetriaDisponible && (
             <Badge variante="advertencia">
-              {agentesData?.alertas?.length} alerta(s) activa(s)
+              {t("views.opsAgents.telemetry.activeAlertsCount", {
+                count: agentesData?.alertas?.length ?? 0,
+              })}
             </Badge>
           )}
         </section>
@@ -667,10 +679,10 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
             }}
           >
             <strong style={{ fontSize: "14px" }}>
-              Sin telemetría disponible: contadores de agentes y etapas sin señal reciente
+              {t("views.opsAgents.telemetry.bannerTitle")}
             </strong>
             <span style={{ fontSize: "13px", color: "var(--muted)" }}>
-              Los indicadores se muestran sin valores para distinguir la pérdida de señal de la ausencia de carga.
+              {t("views.opsAgents.telemetry.bannerSubtitle")}
             </span>
             {errorAgentes && (
               <EstadoError
@@ -701,14 +713,16 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
               fontSize: "13px",
             }}
           >
-            <strong>Atención de frescura operativa:</strong> la última lectura supera los 5 minutos de antigüedad (
-            {formatearAntiguedadRelativa(antiguedadS)}).
+            <strong>{t("views.opsAgents.telemetry.staleBannerPrefix")}</strong>{" "}
+            {t("views.opsAgents.telemetry.staleBannerBody", {
+              relative: formatearAntiguedadRelativa(antiguedadS),
+            })}
           </div>
         )}
 
         {/* Tarjetas de cabecera: Líneas de Producción, Agentes y Colas */}
         <section
-          aria-label="Resumen operativo agregado"
+          aria-label={t("views.opsAgents.summary.regionLabel")}
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -722,14 +736,22 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
             style={{ padding: "16px", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--surface)" }}
           >
             <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-              Líneas de Producción
+              {t("views.opsAgents.summary.linesTitle")}
             </div>
             <div style={{ fontSize: "24px", fontWeight: 700, marginTop: "6px", color: "var(--text)" }}>
-              {valorMetrica(telemetriaDisponible, agentesData?.lineas?.activas)} activas
+              {t("views.opsAgents.summary.linesActive", {
+                count: valorMetrica(telemetriaDisponible, agentesData?.lineas?.activas, lang),
+              })}
             </div>
             <div style={{ marginTop: "8px", fontSize: "13px", color: "var(--muted)", display: "flex", gap: "12px" }}>
-              <span>Mantenimiento: <strong>{valorMetrica(telemetriaDisponible, agentesData?.lineas?.mantenimiento)}</strong></span>
-              <span>Libres: <strong>{valorMetrica(telemetriaDisponible, agentesData?.lineas?.libres)}</strong></span>
+              <span>
+                {t("views.opsAgents.summary.linesMaintenance")}{" "}
+                <strong>{valorMetrica(telemetriaDisponible, agentesData?.lineas?.mantenimiento, lang)}</strong>
+              </span>
+              <span>
+                {t("views.opsAgents.summary.linesFree")}{" "}
+                <strong>{valorMetrica(telemetriaDisponible, agentesData?.lineas?.libres, lang)}</strong>
+              </span>
             </div>
           </article>
 
@@ -740,17 +762,23 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
             style={{ padding: "16px", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--surface)" }}
           >
             <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-              Resumen de Agentes
+              {t("views.opsAgents.summary.agentsTitle")}
             </div>
             <div style={{ fontSize: "24px", fontWeight: 700, marginTop: "6px", color: "var(--text)" }}>
-              {valorMetrica(telemetriaDisponible, agentesOcupados)} / {valorMetrica(telemetriaDisponible, totalAgentes)} ocupados
+              {t("views.opsAgents.summary.agentsBusy", {
+                busy: valorMetrica(telemetriaDisponible, agentesOcupados, lang),
+                total: valorMetrica(telemetriaDisponible, totalAgentes, lang),
+              })}
             </div>
             <div style={{ marginTop: "8px", fontSize: "13px", color: "var(--muted)", display: "flex", gap: "12px", alignItems: "center" }}>
-              <span>Total: <strong>{valorMetrica(telemetriaDisponible, totalAgentes)}</strong></span>
               <span>
-                Caídos:{" "}
+                {t("views.opsAgents.summary.agentsTotal")}{" "}
+                <strong>{valorMetrica(telemetriaDisponible, totalAgentes, lang)}</strong>
+              </span>
+              <span>
+                {t("views.opsAgents.summary.agentsDown")}{" "}
                 <strong style={{ color: (agentesCaidos ?? 0) > 0 && telemetriaDisponible ? "var(--bad)" : "inherit" }}>
-                  {valorMetrica(telemetriaDisponible, agentesCaidos)}
+                  {valorMetrica(telemetriaDisponible, agentesCaidos, lang)}
                 </strong>
               </span>
             </div>
@@ -763,14 +791,22 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
             style={{ padding: "16px", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--surface)" }}
           >
             <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)", textTransform: "uppercase" }}>
-              Resumen de Colas
+              {t("views.opsAgents.summary.queuesTitle")}
             </div>
             <div style={{ fontSize: "24px", fontWeight: 700, marginTop: "6px", color: "var(--text)" }}>
-              {valorMetrica(colasDisponible, totalPendientesColas)} pendientes
+              {t("views.opsAgents.summary.queuesPending", {
+                count: valorMetrica(colasDisponible, totalPendientesColas, lang),
+              })}
             </div>
             <div style={{ marginTop: "8px", fontSize: "13px", color: "var(--muted)", display: "flex", gap: "12px" }}>
-              <span>Fallidos (DLQ): <strong>{valorMetrica(colasDisponible, totalFallidosColas)}</strong></span>
-              <span>En atención/críticas: <strong>{valorMetrica(colasDisponible, totalColasAlerta)}</strong></span>
+              <span>
+                {t("views.opsAgents.summary.queuesFailed")}{" "}
+                <strong>{valorMetrica(colasDisponible, totalFallidosColas, lang)}</strong>
+              </span>
+              <span>
+                {t("views.opsAgents.summary.queuesAttention")}{" "}
+                <strong>{valorMetrica(colasDisponible, totalColasAlerta, lang)}</strong>
+              </span>
             </div>
           </article>
         </section>
@@ -778,7 +814,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
         {/* Alertas activas declaradas */}
         {telemetriaDisponible && (agentesData?.alertas?.length ?? 0) > 0 && (
           <section
-            aria-label="Alertas activas del pipeline"
+            aria-label={t("views.opsAgents.alerts.regionLabel")}
             data-testid="lista-alertas-etapas"
             style={{
               padding: "12px 16px",
@@ -790,12 +826,15 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
               gap: "6px",
             }}
           >
-            <strong style={{ fontSize: "13px" }}>Alertas activas en etapas del pipeline</strong>
+            <strong style={{ fontSize: "13px" }}>{t("views.opsAgents.alerts.title")}</strong>
             <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "13px" }}>
               {agentesData?.alertas?.map((alerta, idx) => (
                 <li key={`${alerta.etapa ?? "global"}-${idx}`}>
                   {alerta.etapa ? <strong>{alerta.etapa}: </strong> : null}
-                  {alerta.mensaje || `Umbral superado (${alerta.tipo ?? "operativa"})`}
+                  {alerta.mensaje ||
+                    t("views.opsAgents.alerts.thresholdExceeded", {
+                      type: alerta.tipo ?? t("views.opsAgents.alerts.defaultType"),
+                    })}
                 </li>
               ))}
             </ul>
@@ -803,13 +842,13 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
         )}
 
         {/* Panel por Etapa del Pipeline */}
-        <section aria-label="Etapas del pipeline de software">
+        <section aria-label={t("views.opsAgents.stages.regionLabel")}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <h2 style={{ fontSize: "16px", fontWeight: 600, margin: 0 }}>
-              Rendimiento por Etapa del Pipeline
+              {t("views.opsAgents.stages.title")}
             </h2>
             {!telemetriaDisponible && (
-              <Badge variante="neutro">Sin telemetría en etapas</Badge>
+              <Badge variante="neutro">{t("views.opsAgents.stages.noTelemetryBadge")}</Badge>
             )}
           </div>
 
@@ -845,11 +884,11 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
                       {etapa.etapa}
                     </strong>
                     {tieneAlerta ? (
-                      <Badge variante="advertencia">Alerta</Badge>
+                      <Badge variante="advertencia">{t("views.opsAgents.stages.badgeAlert")}</Badge>
                     ) : !telemetriaDisponible ? (
-                      <Badge variante="neutro">Sin telemetría</Badge>
+                      <Badge variante="neutro">{t("views.opsAgents.stages.badgeNoTelemetry")}</Badge>
                     ) : (
-                      <Badge variante="exito">Operativa</Badge>
+                      <Badge variante="exito">{t("views.opsAgents.stages.badgeOperational")}</Badge>
                     )}
                   </div>
 
@@ -863,17 +902,17 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
                       fontSize: "13px",
                     }}
                   >
-                    <dt style={{ color: "var(--muted)" }}>Agentes totales</dt>
+                    <dt style={{ color: "var(--muted)" }}>{t("views.opsAgents.stages.totalAgents")}</dt>
                     <dd style={{ margin: 0, fontWeight: 600 }}>
-                      {valorMetrica(telemetriaDisponible, etapa.agentes_total)}
+                      {valorMetrica(telemetriaDisponible, etapa.agentes_total, lang)}
                     </dd>
 
-                    <dt style={{ color: "var(--muted)" }}>Ocupados</dt>
+                    <dt style={{ color: "var(--muted)" }}>{t("views.opsAgents.stages.busy")}</dt>
                     <dd style={{ margin: 0, fontWeight: 600 }}>
-                      {valorMetrica(telemetriaDisponible, etapa.agentes_ocupados)}
+                      {valorMetrica(telemetriaDisponible, etapa.agentes_ocupados, lang)}
                     </dd>
 
-                    <dt style={{ color: "var(--muted)" }}>Caídos</dt>
+                    <dt style={{ color: "var(--muted)" }}>{t("views.opsAgents.stages.down")}</dt>
                     <dd
                       style={{
                         margin: 0,
@@ -881,19 +920,21 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
                         color: tieneAlerta && (etapa.agentes_caidos ?? 0) > 0 ? "var(--bad)" : "inherit",
                       }}
                     >
-                      {valorMetrica(telemetriaDisponible, etapa.agentes_caidos)}
+                      {valorMetrica(telemetriaDisponible, etapa.agentes_caidos, lang)}
                     </dd>
 
-                    <dt style={{ color: "var(--muted)" }}>Jobs completados</dt>
+                    <dt style={{ color: "var(--muted)" }}>{t("views.opsAgents.stages.completedJobs")}</dt>
                     <dd style={{ margin: 0, fontWeight: 600 }}>
-                      {valorMetrica(telemetriaDisponible, etapa.jobs_completados)}
+                      {valorMetrica(telemetriaDisponible, etapa.jobs_completados, lang)}
                     </dd>
 
-                    <dt style={{ color: "var(--muted)" }}>Duración p95</dt>
+                    <dt style={{ color: "var(--muted)" }}>{t("views.opsAgents.stages.p95Duration")}</dt>
                     <dd style={{ margin: 0, fontWeight: 600 }}>
                       {telemetriaDisponible && typeof etapa.duracion_p95_s === "number"
-                        ? `${etapa.duracion_p95_s.toFixed(1)} s`
-                        : "—"}
+                        ? t("views.opsAgents.stages.secondsValue", {
+                            seconds: formatDecimal(etapa.duracion_p95_s, 1, lang),
+                          })
+                        : t("common.states.noData")}
                     </dd>
                   </dl>
                 </article>
@@ -904,7 +945,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
 
         {/* Tabla Densa de Colas del Pipeline */}
         <section
-          aria-label="Colas del pipeline"
+          aria-label={t("views.opsAgents.queues.regionLabel")}
           style={{
             padding: "16px",
             borderRadius: "var(--radius-md)",
@@ -925,7 +966,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
             }}
           >
             <h2 style={{ fontSize: "16px", fontWeight: 600, margin: 0 }}>
-              Colas del Pipeline y Dead Letter Queues
+              {t("views.opsAgents.queues.title")}
             </h2>
 
             <label
@@ -943,7 +984,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
                 checked={incluirDlq}
                 onChange={(e) => setIncluirDlq(e.target.checked)}
               />
-              Incluir Dead Letter Queues (DLQ)
+              {t("views.opsAgents.queues.includeDlq")}
             </label>
           </div>
 
@@ -954,11 +995,11 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
             tipoCarga="tabla"
             filasCarga={4}
             columnasCarga={6}
-            tituloError="No se pudo obtener la telemetría de colas"
+            tituloError={t("views.opsAgents.queues.errorTitle")}
             dataTestIdError="ops-queues-error"
             dataTestIdTrace="ops-queues-trace-id"
-            tituloVacio="Sin colas activas"
-            descripcionVacio="No hay colas registradas para los criterios seleccionados."
+            tituloVacio={t("views.opsAgents.queues.emptyTitle")}
+            descripcionVacio={t("views.opsAgents.queues.emptyDescription")}
             compacto
             alReintentar={() => {
               void refetchColas();
@@ -969,12 +1010,12 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
               <Tabla data-testid="tabla-colas-ops">
                 <TablaEncabezado>
                   <TablaFila>
-                    <TablaCeldaEncabezado scope="col">Cola</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">Pendientes</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">Reclamados</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">Fallidos (DLQ)</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">Antigüedad máxima</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">Estado</TablaCeldaEncabezado>
+                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colQueue")}</TablaCeldaEncabezado>
+                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colPending")}</TablaCeldaEncabezado>
+                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colClaimed")}</TablaCeldaEncabezado>
+                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colFailed")}</TablaCeldaEncabezado>
+                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colMaxAge")}</TablaCeldaEncabezado>
+                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colStatus")}</TablaCeldaEncabezado>
                   </TablaFila>
                 </TablaEncabezado>
                 <TablaCuerpo>
@@ -982,20 +1023,28 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
                     const pendientes = cola.pendientes ?? cola.profundidad ?? null;
                     const reclamados = cola.reclamados ?? cola.no_confirmados ?? null;
                     const fallidos = cola.fallidos ?? cola.dlq ?? null;
-                    const badge = badgeEstadoCola(cola.estado);
+                    const badge = badgeEstadoCola(cola.estado, t);
 
                     return (
                       <TablaFila key={cola.nombre} data-testid={`fila-cola-${cola.nombre}`}>
                         <TablaCelda>
                           <strong>{cola.nombre}</strong>
                         </TablaCelda>
-                        <TablaCelda>{pendientes !== null ? pendientes : "—"}</TablaCelda>
-                        <TablaCelda>{reclamados !== null ? reclamados : "—"}</TablaCelda>
-                        <TablaCelda>{fallidos !== null ? fallidos : "—"}</TablaCelda>
+                        <TablaCelda>
+                          {pendientes !== null ? formatNumber(pendientes, undefined, lang) : t("common.states.noData")}
+                        </TablaCelda>
+                        <TablaCelda>
+                          {reclamados !== null ? formatNumber(reclamados, undefined, lang) : t("common.states.noData")}
+                        </TablaCelda>
+                        <TablaCelda>
+                          {fallidos !== null ? formatNumber(fallidos, undefined, lang) : t("common.states.noData")}
+                        </TablaCelda>
                         <TablaCelda>
                           {cola.antiguedad_max_s !== null && cola.antiguedad_max_s !== undefined
-                            ? `${cola.antiguedad_max_s} s`
-                            : "—"}
+                            ? t("views.opsAgents.queues.secondsValue", {
+                                seconds: formatNumber(cola.antiguedad_max_s, undefined, lang),
+                              })
+                            : t("common.states.noData")}
                         </TablaCelda>
                         <TablaCelda>
                           <Badge variante={badge.variante} punto>

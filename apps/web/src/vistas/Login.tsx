@@ -4,12 +4,14 @@
 
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../estado/auth";
 import { Input } from "../componentes/Input";
 import { Boton } from "../componentes/Boton";
 import { LogoKalliCode } from "../componentes/LogoKalliCode";
 
 export const Login: React.FC = () => {
+  const { t } = useTranslation();
   const { login, estaAutenticado, cargando } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,7 +32,7 @@ export const Login: React.FC = () => {
     setErrorLocal(null);
 
     if (!email || !password) {
-      setErrorLocal("Por favor ingresa tu correo electrónico y contraseña.");
+      setErrorLocal(t("auth.login.errors.missingFields"));
       return;
     }
 
@@ -39,7 +41,7 @@ export const Login: React.FC = () => {
       // Redirigir al segundo factor preservando el estado de redirección
       navigate("/mfa", { state: location.state });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Credenciales no válidas.";
+      const msg = err instanceof Error ? err.message : t("auth.login.errors.invalidCredentials");
       setErrorLocal(msg);
     }
   };
@@ -78,7 +80,7 @@ export const Login: React.FC = () => {
               margin: 0,
             }}
           >
-            Consola de Administración de Personal
+            {t("auth.login.subtitle")}
           </h1>
         </div>
 
@@ -111,13 +113,13 @@ export const Login: React.FC = () => {
                 marginBottom: "0.375rem",
               }}
             >
-              Correo Electrónico (@kallicode.com)
+              {t("auth.login.emailLabel")}
             </label>
             <Input
               id="email"
               name="email"
               type="email"
-              placeholder="nombre@kallicode.com"
+              placeholder={t("auth.login.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
@@ -136,13 +138,13 @@ export const Login: React.FC = () => {
                 marginBottom: "0.375rem",
               }}
             >
-              Contraseña
+              {t("auth.login.passwordLabel")}
             </label>
             <Input
               id="password"
               name="password"
               type="password"
-              placeholder="••••••••••••"
+              placeholder={t("auth.login.passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
@@ -157,7 +159,7 @@ export const Login: React.FC = () => {
               cargando={cargando}
               style={{ width: "100%", justifyContent: "center" }}
             >
-              Continuar al Segundo Factor
+              {t("auth.login.submit")}
             </Boton>
           </div>
         </form>
