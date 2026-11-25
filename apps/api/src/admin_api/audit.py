@@ -20,8 +20,10 @@ comprobar el encadenamiento real. Es la corrección de origen del defecto DB-F04
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
-from datetime import date, datetime, timedelta
+import re
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from kallicode_core.logging import log
@@ -59,6 +61,334 @@ _EXIGEN_TENANT: frozenset[str] = frozenset(
         "revelacion",
     }
 )
+
+_GENESIS_CENTRAL: str = "0" * 64
+
+CLAVES_PROHIBIDAS_AUDITORIA: frozenset[str] = frozenset(
+    {
+        "codigo",
+        "contenido_codigo",
+        "source_code",
+        "archivo",
+        "file_content",
+        "password",
+        "password_hash",
+        "totp_secret",
+        "email_raw",
+        "token",
+        "refresh_token",
+        "access_token",
+        "secret",
+        "private_key",
+    }
+)
+
+_RE_EMAIL = re.compile(r"([a-zA-Z0-9_.+-])[a-zA-Z0-9_.+-]*@([a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)")
+
+
+def validar_payload_sin_fuga(payload: dict[str, Any] | None) -> None:
+    """Rechaza claves sensibles prohibidas por la política no-fuga en auditoría."""
+    if not payload:
+        return
+
+    def _recorrer(valor: Any, ruta: str) -> None:
+        if isinstance(valor, dict):
+            for k, v in valor.items():
+                clave = str(k)
+                clave_norm = clave.lower()
+                if clave_norm in CLAVES_PROHIBIDAS_AUDITORIA:
+                    raise ValueError(
+                        f"clave sensible prohibida en payload de auditoría: {ruta}{clave}"
+                    )
+                _recorrer(v, f"{ruta}{clave}.")
+        elif isinstance(valor, list):
+            for idx, item in enumerate(valor):
+                _recorrer(item, f"{ruta}[{idx}].")
+
+    _recorrer(payload, "")
+
+
+def _enmascarar_emails_en_valor(valor: Any) -> Any:
+    if isinstance(valor, str):
+        return _RE_EMAIL.sub(r"\1***@\2", valor)
+    if isinstance(valor, dict):
+        return {
+            str(k): _enmascarar_emails_en_valor(v)
+            for k, v in valor.items()
+            if str(k).lower() not in CLAVES_PROHIBIDAS_AUDITORIA
+        }
+    if isinstance(valor, list):
+        return [_enmascarar_emails_en_valor(v) for v in valor]
+    return valor
+
+
+def sanitizar_metadata_auditoria(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Elimina claves prohibidas y enmascara posibles emails antes de sellar."""
+    if not payload:
+        return {}
+    resultado = _enmascarar_emails_en_valor(payload)
+    return resultado if isinstance(resultado, dict) else {}
+
+
+def _normalizar_occurred_at_utc(occurred_at: datetime | str | None) -> str:
+    if occurred_at is None:
+        dt = datetime.now(UTC)
+    elif isinstance(occurred_at, datetime):
+        dt = (
+            occurred_at.astimezone(UTC)
+            if occurred_at.tzinfo
+            else occurred_at.replace(tzinfo=UTC)
+        )
+    else:
+        raw = str(occurred_at).strip()
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = datetime.fromisoformat(raw)
+        dt = dt.astimezone(UTC) if dt.tzinfo else dt.replace(tzinfo=UTC)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def construir_evento_canonico_staff(
+    *,
+    tenant_id: str,
+    staff_id: str,
+    staff_role: str,
+    action: str,
+    endpoint: str,
+    reason: str | None = None,
+    resource: str | None = None,
+    scope: str | None = None,
+    grant_id: str | None = None,
+    request_id: str | None = None,
+    occurred_at: datetime | str | None = None,
+    staff_action_id: int | None = None,
+    staff_action_seal: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    actor_typ: str = "staff",
+    strict_no_leak: bool = True,
+) -> dict[str, Any]:
+    """Construye la representación canónica normalizada de un acceso de personal."""
+    if actor_typ != "staff":
+        raise ValueError(f"actor.typ inválido para evento de personal: {actor_typ!r}")
+    if not staff_id or not staff_id.strip():
+        raise ValueError("staff_id es obligatorio en el evento canónico de auditoría")
+    if not staff_role or not staff_role.strip():
+        raise ValueError("staff_role es obligatorio en el evento canónico de auditoría")
+    if not tenant_id or not tenant_id.strip():
+        raise ValueError("tenant_id es obligatorio en la cadena central del cliente")
+    if action in _EXIGEN_TENANT and (not reason or not reason.strip()):
+        raise ValueError(f"la acción {action} exige reason declarado para auditar acceso")
+
+    if strict_no_leak:
+        validar_payload_sin_fuga(metadata)
+    metadata_segura = sanitizar_metadata_auditoria(metadata)
+
+    recurso_efectivo = (
+        resource.strip() if resource and resource.strip() else f"customer:{tenant_id}"
+    )
+    return {
+        "schema_version": "1.0",
+        "tenant_id": tenant_id,
+        "occurred_at": _normalizar_occurred_at_utc(occurred_at),
+        "actor": {
+            "typ": "staff",
+            "staff_id": staff_id,
+            "rol": staff_role,
+        },
+        "action": action,
+        "scope": scope,
+        "grant_id": grant_id,
+        "reason": reason,
+        "resource": recurso_efectivo,
+        "endpoint": endpoint,
+        "request_id": request_id,
+        "staff_action_id": staff_action_id,
+        "staff_action_seal": staff_action_seal,
+        "metadata": metadata_segura,
+    }
+
+
+def serializar_evento_canonico(evento: dict[str, Any]) -> str:
+    """Serializa un evento canónico en JSON determinista con claves ordenadas."""
+    return json.dumps(evento, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def calcular_sello_cadena_central(prev_seal: str, evento: dict[str, Any] | str) -> str:
+    """Calcula SHA-256(sello_n-1 || canonico(evento_n)) en formato hex de 64 chars."""
+    canonico = evento if isinstance(evento, str) else serializar_evento_canonico(evento)
+    return hashlib.sha256((prev_seal + canonico).encode("utf-8")).hexdigest()
+
+
+def _ip_postgres_valida(ip: str | None) -> str | None:
+    if not ip:
+        return None
+    candidata = ip.split(",")[0].strip()
+    try:
+        return str(ipaddress.ip_address(candidata))
+    except ValueError:
+        return None
+
+
+def _construir_resumen_publico(*, staff_role: str, action: str, reason: str | None) -> str:
+    motivo = (reason or "").strip() or action
+    return f"Acceso de personal ({staff_role}): {motivo}"
+
+
+async def _esquema_auditoria_central_disponible(db: AsyncSession) -> tuple[bool, bool, bool]:
+    """Comprueba sobre `db` la presencia de `audit.audit_events` y `audit.chain_heads`."""
+    fila = await uno(
+        db,
+        """
+        SELECT
+            to_regclass('audit.audit_events') IS NOT NULL AS tiene_eventos,
+            to_regclass('audit.chain_heads') IS NOT NULL AS tiene_cabezas,
+            EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'audit'
+                  AND table_name = 'audit_events'
+                  AND column_name = 'ip'
+            ) AS tiene_procedencia,
+            to_regprocedure('audit.verify_chain(text,timestamptz,timestamptz)') IS NOT NULL
+                AS tiene_verify_chain
+    """,
+    )
+    if not fila:
+        return False, False, False
+    disponible = bool(fila.get("tiene_eventos")) and bool(fila.get("tiene_cabezas"))
+    return disponible, bool(fila.get("tiene_procedencia")), bool(fila.get("tiene_verify_chain"))
+
+
+async def _conectar_evento_a_cadena_central(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    staff_id: str,
+    staff_role: str,
+    action: str,
+    endpoint: str,
+    staff_action_id: int | None,
+    staff_action_seal: str,
+    occurred_at: datetime | str | None = None,
+    grant_id: str | None = None,
+    scope: str | None = None,
+    reason: str | None = None,
+    resource: str | None = None,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    request_id: str | None = None,
+    payload: dict[str, Any] | None = None,
+    migrado: bool = False,
+) -> str | None:
+    """Conecta el evento de personal a `audit.audit_events` reutilizando la sesión `db`."""
+    disponible, tiene_procedencia, _ = await _esquema_auditoria_central_disponible(db)
+    if not disponible:
+        return None
+
+    # Alinear el contexto de tenant en la transacción para compatibilidad RLS / triggers
+    ctx_row = await uno(db, "SELECT current_setting('app.tenant_id', true) AS prev_tid")
+    prev_ctx_tid = (ctx_row or {}).get("prev_tid") or ""
+    await uno(db, "SELECT set_config('app.tenant_id', :tid, true)", {"tid": tenant_id})
+    try:
+        await uno(
+            db,
+            """
+            INSERT INTO audit.chain_heads (tenant_id) VALUES (:tid)
+            ON CONFLICT (tenant_id) DO NOTHING
+            RETURNING tenant_id
+        """,
+            {"tid": tenant_id},
+        )
+        cabeza = await uno(
+            db,
+            "SELECT ultimo_sello FROM audit.chain_heads WHERE tenant_id = :tid FOR UPDATE",
+            {"tid": tenant_id},
+        )
+        prev_central_seal = (
+            str(cabeza["ultimo_sello"])
+            if cabeza and cabeza.get("ultimo_sello")
+            else _GENESIS_CENTRAL
+        )
+
+        motivo_efectivo = (reason or "").strip() or f"Acción de personal ({action})"
+        evento_canonico = construir_evento_canonico_staff(
+            tenant_id=tenant_id,
+            staff_id=staff_id,
+            staff_role=staff_role,
+            action=action,
+            endpoint=endpoint,
+            reason=motivo_efectivo,
+            resource=resource,
+            scope=scope,
+            grant_id=grant_id,
+            request_id=request_id,
+            occurred_at=occurred_at,
+            staff_action_id=staff_action_id,
+            staff_action_seal=staff_action_seal,
+            metadata=payload,
+            strict_no_leak=False,
+        )
+        canonical_seal = calcular_sello_cadena_central(prev_central_seal, evento_canonico)
+        datos_central: dict[str, Any] = dict(evento_canonico)
+        datos_central["canonical_prev_seal"] = prev_central_seal
+        datos_central["canonical_seal"] = canonical_seal
+        if migrado:
+            datos_central["migrated_from_staff_actions"] = True
+
+        resumen = _construir_resumen_publico(
+            staff_role=staff_role, action=action, reason=motivo_efectivo
+        )
+        evento_codigo = action if action.startswith("staff_") else f"staff_{action}"
+
+        if tiene_procedencia:
+            insertado = await uno(
+                db,
+                """
+                INSERT INTO audit.audit_events
+                    (tenant_id, actor_tipo, actor_id, evento, resumen, datos,
+                     ip, user_agent, request_id, sello_previo, sello)
+                VALUES (:tid, 'staff', :sid, :ev, :res, CAST(:dat AS jsonb),
+                        CAST(:ip AS inet), :ua, :rq, :prev, :seal)
+                RETURNING sello
+            """,
+                {
+                    "tid": tenant_id,
+                    "sid": staff_id,
+                    "ev": evento_codigo,
+                    "res": resumen,
+                    "dat": json.dumps(datos_central, sort_keys=True, ensure_ascii=False),
+                    "ip": _ip_postgres_valida(ip),
+                    "ua": user_agent,
+                    "rq": request_id,
+                    "prev": prev_central_seal,
+                    "seal": canonical_seal,
+                },
+            )
+        else:
+            insertado = await uno(
+                db,
+                """
+                INSERT INTO audit.audit_events
+                    (tenant_id, actor_tipo, actor_id, evento, resumen, datos,
+                     sello_previo, sello)
+                VALUES (:tid, 'staff', :sid, :ev, :res, CAST(:dat AS jsonb),
+                        :prev, :seal)
+                RETURNING sello
+            """,
+                {
+                    "tid": tenant_id,
+                    "sid": staff_id,
+                    "ev": evento_codigo,
+                    "res": resumen,
+                    "dat": json.dumps(datos_central, sort_keys=True, ensure_ascii=False),
+                    "prev": prev_central_seal,
+                    "seal": canonical_seal,
+                },
+            )
+        return (
+            str(insertado["sello"]) if insertado and insertado.get("sello") else canonical_seal
+        )
+    finally:
+        await uno(db, "SELECT set_config('app.tenant_id', :tid, true)", {"tid": prev_ctx_tid})
 
 
 class ResultadoIntegridadCadena(dict[str, Any]):
@@ -122,6 +452,7 @@ async def registrar_accion(
             f"la acción {action} exige tenant_id: sin cliente afectado el "
             f"registro no es auditable"
         )
+    validar_payload_sin_fuga(payload)
 
     fila = await uno(
         db,
@@ -132,7 +463,7 @@ async def registrar_accion(
              prev_seal, seal)
         VALUES (:sid, :sem, :rol, :act, :tid, :gid, :sc, :rz, :res, :ep, :ip, :ua,
                 :rq, CAST(:pl AS jsonb), '', '')
-        RETURNING seal
+        RETURNING id, occurred_at, seal
     """,
         {
             "sid": staff_id,
@@ -153,6 +484,28 @@ async def registrar_accion(
     )
     assert fila is not None
     sello: str = fila["seal"]
+
+    if tenant_id:
+        await _conectar_evento_a_cadena_central(
+            db,
+            tenant_id=tenant_id,
+            staff_id=staff_id,
+            staff_role=staff_role,
+            action=action,
+            endpoint=endpoint,
+            staff_action_id=int(fila["id"]) if fila.get("id") is not None else None,
+            staff_action_seal=sello,
+            occurred_at=fila.get("occurred_at"),
+            grant_id=grant_id,
+            scope=scope,
+            reason=reason,
+            resource=resource,
+            ip=ip,
+            user_agent=user_agent,
+            request_id=request_id,
+            payload=payload,
+        )
+
     log.info(
         "admin.audit.accion",
         accion=action,
@@ -185,6 +538,7 @@ async def registrar_lectura(
     Se llama una vez por petición servida con concesión, no una vez por fila
     devuelta: lo que se audita es el acceso, no el recuento de registros.
     """
+    recurso_efectivo = resource if resource and resource.strip() else f"customer:{tenant_id}"
     sello = await registrar_accion(
         db,
         staff_id=staff_id,
@@ -195,7 +549,7 @@ async def registrar_lectura(
         grant_id=grant_id,
         scope=scope,
         reason=reason,
-        resource=resource,
+        resource=recurso_efectivo,
         ip=ip,
         user_agent=user_agent,
         request_id=request_id,
@@ -545,7 +899,8 @@ async def consultar_accesos_staff_para_portal(
 
     # Verificación de integridad criptográfica de la cadena en la ventana
     rupturas = await verificar_cadena(db, str(desde), str(hasta + timedelta(days=1)))
-    integra = not rupturas
+    central = await verificar_cadena_central_tenant(db, tenant_id)
+    integra = (not rupturas) and central.integra
 
     items: list[dict[str, Any]] = []
     for f in filas:
@@ -581,16 +936,407 @@ async def consultar_accesos_staff_para_portal(
     return items, total
 
 
+_WRAPPER_CLAVES_CANONICAS: frozenset[str] = frozenset(
+    {
+        "canonical_prev_seal",
+        "canonical_seal",
+        "migrated_from_staff_actions",
+    }
+)
+
+
+def _ordenar_cadena_central(
+    eventos: list[dict[str, Any]],
+    *,
+    ancla_prev: str,
+    desde_ventana: bool,
+) -> list[dict[str, Any]]:
+    if desde_ventana or not eventos:
+        return eventos
+
+    por_prev: dict[str, list[dict[str, Any]]] = {}
+    for ev in eventos:
+        por_prev.setdefault(str(ev.get("sello_previo") or ""), []).append(ev)
+
+    ordenados: list[dict[str, Any]] = []
+    vistos: set[int] = set()
+    cursor = ancla_prev
+    while cursor in por_prev:
+        candidatos = por_prev[cursor]
+        if len(candidatos) != 1:
+            break
+        ev = candidatos[0]
+        if id(ev) in vistos:
+            break
+        vistos.add(id(ev))
+        ordenados.append(ev)
+        cursor = str(ev.get("sello") or "")
+
+    for ev in eventos:
+        if id(ev) not in vistos:
+            ordenados.append(ev)
+    return ordenados
+
+
+def verificar_eventos_centrales_en_memoria(
+    eventos: list[dict[str, Any]],
+    chain_head: dict[str, Any] | None = None,
+    *,
+    desde_ventana: bool = False,
+) -> ResultadoIntegridadCadena:
+    """Verifica determinísticamente eventos centrales de un tenant y su chain_head."""
+    roturas: list[dict[str, Any]] = []
+    ancla_prev = (
+        str(chain_head["ultimo_sello_descartado"])
+        if chain_head and chain_head.get("ultimo_sello_descartado")
+        else _GENESIS_CENTRAL
+    )
+    descartados = int(chain_head.get("eventos_descartados") or 0) if chain_head else 0
+    secuencia = _ordenar_cadena_central(
+        eventos,
+        ancla_prev=ancla_prev,
+        desde_ventana=desde_ventana,
+    )
+
+    esperado_prev: str | None = None if desde_ventana else ancla_prev
+    vistos_prev: set[str] = set()
+
+    for ev in secuencia:
+        prev = str(ev.get("sello_previo") or "")
+        if prev in vistos_prev:
+            roturas.append(
+                {
+                    "broken_at": ev.get("creado_en"),
+                    "broken_id": ev.get("id"),
+                    "motivo": f"bifurcación de sello_previo duplicado ({prev[:12]})",
+                }
+            )
+            break
+        vistos_prev.add(prev)
+
+        if esperado_prev is not None and prev != esperado_prev:
+            roturas.append(
+                {
+                    "broken_at": ev.get("creado_en"),
+                    "broken_id": ev.get("id"),
+                    "motivo": f"encadenamiento central roto: se esperaba {esperado_prev[:12]}",
+                }
+            )
+            break
+
+        datos_raw = ev.get("datos")
+        datos: dict[str, Any] | None
+        if isinstance(datos_raw, str):
+            datos = json.loads(datos_raw) if datos_raw else None
+        elif isinstance(datos_raw, dict):
+            datos = datos_raw
+        else:
+            datos = None
+
+        if (
+            ev.get("actor_tipo") == "staff"
+            and isinstance(datos, dict)
+            and "canonical_seal" in datos
+        ):
+            actor = datos.get("actor")
+            if not isinstance(actor, dict) or actor.get("typ") != "staff":
+                roturas.append(
+                    {
+                        "broken_at": ev.get("creado_en"),
+                        "broken_id": ev.get("id"),
+                        "motivo": "evento de staff sin actor.typ='staff' válido",
+                    }
+                )
+                break
+            if datos.get("canonical_prev_seal") != prev:
+                roturas.append(
+                    {
+                        "broken_at": ev.get("creado_en"),
+                        "broken_id": ev.get("id"),
+                        "motivo": "canonical_prev_seal inconsistente con sello_previo real",
+                    }
+                )
+                break
+            evento_canonico = {
+                k: v for k, v in datos.items() if k not in _WRAPPER_CLAVES_CANONICAS
+            }
+            sello_recalculado = calcular_sello_cadena_central(prev, evento_canonico)
+            if str(datos.get("canonical_seal") or "") != sello_recalculado:
+                roturas.append(
+                    {
+                        "broken_at": ev.get("creado_en"),
+                        "broken_id": ev.get("id"),
+                        "motivo": "sello canónico de staff no reproducible",
+                    }
+                )
+                break
+
+        esperado_prev = str(ev.get("sello") or "")
+
+    if not roturas and chain_head is not None and not desde_ventana:
+        ultimo_head = str(chain_head.get("ultimo_sello") or "")
+        total_head = int(chain_head.get("eventos") or 0)
+        esperado_ultimo: str = (esperado_prev or "") if eventos else ancla_prev
+        if total_head != len(eventos) + descartados:
+            roturas.append(
+                {
+                    "broken_at": None,
+                    "broken_id": None,
+                    "motivo": (
+                        f"chain_heads.eventos ({total_head}) difiere de los eventos "
+                        f"observados ({len(eventos) + descartados})"
+                    ),
+                }
+            )
+        elif ultimo_head != esperado_ultimo:
+            roturas.append(
+                {
+                    "broken_at": None,
+                    "broken_id": None,
+                    "motivo": (
+                        f"chain_heads.ultimo_sello ({ultimo_head[:12]}) difiere "
+                        f"del último sello real ({esperado_ultimo[:12]})"
+                    ),
+                }
+            )
+
+    integro = len(roturas) == 0
+    return ResultadoIntegridadCadena(
+        integra=integro,
+        verificado=integro,
+        roturas=roturas,
+        total_roturas=len(roturas),
+        primer_evento_roto=roturas[0] if roturas else None,
+    )
+
+
+async def verificar_cadena_central_tenant(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    desde: str | None = None,
+    hasta: str | None = None,
+) -> ResultadoIntegridadCadena:
+    """Verifica la cadena central (`audit.audit_events` + `audit.chain_heads`) de un tenant."""
+    disponible, _, tiene_verify = await _esquema_auditoria_central_disponible(db)
+    if not disponible:
+        return ResultadoIntegridadCadena(
+            integra=True,
+            verificado=True,
+            roturas=[],
+            total_roturas=0,
+            primer_evento_roto=None,
+        )
+
+    roturas_sql: list[dict[str, Any]] = []
+    if tiene_verify:
+        verif = await uno(
+            db,
+            """
+            SELECT integra, primer_evento_roto
+            FROM audit.verify_chain(
+                :tid,
+                CAST(CAST(:d AS text) AS timestamptz),
+                CAST(CAST(:h AS text) AS timestamptz)
+            )
+        """,
+            {"tid": tenant_id, "d": desde, "h": hasta},
+        )
+        if verif is not None and not bool(verif.get("integra")):
+            roturas_sql.append(
+                {
+                    "broken_at": None,
+                    "broken_id": verif.get("primer_evento_roto"),
+                    "motivo": "sello central de audit.verify_chain inválido",
+                }
+            )
+
+    conds = ["tenant_id = :tid"]
+    params: dict[str, Any] = {"tid": tenant_id, "d": desde, "h": hasta}
+    if desde:
+        conds.append("creado_en >= CAST(CAST(:d AS text) AS timestamptz)")
+    if hasta:
+        conds.append("creado_en < CAST(CAST(:h AS text) AS timestamptz)")
+
+    eventos = await todos(
+        db,
+        f"""
+        SELECT id, tenant_id, actor_tipo, actor_id, evento, resumen,
+               datos, sello_previo, sello, creado_en
+        FROM audit.audit_events
+        WHERE {' AND '.join(conds)}
+        ORDER BY creado_en ASC, id ASC
+    """,
+        params,
+    )
+
+    cabeza = await uno(
+        db,
+        "SELECT tenant_id, ultimo_sello, eventos FROM audit.chain_heads WHERE tenant_id = :tid",
+        {"tid": tenant_id},
+    )
+    if cabeza is not None:
+        ancla = await uno(
+            db,
+            """
+            SELECT to_regclass('audit.chain_anchors') IS NOT NULL AS tiene_anchors
+        """,
+        )
+        if ancla and ancla.get("tiene_anchors"):
+            datos_anc = await uno(
+                db,
+                """
+                SELECT eventos_descartados, ultimo_sello_descartado
+                FROM audit.chain_anchors
+                WHERE tenant_id = :tid
+            """,
+                {"tid": tenant_id},
+            )
+            if datos_anc:
+                cabeza["eventos_descartados"] = datos_anc.get("eventos_descartados") or 0
+                cabeza["ultimo_sello_descartado"] = datos_anc.get("ultimo_sello_descartado")
+    elif eventos and not desde and not hasta:
+        roturas_sql.append(
+            {
+                "broken_at": None,
+                "broken_id": eventos[0].get("id"),
+                "motivo": "eventos en audit.audit_events sin entrada en audit.chain_heads",
+            }
+        )
+
+    res_py = verificar_eventos_centrales_en_memoria(
+        eventos,
+        cabeza,
+        desde_ventana=bool(desde or hasta),
+    )
+    todas_roturas = [*roturas_sql, *res_py.roturas]
+    integro = len(todas_roturas) == 0
+    return ResultadoIntegridadCadena(
+        integra=integro,
+        verificado=integro,
+        roturas=todas_roturas,
+        total_roturas=len(todas_roturas),
+        primer_evento_roto=todas_roturas[0] if todas_roturas else None,
+    )
+
+
+async def migrar_historico_staff_a_cadena_central(
+    db: AsyncSession,
+    *,
+    tenant_id: str | None = None,
+) -> dict[str, int]:
+    """Migra de forma idempotente `admin.staff_actions` hacia `audit.audit_events`.
+
+    Reutiliza la sesión `db` proporcionada por el llamador y nunca ejecuta UPDATE ni DELETE
+    sobre `admin.staff_actions` (estrictamente append-only).
+    """
+    disponible, _, _ = await _esquema_auditoria_central_disponible(db)
+    if not disponible:
+        return {"procesados": 0, "migrados": 0, "omitidos": 0}
+
+    filas = await todos(
+        db,
+        """
+        SELECT sa.id, sa.occurred_at, sa.staff_id, sa.staff_role, sa.action,
+               sa.tenant_id, sa.grant_id, sa.scope, sa.reason, sa.resource,
+               sa.endpoint, sa.ip, sa.user_agent, sa.request_id, sa.payload, sa.seal
+        FROM admin.staff_actions sa
+        WHERE sa.tenant_id IS NOT NULL
+          AND (CAST(:tid AS text) IS NULL OR sa.tenant_id = :tid)
+        ORDER BY sa.occurred_at ASC, sa.id ASC
+    """,
+        {"tid": tenant_id},
+    )
+
+    existentes_rows = await todos(
+        db,
+        """
+        SELECT tenant_id,
+               datos->>'staff_action_id' AS sa_id,
+               datos->>'staff_action_seal' AS sa_seal
+        FROM audit.audit_events
+        WHERE actor_tipo = 'staff'
+          AND (CAST(:tid AS text) IS NULL OR tenant_id = :tid)
+          AND datos ? 'staff_action_id'
+    """,
+        {"tid": tenant_id},
+    )
+    ya_migrados: set[tuple[str, str, str]] = {
+        (
+            str(r["tenant_id"]),
+            str(r.get("sa_id") or ""),
+            str(r.get("sa_seal") or ""),
+        )
+        for r in existentes_rows
+    }
+
+    migrados = 0
+    omitidos = 0
+    for f in filas:
+        clave = (str(f["tenant_id"]), str(f["id"]), str(f["seal"]))
+        if clave in ya_migrados:
+            omitidos += 1
+            continue
+
+        payload_raw = f.get("payload")
+        if isinstance(payload_raw, str):
+            payload_dict: dict[str, Any] | None = (
+                json.loads(payload_raw) if payload_raw else None
+            )
+        elif isinstance(payload_raw, dict):
+            payload_dict = payload_raw
+        else:
+            payload_dict = None
+
+        await _conectar_evento_a_cadena_central(
+            db,
+            tenant_id=str(f["tenant_id"]),
+            staff_id=str(f["staff_id"]),
+            staff_role=str(f["staff_role"]),
+            action=str(f["action"]),
+            endpoint=str(f["endpoint"]),
+            staff_action_id=int(f["id"]),
+            staff_action_seal=str(f["seal"]),
+            occurred_at=f.get("occurred_at"),
+            grant_id=f.get("grant_id"),
+            scope=f.get("scope"),
+            reason=f.get("reason"),
+            resource=f.get("resource"),
+            ip=f.get("ip"),
+            user_agent=f.get("user_agent"),
+            request_id=f.get("request_id"),
+            payload=payload_dict,
+            migrado=True,
+        )
+        ya_migrados.add(clave)
+        migrados += 1
+
+    return {
+        "procesados": len(filas),
+        "migrados": migrados,
+        "omitidos": omitidos,
+    }
+
+
 __all__ = [
+    "CLAVES_PROHIBIDAS_AUDITORIA",
     "Accion",
     "ResultadoIntegridadCadena",
+    "calcular_sello_cadena_central",
     "calcular_sello_staff_action",
+    "construir_evento_canonico_staff",
     "consultar_accesos_staff_para_portal",
     "formatear_nombre_publico",
+    "migrar_historico_staff_a_cadena_central",
     "recalcular_y_verificar_cadena",
     "registrar_accion",
     "registrar_accion_staff",
     "registrar_lectura",
+    "sanitizar_metadata_auditoria",
+    "serializar_evento_canonico",
+    "validar_payload_sin_fuga",
     "verificar_cadena",
+    "verificar_cadena_central_tenant",
     "verificar_cadena_staff_actions",
+    "verificar_eventos_centrales_en_memoria",
 ]

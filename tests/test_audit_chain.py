@@ -1193,3 +1193,99 @@ async def test_verificacion_por_tenant_id(db: Any, staff_factory: Any) -> None:
     assert res_globex.integra is True
     assert res_globex.verificado is True
     assert res_globex.total_roturas == 0
+
+
+# ========================================================= 12. Integración Cadena Central
+async def test_portal_staff_accesses_integra_cadena_central_y_detecta_tamper(
+    cliente: Any, dsn: str, db: Any, staff_factory: Any
+) -> None:
+    """GET /api/v1/audit/staff-accesses combina staff_actions y audit.audit_events."""
+    st = await staff_factory("staff_soporte")
+    tenant = "org_acme"
+    gid = await _crear_concesion_y_accion(
+        db,
+        st["id"],
+        tenant,
+        reason="Revision justificada SUP-01 central para portal cliente KC-6606",
+        reference="KC-6606",
+    )
+
+    token = _token_portal(user_id="usr_central", org=tenant, rol="admin")
+    r_ok = await cliente.get(
+        "/api/v1/audit/staff-accesses?ticket_id=KC-6606",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r_ok.status_code == 200, r_ok.text
+    item_ok = next(it for it in r_ok.json()["items"] if it["id"] == gid)
+    assert item_ok["verificado"] is True
+
+    engine_su = create_async_engine(
+        dsn.replace("postgresql://", "postgresql+asyncpg://"),
+        poolclass=NullPool,
+    )
+    try:
+        async with engine_su.begin() as conn:
+            row = (
+                await conn.execute(
+                    text(
+                        """
+                    SELECT id, creado_en, resumen
+                    FROM audit.audit_events
+                    WHERE tenant_id = :tid AND actor_tipo = 'staff'
+                      AND datos->>'grant_id' = :gid
+                    ORDER BY id DESC LIMIT 1
+                """
+                    ),
+                    {"tid": tenant, "gid": gid},
+                )
+            ).fetchone()
+            assert row is not None, "no se propagó el acceso a audit.audit_events"
+            ev_id, ev_ts, orig_resumen = row.id, row.creado_en, row.resumen
+
+            await conn.execute(
+                text("ALTER TABLE audit.audit_events DISABLE TRIGGER trg_audit_immutable")
+            )
+            try:
+                await conn.execute(
+                    text(
+                        """
+                    UPDATE audit.audit_events
+                    SET resumen = 'Resumen alterado maliciosamente'
+                    WHERE id = :id AND creado_en = :ts
+                """
+                    ),
+                    {"id": ev_id, "ts": ev_ts},
+                )
+            finally:
+                await conn.execute(
+                    text("ALTER TABLE audit.audit_events ENABLE TRIGGER trg_audit_immutable")
+                )
+
+        r_tamper = await cliente.get(
+            "/api/v1/audit/staff-accesses?ticket_id=KC-6606",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r_tamper.status_code == 200
+        item_tamper = next(it for it in r_tamper.json()["items"] if it["id"] == gid)
+        assert item_tamper["verificado"] is False
+    finally:
+        async with engine_su.begin() as conn:
+            await conn.execute(
+                text("ALTER TABLE audit.audit_events DISABLE TRIGGER trg_audit_immutable")
+            )
+            try:
+                await conn.execute(
+                    text(
+                        """
+                    UPDATE audit.audit_events
+                    SET resumen = :orig
+                    WHERE id = :id AND creado_en = :ts
+                """
+                    ),
+                    {"orig": orig_resumen, "id": ev_id, "ts": ev_ts},
+                )
+            finally:
+                await conn.execute(
+                    text("ALTER TABLE audit.audit_events ENABLE TRIGGER trg_audit_immutable")
+                )
+        await engine_su.dispose()
