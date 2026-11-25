@@ -179,6 +179,7 @@ export const BizTokens: React.FC = () => {
 
   // Modal de Concesión E6
   const [modalConcesionAbierto, setModalConcesionAbierto] = useState(false);
+  const [mostrarTodasColumnas, setMostrarTodasColumnas] = useState(false);
   const [concesionTenantId, setConcesionTenantId] = useState("");
   const [concesionRazonSocial, setConcesionRazonSocial] = useState("");
 
@@ -379,7 +380,7 @@ export const BizTokens: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+        <div className="kc-toolbar-actions">
           <ControlExportarReporte
             tipo="consumo"
             etiquetaBoton={t("components.exportReport.button")}
@@ -462,17 +463,15 @@ export const BizTokens: React.FC = () => {
       {/* Barra de Filtros y Controles Analíticos */}
       <section
         aria-label={t("views.bizTokens.filters.regionLabel")}
+        className="kc-filter-bar"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
-          gap: "1rem",
           padding: "1rem",
           backgroundColor: "var(--card)",
           borderRadius: "var(--radius-md)",
           border: "1px solid var(--border)",
         }}
       >
-        <div>
+        <div className="kc-filter-item">
           <label
             htmlFor="filtro-periodo"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
@@ -488,7 +487,7 @@ export const BizTokens: React.FC = () => {
           />
         </div>
 
-        <div>
+        <div className="kc-filter-item">
           <label
             htmlFor="filtro-plan"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
@@ -504,7 +503,7 @@ export const BizTokens: React.FC = () => {
           />
         </div>
 
-        <div>
+        <div className="kc-filter-item">
           <label
             htmlFor="filtro-agrupacion"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
@@ -520,7 +519,7 @@ export const BizTokens: React.FC = () => {
           />
         </div>
 
-        <div>
+        <div className="kc-filter-item-wide">
           <label
             htmlFor="filtro-busqueda-cliente"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
@@ -536,7 +535,7 @@ export const BizTokens: React.FC = () => {
           />
         </div>
 
-        <div>
+        <div className="kc-filter-item">
           <label
             htmlFor="filtro-ordenacion"
             style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}
@@ -777,13 +776,7 @@ export const BizTokens: React.FC = () => {
               </div>
 
               {/* Tarjetas Visuales por Tier */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: "1rem",
-                }}
-              >
+              <div className="kc-grid-cards">
                 {/* Tier Flash */}
                 <div
                   data-testid="tier-desglose-flash"
@@ -935,7 +928,7 @@ export const BizTokens: React.FC = () => {
                 backgroundColor: "var(--card)",
                 borderRadius: "var(--radius-md)",
                 border: "1px solid var(--border)",
-                overflow: "hidden",
+                overflowX: "clip",
               }}
             >
               <div
@@ -970,322 +963,331 @@ export const BizTokens: React.FC = () => {
                   </div>
                 </div>
 
-                {data.alguna_enmascarada && (
-                  <Badge variante="warn">
-                    {t("views.bizTokens.table.maskedBanner")}
-                  </Badge>
-                )}
+                <div className="kc-toolbar-actions">
+                  {data.alguna_enmascarada && (
+                    <Badge variante="warn">
+                      {t("views.bizTokens.table.maskedBanner")}
+                    </Badge>
+                  )}
+                  <Boton
+                    variante="ghost"
+                    tamano="sm"
+                    className="kc-columns-toggle"
+                    data-testid="toggle-columnas-completas"
+                    aria-pressed={mostrarTodasColumnas}
+                    aria-label={t("components.table.toggleColumnsAria")}
+                    onClick={() => setMostrarTodasColumnas((prev) => !prev)}
+                  >
+                    {mostrarTodasColumnas
+                      ? t("components.table.compactColumns")
+                      : t("components.table.showAllColumns")}
+                  </Boton>
+                </div>
               </div>
 
               {/* Renderizado de Tabla Semántica A11Y */}
-              <div style={{ overflowX: "auto" }}>
-                <Tabla>
-                  <TablaEncabezado>
-                    <TablaFila>
-                      {agruparPor === "cliente" ? (
-                        <>
-                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colClient")}</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colPlan")}</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensIn")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensOut")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensTotal")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colTiers")}</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colEstCost")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colUsageQuota")}</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>
-                            {t("views.bizTokens.table.colBilling")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>
-                            {t("views.bizTokens.table.colPrivacy")}
-                          </TablaCeldaEncabezado>
-                        </>
-                      ) : agruparPor === "tier" ? (
-                        <>
-                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colTierModel")}</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensIn")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensOut")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensTotal")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colEstimatedCost")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>
-                            {t("views.bizTokens.table.colBilling")}
-                          </TablaCeldaEncabezado>
-                        </>
-                      ) : (
-                        <>
-                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colDate")}</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensIn")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensOut")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colTokensTotal")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col">{t("views.bizTokens.table.colTiers")}</TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
-                            {t("views.bizTokens.table.colEstimatedCost")}
-                          </TablaCeldaEncabezado>
-                          <TablaCeldaEncabezado scope="col" style={{ textAlign: "center" }}>
-                            {t("views.bizTokens.table.colBilling")}
-                          </TablaCeldaEncabezado>
-                        </>
-                      )}
-                    </TablaFila>
-                  </TablaEncabezado>
+              <Tabla densidad="alta" mostrarTodasColumnas={mostrarTodasColumnas}>
+                <TablaEncabezado>
+                  <TablaFila>
+                    {agruparPor === "cliente" ? (
+                      <>
+                        <TablaCeldaEncabezado scope="col" fija>{t("views.bizTokens.table.colClient")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="media">{t("views.bizTokens.table.colPlan")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensIn")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensOut")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensTotal")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja">{t("views.bizTokens.table.colTiers")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colEstCost")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="media">{t("views.bizTokens.table.colUsageQuota")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja" style={{ textAlign: "center" }}>
+                          {t("views.bizTokens.table.colBilling")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="media" style={{ textAlign: "center" }}>
+                          {t("views.bizTokens.table.colPrivacy")}
+                        </TablaCeldaEncabezado>
+                      </>
+                    ) : agruparPor === "tier" ? (
+                      <>
+                        <TablaCeldaEncabezado scope="col" fija>{t("views.bizTokens.table.colTierModel")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensIn")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensOut")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensTotal")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colEstimatedCost")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="media" style={{ textAlign: "center" }}>
+                          {t("views.bizTokens.table.colBilling")}
+                        </TablaCeldaEncabezado>
+                      </>
+                    ) : (
+                      <>
+                        <TablaCeldaEncabezado scope="col" fija>{t("views.bizTokens.table.colDate")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensIn")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensOut")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colTokensTotal")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="baja">{t("views.bizTokens.table.colTiers")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" style={{ textAlign: "right" }}>
+                          {t("views.bizTokens.table.colEstimatedCost")}
+                        </TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado scope="col" prioridad="media" style={{ textAlign: "center" }}>
+                          {t("views.bizTokens.table.colBilling")}
+                        </TablaCeldaEncabezado>
+                      </>
+                    )}
+                  </TablaFila>
+                </TablaEncabezado>
 
-                  <TablaCuerpo>
-                    {data.items.map((item, idx) => {
-                      const cuadra = item.cuadra_con_facturacion !== false;
-                      const cuota = item.cuota_pct ?? item.porcentaje_consumido ?? 0;
+                <TablaCuerpo>
+                  {data.items.map((item, idx) => {
+                    const cuadra = item.cuadra_con_facturacion !== false;
+                    const cuota = item.cuota_pct ?? item.porcentaje_consumido ?? 0;
 
-                      if (agruparPor === "cliente") {
-                        const tenantId = item.tenant_id || item.clave;
-                        const esEnmascarado = item.enmascarado ?? true;
+                    if (agruparPor === "cliente") {
+                      const tenantId = item.tenant_id || item.clave;
+                      const esEnmascarado = item.enmascarado ?? true;
 
-                        return (
-                          <TablaFila key={tenantId || idx} data-testid={`fila-cliente-${tenantId}`}>
-                            {/* Organización y Razón Social */}
-                            <TablaCelda>
-                              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                                <Link
-                                  to={`/business/customers/${tenantId}`}
-                                  style={{
-                                    fontWeight: 600,
-                                    color: "var(--accent)",
-                                    textDecoration: "none",
-                                    fontSize: "0.875rem",
-                                  }}
-                                >
-                                  {tenantId}
-                                </Link>
-                                <span style={{ fontSize: "0.8125rem", color: "var(--text)" }}>
-                                  {item.razon_social || "A•••• S.L."}
-                                </span>
-                              </div>
-                            </TablaCelda>
-
-                            {/* Plan Comercial */}
-                            <TablaCelda>
-                              <Badge variante="accent">{item.plan || "starter"}</Badge>
-                            </TablaCelda>
-
-                            {/* Tokens In */}
-                            <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontSize: "0.8125rem" }}>
-                              {formatNumber(item.tokens_input ?? item.tokens_in, undefined, lang)}
-                            </TablaCelda>
-
-                            {/* Tokens Out */}
-                            <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontSize: "0.8125rem" }}>
-                              {formatNumber(item.tokens_output ?? item.tokens_out, undefined, lang)}
-                            </TablaCelda>
-
-                            {/* Tokens Total */}
-                            <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "0.875rem" }}>
-                              {formatNumber(item.tokens_total, undefined, lang)}
-                            </TablaCelda>
-
-                            {/* Desglose por Tier */}
-                            <TablaCelda>
-                              <div style={{ display: "flex", flexDirection: "column", gap: "2px", fontSize: "0.75rem" }}>
-                                <span>
-                                  Flash: <strong>{formatNumber(item.por_tier?.flash ?? 0, undefined, lang)}</strong>
-                                </span>
-                                <span>
-                                  Pro: <strong>{formatNumber(item.por_tier?.pro ?? 0, undefined, lang)}</strong>
-                                </span>
-                                <span style={{ color: "var(--warn)" }}>
-                                  Fable: <strong>{formatNumber(item.por_tier?.fable ?? 0, undefined, lang)}</strong>
-                                </span>
-                              </div>
-                            </TablaCelda>
-
-                            {/* Coste Estimado EUR */}
-                            <TablaCelda style={{ textAlign: "right", fontWeight: 600, color: "var(--accent)" }}>
-                              {formatCurrencyEUR(item.coste_estimado_eur ?? item.coste, "EUR", lang)}
-                            </TablaCelda>
-
-                            {/* Cuota de Uso */}
-                            <TablaCelda>
-                              <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "100px" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                                  <span>{formatPercent(cuota, { decimals: 1, lang })}</span>
-                                  {cuota > 100 ? (
-                                    <span style={{ color: "var(--bad)", fontWeight: 700 }}>
-                                      {t("views.bizTokens.table.quotaExceeded")}
-                                    </span>
-                                  ) : cuota > 80 ? (
-                                    <span style={{ color: "var(--warn)", fontWeight: 700 }}>
-                                      {t("views.bizTokens.table.quotaAlert")}
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <div
-                                  style={{
-                                    height: "6px",
-                                    borderRadius: "3px",
-                                    backgroundColor: "var(--surface2)",
-                                    overflow: "hidden",
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      width: `${Math.min(cuota, 100)}%`,
-                                      height: "100%",
-                                      backgroundColor:
-                                        cuota > 100
-                                          ? "var(--bad)"
-                                          : cuota > 80
-                                          ? "var(--warn)"
-                                          : "var(--good)",
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            </TablaCelda>
-
-                            {/* Cuadre Facturación */}
-                            <TablaCelda style={{ textAlign: "center" }}>
-                              {cuadra ? (
-                                <Badge variante="good" title={t("views.bizTokens.table.matchOkTitle")}>
-                                  {t("views.bizTokens.table.matchOk")}
-                                </Badge>
-                              ) : (
-                                <Badge variante="error" title={t("views.bizTokens.table.matchErrTitle")}>
-                                  {t("views.bizTokens.table.matchErr")}
-                                </Badge>
-                              )}
-                            </TablaCelda>
-
-                            {/* Privacidad E6 y Concesión */}
-                            <TablaCelda style={{ textAlign: "center" }}>
-                              {esEnmascarado ? (
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-                                  <Badge variante="neutro">{t("common.states.masked")}</Badge>
-                                  <Boton
-                                    variante="secondary"
-                                    tamano="sm"
-                                    onClick={() => handleAbrirConcesion(tenantId, item.razon_social)}
-                                    data-testid={`btn-concesion-${tenantId}`}
-                                    style={{ fontSize: "0.6875rem", padding: "2px 6px" }}
-                                  >
-                                    {t("common.actions.requestAccess")}
-                                  </Boton>
-                                </div>
-                              ) : (
-                                <Badge variante="good">{t("common.states.unmasked")}</Badge>
-                              )}
-                            </TablaCelda>
-                          </TablaFila>
-                        );
-                      }
-
-                      if (agruparPor === "tier") {
-                        const nombreTier = item.tier || item.clave;
-                        const esFable = nombreTier === "fable";
-
-                        return (
-                          <TablaFila key={nombreTier} data-testid={`fila-tier-${nombreTier}`}>
-                            <TablaCelda>
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <Badge variante={esFable ? "warn" : "accent"}>{nombreTier}</Badge>
-                                {esFable && (
-                                  <span style={{ fontSize: "0.75rem", color: "var(--warn)" }}>
-                                    {t("views.bizTokens.table.fableNote")}
-                                  </span>
-                                )}
-                              </div>
-                            </TablaCelda>
-                            <TablaCelda style={{ textAlign: "right", fontFamily: "monospace" }}>
-                              {formatNumber(item.tokens_input ?? item.tokens_in, undefined, lang)}
-                            </TablaCelda>
-                            <TablaCelda style={{ textAlign: "right", fontFamily: "monospace" }}>
-                              {formatNumber(item.tokens_output ?? item.tokens_out, undefined, lang)}
-                            </TablaCelda>
-                            <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>
-                              {formatNumber(item.tokens_total, undefined, lang)}
-                            </TablaCelda>
-                            <TablaCelda style={{ textAlign: "right", fontWeight: 600, color: "var(--accent)" }}>
-                              {formatCurrencyEUR(item.coste_estimado_eur ?? item.coste, "EUR", lang)}
-                            </TablaCelda>
-                            <TablaCelda style={{ textAlign: "center" }}>
-                              <Badge variante="good">{t("views.bizTokens.table.reconciledBadge")}</Badge>
-                            </TablaCelda>
-                          </TablaFila>
-                        );
-                      }
-
-                      // Agrupación por día
-                      const diaStr = item.dia || item.clave;
                       return (
-                        <TablaFila key={diaStr} data-testid={`fila-dia-${diaStr}`}>
-                          <TablaCelda style={{ fontWeight: 600 }}>{diaStr}</TablaCelda>
-                          <TablaCelda style={{ textAlign: "right", fontFamily: "monospace" }}>
+                        <TablaFila key={tenantId || idx} data-testid={`fila-cliente-${tenantId}`}>
+                          {/* Organización y Razón Social */}
+                          <TablaCelda fija>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                              <Link
+                                to={`/business/customers/${tenantId}`}
+                                style={{
+                                  fontWeight: 600,
+                                  color: "var(--accent)",
+                                  textDecoration: "none",
+                                  fontSize: "0.875rem",
+                                }}
+                              >
+                                {tenantId}
+                              </Link>
+                              <span style={{ fontSize: "0.8125rem", color: "var(--text)" }}>
+                                {item.razon_social || "A•••• S.L."}
+                              </span>
+                            </div>
+                          </TablaCelda>
+
+                          {/* Plan Comercial */}
+                          <TablaCelda prioridad="media">
+                            <Badge variante="accent">{item.plan || "starter"}</Badge>
+                          </TablaCelda>
+
+                          {/* Tokens In */}
+                          <TablaCelda prioridad="baja" style={{ textAlign: "right", fontFamily: "monospace", fontSize: "0.8125rem" }}>
                             {formatNumber(item.tokens_input ?? item.tokens_in, undefined, lang)}
                           </TablaCelda>
-                          <TablaCelda style={{ textAlign: "right", fontFamily: "monospace" }}>
+
+                          {/* Tokens Out */}
+                          <TablaCelda prioridad="baja" style={{ textAlign: "right", fontFamily: "monospace", fontSize: "0.8125rem" }}>
+                            {formatNumber(item.tokens_output ?? item.tokens_out, undefined, lang)}
+                          </TablaCelda>
+
+                          {/* Tokens Total */}
+                          <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "0.875rem" }}>
+                            {formatNumber(item.tokens_total, undefined, lang)}
+                          </TablaCelda>
+
+                          {/* Desglose por Tier */}
+                          <TablaCelda prioridad="baja">
+                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", fontSize: "0.75rem" }}>
+                              <span>
+                                Flash: <strong>{formatNumber(item.por_tier?.flash ?? 0, undefined, lang)}</strong>
+                              </span>
+                              <span>
+                                Pro: <strong>{formatNumber(item.por_tier?.pro ?? 0, undefined, lang)}</strong>
+                              </span>
+                              <span style={{ color: "var(--warn)" }}>
+                                Fable: <strong>{formatNumber(item.por_tier?.fable ?? 0, undefined, lang)}</strong>
+                              </span>
+                            </div>
+                          </TablaCelda>
+
+                          {/* Coste Estimado EUR */}
+                          <TablaCelda style={{ textAlign: "right", fontWeight: 600, color: "var(--accent)" }}>
+                            {formatCurrencyEUR(item.coste_estimado_eur ?? item.coste, "EUR", lang)}
+                          </TablaCelda>
+
+                          {/* Cuota de Uso */}
+                          <TablaCelda prioridad="media">
+                            <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "100px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
+                                <span>{formatPercent(cuota, { decimals: 1, lang })}</span>
+                                {cuota > 100 ? (
+                                  <span style={{ color: "var(--bad)", fontWeight: 700 }}>
+                                    {t("views.bizTokens.table.quotaExceeded")}
+                                  </span>
+                                ) : cuota > 80 ? (
+                                  <span style={{ color: "var(--warn)", fontWeight: 700 }}>
+                                    {t("views.bizTokens.table.quotaAlert")}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div
+                                style={{
+                                  height: "6px",
+                                  borderRadius: "3px",
+                                  backgroundColor: "var(--surface2)",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: `${Math.min(cuota, 100)}%`,
+                                    height: "100%",
+                                    backgroundColor:
+                                      cuota > 100
+                                        ? "var(--bad)"
+                                        : cuota > 80
+                                        ? "var(--warn)"
+                                        : "var(--good)",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </TablaCelda>
+
+                          {/* Cuadre Facturación */}
+                          <TablaCelda prioridad="baja" style={{ textAlign: "center" }}>
+                            {cuadra ? (
+                              <Badge variante="good" title={t("views.bizTokens.table.matchOkTitle")}>
+                                {t("views.bizTokens.table.matchOk")}
+                              </Badge>
+                            ) : (
+                              <Badge variante="error" title={t("views.bizTokens.table.matchErrTitle")}>
+                                {t("views.bizTokens.table.matchErr")}
+                              </Badge>
+                            )}
+                          </TablaCelda>
+
+                          {/* Privacidad E6 y Concesión */}
+                          <TablaCelda prioridad="media" style={{ textAlign: "center" }}>
+                            {esEnmascarado ? (
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                                <Badge variante="neutro">{t("common.states.masked")}</Badge>
+                                <Boton
+                                  variante="secondary"
+                                  tamano="sm"
+                                  onClick={() => handleAbrirConcesion(tenantId, item.razon_social)}
+                                  data-testid={`btn-concesion-${tenantId}`}
+                                  style={{ fontSize: "0.6875rem", padding: "2px 6px" }}
+                                >
+                                  {t("common.actions.requestAccess")}
+                                </Boton>
+                              </div>
+                            ) : (
+                              <Badge variante="good">{t("common.states.unmasked")}</Badge>
+                            )}
+                          </TablaCelda>
+                        </TablaFila>
+                      );
+                    }
+
+                    if (agruparPor === "tier") {
+                      const nombreTier = item.tier || item.clave;
+                      const esFable = nombreTier === "fable";
+
+                      return (
+                        <TablaFila key={nombreTier} data-testid={`fila-tier-${nombreTier}`}>
+                          <TablaCelda fija>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <Badge variante={esFable ? "warn" : "accent"}>{nombreTier}</Badge>
+                              {esFable && (
+                                <span style={{ fontSize: "0.75rem", color: "var(--warn)" }}>
+                                  {t("views.bizTokens.table.fableNote")}
+                                </span>
+                              )}
+                            </div>
+                          </TablaCelda>
+                          <TablaCelda prioridad="baja" style={{ textAlign: "right", fontFamily: "monospace" }}>
+                            {formatNumber(item.tokens_input ?? item.tokens_in, undefined, lang)}
+                          </TablaCelda>
+                          <TablaCelda prioridad="baja" style={{ textAlign: "right", fontFamily: "monospace" }}>
                             {formatNumber(item.tokens_output ?? item.tokens_out, undefined, lang)}
                           </TablaCelda>
                           <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>
                             {formatNumber(item.tokens_total, undefined, lang)}
                           </TablaCelda>
-                          <TablaCelda>
-                            <div style={{ display: "flex", gap: "0.5rem", fontSize: "0.75rem" }}>
-                              <span>
-                                F: <strong>{formatNumber(item.por_tier?.flash ?? 0, undefined, lang)}</strong>
-                              </span>
-                              <span>
-                                P: <strong>{formatNumber(item.por_tier?.pro ?? 0, undefined, lang)}</strong>
-                              </span>
-                              <span style={{ color: "var(--warn)" }}>
-                                Fa: <strong>{formatNumber(item.por_tier?.fable ?? 0, undefined, lang)}</strong>
-                              </span>
-                            </div>
-                          </TablaCelda>
                           <TablaCelda style={{ textAlign: "right", fontWeight: 600, color: "var(--accent)" }}>
                             {formatCurrencyEUR(item.coste_estimado_eur ?? item.coste, "EUR", lang)}
                           </TablaCelda>
-                          <TablaCelda style={{ textAlign: "center" }}>
+                          <TablaCelda prioridad="media" style={{ textAlign: "center" }}>
                             <Badge variante="good">{t("views.bizTokens.table.reconciledBadge")}</Badge>
                           </TablaCelda>
                         </TablaFila>
                       );
-                    })}
-                  </TablaCuerpo>
-                </Tabla>
-              </div>
+                    }
+
+                    // Agrupación por día
+                    const diaStr = item.dia || item.clave;
+                    return (
+                      <TablaFila key={diaStr} data-testid={`fila-dia-${diaStr}`}>
+                        <TablaCelda fija style={{ fontWeight: 600 }}>{diaStr}</TablaCelda>
+                        <TablaCelda prioridad="baja" style={{ textAlign: "right", fontFamily: "monospace" }}>
+                          {formatNumber(item.tokens_input ?? item.tokens_in, undefined, lang)}
+                        </TablaCelda>
+                        <TablaCelda prioridad="baja" style={{ textAlign: "right", fontFamily: "monospace" }}>
+                          {formatNumber(item.tokens_output ?? item.tokens_out, undefined, lang)}
+                        </TablaCelda>
+                        <TablaCelda style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>
+                          {formatNumber(item.tokens_total, undefined, lang)}
+                        </TablaCelda>
+                        <TablaCelda prioridad="baja">
+                          <div style={{ display: "flex", gap: "0.5rem", fontSize: "0.75rem" }}>
+                            <span>
+                              F: <strong>{formatNumber(item.por_tier?.flash ?? 0, undefined, lang)}</strong>
+                            </span>
+                            <span>
+                              P: <strong>{formatNumber(item.por_tier?.pro ?? 0, undefined, lang)}</strong>
+                            </span>
+                            <span style={{ color: "var(--warn)" }}>
+                              Fa: <strong>{formatNumber(item.por_tier?.fable ?? 0, undefined, lang)}</strong>
+                            </span>
+                          </div>
+                        </TablaCelda>
+                        <TablaCelda style={{ textAlign: "right", fontWeight: 600, color: "var(--accent)" }}>
+                          {formatCurrencyEUR(item.coste_estimado_eur ?? item.coste, "EUR", lang)}
+                        </TablaCelda>
+                        <TablaCelda prioridad="media" style={{ textAlign: "center" }}>
+                          <Badge variante="good">{t("views.bizTokens.table.reconciledBadge")}</Badge>
+                        </TablaCelda>
+                      </TablaFila>
+                    );
+                  })}
+                </TablaCuerpo>
+              </Tabla>
 
               {/* Barra de Paginación Transversal */}
               <div
+                className="kc-pagination"
                 style={{
                   padding: "0.75rem 1.25rem",
                   borderTop: "1px solid var(--border)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "0.75rem",
                   fontSize: "0.8125rem",
                   color: "var(--muted)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div className="kc-pagination-controls">
                   <span>{t("common.pagination.rowsPerPage")}</span>
                   <select
                     data-testid="select-page-size"

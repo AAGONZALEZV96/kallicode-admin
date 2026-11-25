@@ -74,7 +74,10 @@ export const Modal: React.FC<ModalProps> = ({
         aria-modal="true"
         aria-labelledby={titulo ? idTitulo : undefined}
         tabIndex={-1}
-        style={{ maxWidth: anchoMaximo }}
+        style={{
+          maxWidth: anchoMaximo,
+          "--modal-max-width": anchoMaximo,
+        } as React.CSSProperties}
       >
         {titulo && (
           <div className="modal-head">

@@ -257,6 +257,12 @@
         "indisponibilidad_proveedor_llm": "Indisponibilidad de proveedor LLM",
         "otro": "Otra pausa justificada"
       }
+    },
+    "table": {
+      "regionLabel": "Tabla de datos con desplazamiento horizontal",
+      "showAllColumns": "Ver todas las columnas",
+      "compactColumns": "Vista compacta",
+      "toggleColumnsAria": "Alternar visualización de columnas secundarias en pantallas reducidas"
     }
   },
   "auth": {

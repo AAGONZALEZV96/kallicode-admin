@@ -5,7 +5,7 @@
  * enlaces dinámicos según permisos RBAC y botón de cierre de sesión.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth, RolStaff } from "../estado/auth";
@@ -50,23 +50,65 @@ export const AdminLayout: React.FC = () => {
 
   const cerrarMenuMovil = () => setMenuMovilAbierto(false);
 
+  // Cerrar drawer móvil automáticamente al navegar entre rutas
+  useEffect(() => {
+    setMenuMovilAbierto(false);
+  }, [location.pathname]);
+
+  // Cerrar drawer móvil con Escape o al ampliar el viewport por encima de 1024px
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const manejarResize = () => {
+      const esEscritorioPorMatchMedia =
+        typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1025px)").matches;
+      if (esEscritorioPorMatchMedia || window.innerWidth >= 1025) {
+        setMenuMovilAbierto(false);
+      }
+    };
+
+    const manejarKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuMovilAbierto(false);
+      }
+    };
+
+    const mq =
+      typeof window.matchMedia === "function" ? window.matchMedia("(min-width: 1025px)") : null;
+
+    mq?.addEventListener?.("change", manejarResize);
+    window.addEventListener("resize", manejarResize);
+    window.addEventListener("keydown", manejarKeyDown);
+
+    return () => {
+      mq?.removeEventListener?.("change", manejarResize);
+      window.removeEventListener("resize", manejarResize);
+      window.removeEventListener("keydown", manejarKeyDown);
+    };
+  }, []);
+
+  // Evitar scroll en fondo mientras el drawer móvil está abierto
+  useEffect(() => {
+    if (!menuMovilAbierto || typeof document === "undefined") return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [menuMovilAbierto]);
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--bg, #0f172a)" }}>
+    <div
+      className="admin-shell"
+      style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--bg, #0f172a)" }}
+    >
       {/* Header / Navbar Responsivo */}
       <header className="admin-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+        <div className="admin-brand-wrap">
           <Link
             to="/"
             onClick={cerrarMenuMovil}
-            style={{
-              fontSize: "1.125rem",
-              fontWeight: 700,
-              color: "var(--text, #f8fafc)",
-              textDecoration: "none",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-            }}
+            className="admin-brand-link"
           >
             <LogoKalliCode variante="isotipo" altura={24} />
             <span>{t("layout.consoleTitle")}</span>

@@ -281,7 +281,7 @@ export const SolicitudConcesionModal: React.FC<SolicitudConcesionModalProps> = (
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+          <div className="kc-modal-grid-2">
             <div>
               <label
                 htmlFor="concesion-alcance"

@@ -20,6 +20,7 @@ import { formatCurrencyEUR, formatNumber, formatPercent, formatTokens } from "..
 import { ControlesLiveRefresh } from "../componentes/ControlesLiveRefresh";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { Badge } from "../componentes/Badge";
+import { Boton } from "../componentes/Boton";
 import { Select } from "../componentes/Select";
 import {
   Tabla,
@@ -225,6 +226,7 @@ const TablaModelosSeccion: React.FC<TablaModelosSeccionProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage || i18n.language;
+  const [mostrarTodasColumnas, setMostrarTodasColumnas] = useState<boolean>(false);
 
   const prevPorModelo = useMemo(() => {
     const mapa = new Map<string, ModeloMetrica>();
@@ -241,142 +243,156 @@ const TablaModelosSeccion: React.FC<TablaModelosSeccionProps> = ({
       aria-label={titulo}
       style={{ display: "flex", flexDirection: "column", gap: "12px" }}
     >
-      <div>
-        <h2 style={{ fontSize: "15px", fontWeight: 650, margin: 0, color: "var(--text)" }}>
-          {titulo}
-        </h2>
-        <p style={{ fontSize: "12px", color: "var(--muted)", margin: "4px 0 0 0" }}>
-          {subtitulo}
-        </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px" }}>
+        <div>
+          <h2 style={{ fontSize: "15px", fontWeight: 650, margin: 0, color: "var(--text)" }}>
+            {titulo}
+          </h2>
+          <p style={{ fontSize: "12px", color: "var(--muted)", margin: "4px 0 0 0" }}>
+            {subtitulo}
+          </p>
+        </div>
+
+        <Boton
+          variante="ghost"
+          tamano="sm"
+          className="kc-columns-toggle"
+          data-testid={`toggle-columnas-${testId}`}
+          aria-pressed={mostrarTodasColumnas}
+          aria-label={t("components.table.toggleColumnsAria")}
+          onClick={() => setMostrarTodasColumnas((prev) => !prev)}
+        >
+          {mostrarTodasColumnas
+            ? t("components.table.compactColumns")
+            : t("components.table.showAllColumns")}
+        </Boton>
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <Tabla densidad="alta">
-          <TablaEncabezado>
-            <TablaFila>
-              <TablaCeldaEncabezado scope="col">{t("views.opsModels.tables.colProvider")}</TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col">{t("views.opsModels.tables.colModel")}</TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col">{t("views.opsModels.tables.colTier")}</TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col" numerico>
-                {t("views.opsModels.tables.colCalls")}
+      <Tabla densidad="alta" mostrarTodasColumnas={mostrarTodasColumnas}>
+        <TablaEncabezado>
+          <TablaFila>
+            <TablaCeldaEncabezado scope="col" fija>{t("views.opsModels.tables.colProvider")}</TablaCeldaEncabezado>
+            <TablaCeldaEncabezado scope="col">{t("views.opsModels.tables.colModel")}</TablaCeldaEncabezado>
+            <TablaCeldaEncabezado scope="col">{t("views.opsModels.tables.colTier")}</TablaCeldaEncabezado>
+            <TablaCeldaEncabezado scope="col" numerico prioridad="baja">
+              {t("views.opsModels.tables.colCalls")}
+            </TablaCeldaEncabezado>
+            <TablaCeldaEncabezado scope="col" numerico>
+              {t("views.opsModels.tables.colAvailability")}
+            </TablaCeldaEncabezado>
+            <TablaCeldaEncabezado scope="col" numerico prioridad="baja">
+              {t("views.opsModels.tables.colLatencyP50")}
+            </TablaCeldaEncabezado>
+            <TablaCeldaEncabezado scope="col" numerico>
+              {t("views.opsModels.tables.colLatencyP95")}
+            </TablaCeldaEncabezado>
+            <TablaCeldaEncabezado scope="col" numerico prioridad="media">
+              {t("views.opsModels.tables.colErrorRate")}
+            </TablaCeldaEncabezado>
+            {mostrarComparativa && (
+              <TablaCeldaEncabezado scope="col" numerico prioridad="baja">
+                {t("views.opsModels.tables.colDelta")}
               </TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col" numerico>
-                {t("views.opsModels.tables.colAvailability")}
-              </TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col" numerico>
-                {t("views.opsModels.tables.colLatencyP50")}
-              </TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col" numerico>
-                {t("views.opsModels.tables.colLatencyP95")}
-              </TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col" numerico>
-                {t("views.opsModels.tables.colErrorRate")}
-              </TablaCeldaEncabezado>
-              {mostrarComparativa && (
-                <TablaCeldaEncabezado scope="col" numerico>
-                  {t("views.opsModels.tables.colDelta")}
-                </TablaCeldaEncabezado>
-              )}
-            </TablaFila>
-          </TablaEncabezado>
-          <TablaCuerpo>
-            {modelos.map((m) => {
-              const degradado =
-                ventana === "1h" && m.disponibilidad_pct < UMBRAL_DISPONIBILIDAD_1H;
-              const previo = prevPorModelo.get(m.modelo);
-              const deltaLlamadas =
-                previo && m.llamadas !== undefined
-                  ? calcularDeltaPorcentual(m.llamadas, previo.llamadas, lang)
-                  : null;
-              const deltaLatencia = previo
-                ? calcularDeltaPorcentual(m.latencia_p95_ms, previo.latencia_p95_ms, lang)
+            )}
+          </TablaFila>
+        </TablaEncabezado>
+        <TablaCuerpo>
+          {modelos.map((m) => {
+            const degradado =
+              ventana === "1h" && m.disponibilidad_pct < UMBRAL_DISPONIBILIDAD_1H;
+            const previo = prevPorModelo.get(m.modelo);
+            const deltaLlamadas =
+              previo && m.llamadas !== undefined
+                ? calcularDeltaPorcentual(m.llamadas, previo.llamadas, lang)
                 : null;
+            const deltaLatencia = previo
+              ? calcularDeltaPorcentual(m.latencia_p95_ms, previo.latencia_p95_ms, lang)
+              : null;
 
-              return (
-                <TablaFila
-                  key={`${m.proveedor}-${m.modelo}-${m.tier}`}
-                  data-testid={`fila-modelo-${m.modelo}`}
-                  style={
-                    degradado
-                      ? { backgroundColor: "var(--bad-bg)" }
-                      : undefined
-                  }
-                >
-                  <TablaCelda>
-                    <strong>{m.proveedor}</strong>
-                  </TablaCelda>
-                  <TablaCelda>
-                    <code className="mono">{m.modelo}</code>
-                  </TablaCelda>
-                  <TablaCelda>
-                    <Badge
-                      variante={
-                        m.tier === "fable"
-                          ? "advertencia"
-                          : m.tier === "pro"
-                          ? "enmascarado"
-                          : "accent"
-                      }
-                      style={estiloBadgeTier(m.tier)}
-                    >
-                      {m.tier.toUpperCase()}
-                    </Badge>
-                  </TablaCelda>
-                  <TablaCelda numerico>
-                    {m.llamadas !== undefined && Number.isFinite(m.llamadas)
-                      ? formatNumber(m.llamadas, undefined, lang)
-                      : t("common.states.noData")}
-                  </TablaCelda>
-                  <TablaCelda numerico>
+            return (
+              <TablaFila
+                key={`${m.proveedor}-${m.modelo}-${m.tier}`}
+                data-testid={`fila-modelo-${m.modelo}`}
+                style={
+                  degradado
+                    ? { backgroundColor: "var(--bad-bg)" }
+                    : undefined
+                }
+              >
+                <TablaCelda fija>
+                  <strong>{m.proveedor}</strong>
+                </TablaCelda>
+                <TablaCelda>
+                  <code className="mono">{m.modelo}</code>
+                </TablaCelda>
+                <TablaCelda>
+                  <Badge
+                    variante={
+                      m.tier === "fable"
+                        ? "advertencia"
+                        : m.tier === "pro"
+                        ? "enmascarado"
+                        : "accent"
+                    }
+                    style={estiloBadgeTier(m.tier)}
+                  >
+                    {m.tier.toUpperCase()}
+                  </Badge>
+                </TablaCelda>
+                <TablaCelda numerico prioridad="baja">
+                  {m.llamadas !== undefined && Number.isFinite(m.llamadas)
+                    ? formatNumber(m.llamadas, undefined, lang)
+                    : t("common.states.noData")}
+                </TablaCelda>
+                <TablaCelda numerico>
+                  <span
+                    style={{
+                      color: degradado
+                        ? "var(--bad)"
+                        : m.disponibilidad_pct >= 99.9
+                        ? "var(--good)"
+                        : "var(--warn)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {formatPercent(m.disponibilidad_pct, { decimals: 2, lang })}
+                  </span>
+                </TablaCelda>
+                <TablaCelda numerico prioridad="baja">
+                  {m.latencia_p50_ms !== null && m.latencia_p50_ms !== undefined
+                    ? t("views.opsModels.tables.msValue", {
+                        ms: formatNumber(m.latencia_p50_ms, undefined, lang),
+                      })
+                    : t("common.states.noData")}
+                </TablaCelda>
+                <TablaCelda numerico>
+                  {t("views.opsModels.tables.msValue", {
+                    ms: formatNumber(m.latencia_p95_ms, undefined, lang),
+                  })}
+                </TablaCelda>
+                <TablaCelda numerico prioridad="media">
+                  {formatPercent(m.tasa_error_pct, { decimals: 2, lang })}
+                </TablaCelda>
+                {mostrarComparativa && (
+                  <TablaCelda numerico prioridad="baja">
                     <span
-                      style={{
-                        color: degradado
-                          ? "var(--bad)"
-                          : m.disponibilidad_pct >= 99.9
-                          ? "var(--good)"
-                          : "var(--warn)",
-                        fontWeight: 600,
-                      }}
+                      data-testid={`delta-${m.modelo}`}
+                      style={{ fontSize: "12px", color: "var(--muted)" }}
                     >
-                      {formatPercent(m.disponibilidad_pct, { decimals: 2, lang })}
+                      {deltaLlamadas
+                        ? t("views.opsModels.tables.deltaCalls", { delta: deltaLlamadas })
+                        : t("common.states.noData")}
+                      {deltaLatencia
+                        ? ` · ${t("views.opsModels.tables.deltaP95", { delta: deltaLatencia })}`
+                        : ""}
                     </span>
                   </TablaCelda>
-                  <TablaCelda numerico>
-                    {m.latencia_p50_ms !== null && m.latencia_p50_ms !== undefined
-                      ? t("views.opsModels.tables.msValue", {
-                          ms: formatNumber(m.latencia_p50_ms, undefined, lang),
-                        })
-                      : t("common.states.noData")}
-                  </TablaCelda>
-                  <TablaCelda numerico>
-                    {t("views.opsModels.tables.msValue", {
-                      ms: formatNumber(m.latencia_p95_ms, undefined, lang),
-                    })}
-                  </TablaCelda>
-                  <TablaCelda numerico>
-                    {formatPercent(m.tasa_error_pct, { decimals: 2, lang })}
-                  </TablaCelda>
-                  {mostrarComparativa && (
-                    <TablaCelda numerico>
-                      <span
-                        data-testid={`delta-${m.modelo}`}
-                        style={{ fontSize: "12px", color: "var(--muted)" }}
-                      >
-                        {deltaLlamadas
-                          ? t("views.opsModels.tables.deltaCalls", { delta: deltaLlamadas })
-                          : t("common.states.noData")}
-                        {deltaLatencia
-                          ? ` · ${t("views.opsModels.tables.deltaP95", { delta: deltaLatencia })}`
-                          : ""}
-                      </span>
-                    </TablaCelda>
-                  )}
-                </TablaFila>
-              );
-            })}
-          </TablaCuerpo>
-        </Tabla>
-      </div>
+                )}
+              </TablaFila>
+            );
+          })}
+        </TablaCuerpo>
+      </Tabla>
     </section>
   );
 };
@@ -610,8 +626,7 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
 
   return (
     <div
-      className="view ops-models"
-      style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}
+      className="view ops-models kc-view-container"
     >
       {/* Cabecera y controles de refresco en vivo */}
       <header
@@ -638,15 +653,9 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
       {/* Filtros reactivos */}
       <section
         aria-label={t("views.opsModels.filters.regionLabel")}
-        className="card"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "flex-end",
-          gap: "16px",
-        }}
+        className="card kc-filter-bar"
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        <div className="kc-filter-item" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>
             {t("views.opsModels.filters.windowLabel")}
           </span>
@@ -654,12 +663,12 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
             role="group"
             aria-label={t("views.opsModels.filters.windowAria")}
             data-testid="selector-ventana-models"
+            className="kc-tabs-scroll"
             style={{
-              display: "inline-flex",
               borderRadius: "var(--radius-sm)",
               border: "1px solid var(--border)",
-              overflow: "hidden",
               background: "var(--surface)",
+              width: "fit-content",
             }}
           >
             {VENTANAS_MODELOS.map((v) => {
@@ -688,7 +697,7 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
           </div>
         </div>
 
-        <div style={{ minWidth: "180px" }}>
+        <div className="kc-filter-item">
           <Select
             id="ops-models-proveedor"
             etiqueta={t("views.opsModels.filters.providerLabel")}
@@ -705,7 +714,7 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
           />
         </div>
 
-        <div style={{ minWidth: "150px" }}>
+        <div className="kc-filter-item">
           <Select
             id="ops-models-tier"
             etiqueta={t("views.opsModels.filters.tierLabel")}
@@ -721,24 +730,25 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
           />
         </div>
 
-        <label
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            fontSize: "13px",
-            cursor: "pointer",
-            paddingBottom: "8px",
-          }}
-        >
-          <input
-            type="checkbox"
-            data-testid="toggle-comparar-periodo"
-            checked={compararPeriodo}
-            onChange={(e) => setCompararPeriodo(e.target.checked)}
-          />
-          {t("views.opsModels.filters.comparePrevious")}
-        </label>
+        <div className="kc-filter-actions" style={{ paddingBottom: "4px" }}>
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "13px",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              data-testid="toggle-comparar-periodo"
+              checked={compararPeriodo}
+              onChange={(e) => setCompararPeriodo(e.target.checked)}
+            />
+            {t("views.opsModels.filters.comparePrevious")}
+          </label>
+        </div>
       </section>
 
       {/* Salud de Servicios y Dependencias Core */}

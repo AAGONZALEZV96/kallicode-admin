@@ -476,13 +476,7 @@ export const CustomerDetail: React.FC = () => {
       )}
 
       {/* Rejilla de las 6 Secciones Ejecutivas 360° */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-          gap: "var(--space-5)",
-        }}
-      >
+      <div className="kc-grid-detail">
         {/* BLOQUE 1: Identificación & Suscripción */}
         <article className="card" data-testid="card-identificacion-suscripcion">
           <header style={{ marginBottom: "var(--space-4)" }}>
@@ -687,11 +681,11 @@ export const CustomerDetail: React.FC = () => {
           <h3 style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", color: "var(--muted)", marginBottom: "var(--space-2)" }}>
             {t("views.customerDetail.fields.historyTitle")}
           </h3>
-          <Tabla>
+          <Tabla densidad="alta">
             <TablaEncabezado>
               <TablaFila>
-                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colCycle")}</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado style={{ textAlign: "right" }}>
+                <TablaCeldaEncabezado fija>{t("views.customerDetail.fields.colCycle")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado prioridad="media" style={{ textAlign: "right" }}>
                   {t("views.customerDetail.fields.colLoc")}
                 </TablaCeldaEncabezado>
                 <TablaCeldaEncabezado style={{ textAlign: "right" }}>
@@ -706,10 +700,10 @@ export const CustomerDetail: React.FC = () => {
               {historicoCiclos.length > 0 ? (
                 historicoCiclos.map((item, idx) => (
                   <TablaFila key={idx}>
-                    <TablaCelda>
+                    <TablaCelda fija>
                       <strong className="mono">{item.ciclo}</strong>
                     </TablaCelda>
-                    <TablaCelda style={{ textAlign: "right" }}>
+                    <TablaCelda prioridad="media" style={{ textAlign: "right" }}>
                       <span className="tabular">{formatNumber(item.loc, undefined, lang)}</span>
                     </TablaCelda>
                     <TablaCelda style={{ textAlign: "right" }}>
@@ -741,7 +735,7 @@ export const CustomerDetail: React.FC = () => {
 
         {/* BLOQUE 4: Usuarios de la Organización */}
         <article className="card" data-testid="card-usuarios-organizacion">
-          <header style={{ marginBottom: "var(--space-3)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <header style={{ marginBottom: "var(--space-3)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
               {t("views.customerDetail.sections.users", { count: usuarios.length })}
             </h2>
@@ -751,12 +745,12 @@ export const CustomerDetail: React.FC = () => {
               </span>
             )}
           </header>
-          <Tabla>
+          <Tabla densidad="alta">
             <TablaEncabezado>
               <TablaFila>
-                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colUserEmail")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado fija>{t("views.customerDetail.fields.colUserEmail")}</TablaCeldaEncabezado>
                 <TablaCeldaEncabezado>{t("views.customerDetail.fields.colRole")}</TablaCeldaEncabezado>
-                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colLanguage")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado prioridad="media">{t("views.customerDetail.fields.colLanguage")}</TablaCeldaEncabezado>
                 <TablaCeldaEncabezado>{t("views.customerDetail.fields.colStatus")}</TablaCeldaEncabezado>
               </TablaFila>
             </TablaEncabezado>
@@ -764,7 +758,7 @@ export const CustomerDetail: React.FC = () => {
               {usuarios.length > 0 ? (
                 usuarios.map((usr) => (
                   <TablaFila key={usr.id}>
-                    <TablaCelda>
+                    <TablaCelda fija>
                       <div>
                         {usr.nombre && <div style={{ fontWeight: "var(--font-medium)" }}>{usr.nombre}</div>}
                         <span className="mono" style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
@@ -777,7 +771,7 @@ export const CustomerDetail: React.FC = () => {
                         {usr.rol}
                       </span>
                     </TablaCelda>
-                    <TablaCelda>{usr.idioma || "es"}</TablaCelda>
+                    <TablaCelda prioridad="media">{usr.idioma || "es"}</TablaCelda>
                     <TablaCelda>
                       <Badge variante={usr.estado === "activo" ? "good" : "neutro"}>
                         {usr.estado}
@@ -798,7 +792,7 @@ export const CustomerDetail: React.FC = () => {
 
         {/* BLOQUE 5: Integraciones Conectadas */}
         <article className="card" data-testid="card-integraciones">
-          <header style={{ marginBottom: "var(--space-3)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <header style={{ marginBottom: "var(--space-3)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
             <h2 style={{ fontSize: "var(--text-md)", fontWeight: "var(--font-semibold)", color: "var(--accent)" }}>
               {t("views.customerDetail.sections.integrations", { count: integraciones.length })}
             </h2>
@@ -808,10 +802,10 @@ export const CustomerDetail: React.FC = () => {
               </span>
             )}
           </header>
-          <Tabla>
+          <Tabla densidad="alta">
             <TablaEncabezado>
               <TablaFila>
-                <TablaCeldaEncabezado>{t("views.customerDetail.fields.colType")}</TablaCeldaEncabezado>
+                <TablaCeldaEncabezado fija>{t("views.customerDetail.fields.colType")}</TablaCeldaEncabezado>
                 <TablaCeldaEncabezado>{t("views.customerDetail.fields.colIdentifier")}</TablaCeldaEncabezado>
                 <TablaCeldaEncabezado>{t("views.customerDetail.fields.colStatus")}</TablaCeldaEncabezado>
               </TablaFila>
@@ -820,7 +814,7 @@ export const CustomerDetail: React.FC = () => {
               {integraciones.length > 0 ? (
                 integraciones.map((integ) => (
                   <TablaFila key={integ.id}>
-                    <TablaCelda>
+                    <TablaCelda fija>
                       <strong style={{ textTransform: "capitalize" }}>{integ.tipo}</strong>
                     </TablaCelda>
                     <TablaCelda>

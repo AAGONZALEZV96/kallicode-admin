@@ -290,7 +290,7 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
             opciones={opcionesFormato}
           />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          <div className="kc-modal-grid-2">
             <div>
               <label
                 htmlFor={`desde-reporte-${tipo}`}
@@ -379,7 +379,7 @@ export const ControlExportarReporte: React.FC<ControlExportarReporteProps> = ({
             </div>
           )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
             <Boton type="button" variante="ghost" tamano="sm" onClick={() => setAbierto(false)}>
               {t("common.actions.close")}
             </Boton>

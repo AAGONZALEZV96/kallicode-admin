@@ -100,6 +100,7 @@ export const BizCustomers: React.FC = () => {
   // Control de modales: explicativo y operativo de concesión
   const [modalInformativoAbierto, setModalInformativoAbierto] = useState<boolean>(false);
   const [modalConcesionAbierto, setModalConcesionAbierto] = useState<boolean>(false);
+  const [mostrarTodasColumnas, setMostrarTodasColumnas] = useState<boolean>(false);
   const [tenantSeleccionado, setTenantSeleccionado] = useState<{
     tenant_id: string;
     razon_social: string;
@@ -288,7 +289,7 @@ export const BizCustomers: React.FC = () => {
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div className="kc-toolbar-actions">
               {data.alguna_enmascarada && (
                 <Boton
                   variante="ghost"
@@ -360,11 +361,8 @@ export const BizCustomers: React.FC = () => {
       {/* Barra de Filtros, Búsqueda y Ordenación */}
       <section
         aria-label={t("views.bizCustomers.filters.regionLabel")}
+        className="kc-filter-bar"
         style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "flex-end",
-          gap: "1rem",
           padding: "1rem",
           backgroundColor: "var(--card)",
           borderRadius: "var(--radius-md)",
@@ -372,7 +370,7 @@ export const BizCustomers: React.FC = () => {
         }}
       >
         {/* Búsqueda por texto (q) */}
-        <div style={{ flex: "1 1 200px", minWidth: "min(100%, 200px)" }}>
+        <div className="kc-filter-item-wide">
           <Input
             id="filtro-busqueda-clientes"
             etiqueta={t("views.bizCustomers.filters.searchLabel")}
@@ -383,7 +381,7 @@ export const BizCustomers: React.FC = () => {
         </div>
 
         {/* Filtro por Plan */}
-        <div style={{ flex: "1 1 140px", minWidth: "min(100%, 140px)" }}>
+        <div className="kc-filter-item">
           <Select
             id="filtro-plan-clientes"
             etiqueta={t("views.bizCustomers.filters.planLabel")}
@@ -394,7 +392,7 @@ export const BizCustomers: React.FC = () => {
         </div>
 
         {/* Filtro por Estado */}
-        <div style={{ flex: "1 1 150px", minWidth: "min(100%, 150px)" }}>
+        <div className="kc-filter-item">
           <Select
             id="filtro-estado-clientes"
             etiqueta={t("views.bizCustomers.filters.statusLabel")}
@@ -406,7 +404,7 @@ export const BizCustomers: React.FC = () => {
 
         {/* Botón para restablecer filtros si hay alguno activo */}
         {(plan !== "todos" || estado !== "todos" || urlQ !== "" || sort !== "") && (
-          <div style={{ alignSelf: "flex-end" }}>
+          <div className="kc-filter-actions">
             <Boton
               variante="ghost"
               tamano="sm"
@@ -423,8 +421,24 @@ export const BizCustomers: React.FC = () => {
 
       {/* Tabla Densa de Organizaciones */}
       <section aria-label={t("views.bizCustomers.table.regionLabel")}>
+        <div className="kc-toolbar-actions" style={{ justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+          <Boton
+            variante="ghost"
+            tamano="sm"
+            className="kc-columns-toggle"
+            data-testid="toggle-columnas-completas"
+            aria-pressed={mostrarTodasColumnas}
+            aria-label={t("components.table.toggleColumnsAria")}
+            onClick={() => setMostrarTodasColumnas((prev) => !prev)}
+          >
+            {mostrarTodasColumnas
+              ? t("components.table.compactColumns")
+              : t("components.table.showAllColumns")}
+          </Boton>
+        </div>
         <Tabla
           densidad="alta"
+          mostrarTodasColumnas={mostrarTodasColumnas}
           estadoVacio={
             items.length === 0 ? (
               <div data-testid="estado-vacio-clientes" style={{ padding: "2rem", textAlign: "center" }}>
@@ -441,6 +455,7 @@ export const BizCustomers: React.FC = () => {
           <TablaEncabezado>
             <TablaFila>
               <TablaCeldaEncabezado
+                fija
                 onClick={() => alternarOrden("tenant_id")}
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("tenant_id") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
@@ -472,12 +487,13 @@ export const BizCustomers: React.FC = () => {
                 {t("views.bizCustomers.table.colStatus")}{iconoOrden("estado")}
               </TablaCeldaEncabezado>
 
-              <TablaCeldaEncabezado numerico>
+              <TablaCeldaEncabezado numerico prioridad="baja">
                 {t("views.bizCustomers.table.colLines")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
                 numerico
+                prioridad="media"
                 onClick={() => alternarOrden("consumo")}
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("consumo") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
@@ -486,6 +502,7 @@ export const BizCustomers: React.FC = () => {
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
+                prioridad="baja"
                 onClick={() => alternarOrden("actualizado_en")}
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("actualizado_en") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
@@ -493,7 +510,7 @@ export const BizCustomers: React.FC = () => {
                 {t("views.bizCustomers.table.colLastActivity")}{iconoOrden("actualizado_en")}
               </TablaCeldaEncabezado>
 
-              <TablaCeldaEncabezado>
+              <TablaCeldaEncabezado prioridad="media">
                 {t("views.bizCustomers.table.colPrivacy")}
               </TablaCeldaEncabezado>
 
@@ -507,7 +524,7 @@ export const BizCustomers: React.FC = () => {
             {items.map((c) => (
               <TablaFila key={c.tenant_id} data-testid={`fila-cliente-${c.tenant_id}`}>
                 {/* 1. Tenant ID */}
-                <TablaCelda>
+                <TablaCelda fija>
                   <Link
                     to={`/business/customers/${c.tenant_id}`}
                     style={{
@@ -562,7 +579,7 @@ export const BizCustomers: React.FC = () => {
                 </TablaCelda>
 
                 {/* 5. Líneas Contratadas */}
-                <TablaCelda numerico>
+                <TablaCelda numerico prioridad="baja">
                   <span style={{ fontWeight: 600, color: "var(--text)" }}>
                     {formatNumber(c.lineas_contratadas, undefined, lang)}
                   </span>
@@ -574,7 +591,7 @@ export const BizCustomers: React.FC = () => {
                 </TablaCelda>
 
                 {/* 6. Consumo Ciclo (LOC, tokens, % cuota) */}
-                <TablaCelda numerico>
+                <TablaCelda numerico prioridad="media">
                   <div>
                     <span style={{ fontWeight: 600, color: "var(--text)" }}>
                       {t("views.bizCustomers.table.locLabel", {
@@ -591,14 +608,14 @@ export const BizCustomers: React.FC = () => {
                 </TablaCelda>
 
                 {/* 7. Última Actividad */}
-                <TablaCelda>
+                <TablaCelda prioridad="baja">
                   <time dateTime={c.ultima_actividad} style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
                     {formatDate(c.ultima_actividad, { year: "numeric", month: "short", day: "numeric" }, lang)}
                   </time>
                 </TablaCelda>
 
                 {/* 8. Privacidad / Enmascarado */}
-                <TablaCelda>
+                <TablaCelda prioridad="media">
                   {c.enmascarado ? (
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
                       <Badge variante="warn" data-testid={`badge-enmascarado-${c.tenant_id}`} punto>
@@ -643,12 +660,8 @@ export const BizCustomers: React.FC = () => {
       {/* Barra de Paginación Transversal */}
       <footer
         data-testid="customers-pagination"
+        className="kc-pagination"
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "1rem",
           padding: "0.75rem 1rem",
           backgroundColor: "var(--card)",
           borderRadius: "var(--radius-md)",
@@ -661,9 +674,9 @@ export const BizCustomers: React.FC = () => {
         </div>
 
         {/* Controles de página y tamaño */}
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+        <div className="kc-pagination-controls" style={{ gap: "0.75rem" }}>
           {/* Selector de tamaño de página */}
-          <div style={{ minWidth: "120px" }}>
+          <div className="kc-pagination-size">
             <Select
               id="filtro-tamano-pagina"
               aria-label={t("common.pagination.recordsPerPage")}

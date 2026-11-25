@@ -22,6 +22,7 @@ import { ControlesLiveRefresh } from "../componentes/ControlesLiveRefresh";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { EstadoError } from "../componentes/EstadoError";
 import { Badge, BadgeVariante } from "../componentes/Badge";
+import { Boton } from "../componentes/Boton";
 import {
   Tabla,
   TablaEncabezado,
@@ -339,6 +340,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
     datosIniciales?.ventana ?? "1h"
   );
   const [incluirDlq, setIncluirDlq] = useState<boolean>(true);
+  const [mostrarTodasColumnas, setMostrarTodasColumnas] = useState<boolean>(false);
 
   const rolNoAutorizado =
     Boolean(usuario) && !ROLES_OPERACIONES_PERMITIDOS.has(usuario?.role ?? "");
@@ -539,7 +541,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
   }
 
   return (
-    <div className="ops-agents" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div className="ops-agents kc-view-container">
       {/* Cabecera */}
       <header
         style={{
@@ -559,16 +561,15 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+        <div className="kc-toolbar-actions">
           <div
             role="group"
             aria-label={t("views.opsAgents.windowGroupAria")}
             data-testid="selector-ventana-agents"
+            className="kc-tabs-scroll"
             style={{
-              display: "inline-flex",
               borderRadius: "var(--radius-sm)",
               border: "1px solid var(--border)",
-              overflow: "hidden",
               background: "var(--surface)",
             }}
           >
@@ -969,23 +970,38 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
               {t("views.opsAgents.queues.title")}
             </h2>
 
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                fontSize: "13px",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                data-testid="toggle-incluir-dlq"
-                checked={incluirDlq}
-                onChange={(e) => setIncluirDlq(e.target.checked)}
-              />
-              {t("views.opsAgents.queues.includeDlq")}
-            </label>
+            <div className="kc-toolbar-actions">
+              <Boton
+                variante="ghost"
+                tamano="sm"
+                className="kc-columns-toggle"
+                data-testid="toggle-columnas-completas"
+                aria-pressed={mostrarTodasColumnas}
+                aria-label={t("components.table.toggleColumnsAria")}
+                onClick={() => setMostrarTodasColumnas((prev) => !prev)}
+              >
+                {mostrarTodasColumnas
+                  ? t("components.table.compactColumns")
+                  : t("components.table.showAllColumns")}
+              </Boton>
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  data-testid="toggle-incluir-dlq"
+                  checked={incluirDlq}
+                  onChange={(e) => setIncluirDlq(e.target.checked)}
+                />
+                {t("views.opsAgents.queues.includeDlq")}
+              </label>
+            </div>
           </div>
 
           <ContenedorEstado
@@ -1006,57 +1022,59 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
             }}
             reintentando={isFetchingColas}
           >
-            <div style={{ overflowX: "auto" }}>
-              <Tabla data-testid="tabla-colas-ops">
-                <TablaEncabezado>
-                  <TablaFila>
-                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colQueue")}</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colPending")}</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colClaimed")}</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colFailed")}</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colMaxAge")}</TablaCeldaEncabezado>
-                    <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colStatus")}</TablaCeldaEncabezado>
-                  </TablaFila>
-                </TablaEncabezado>
-                <TablaCuerpo>
-                  {colasOrdenadas.map((cola) => {
-                    const pendientes = cola.pendientes ?? cola.profundidad ?? null;
-                    const reclamados = cola.reclamados ?? cola.no_confirmados ?? null;
-                    const fallidos = cola.fallidos ?? cola.dlq ?? null;
-                    const badge = badgeEstadoCola(cola.estado, t);
+            <Tabla
+              data-testid="tabla-colas-ops"
+              densidad="alta"
+              mostrarTodasColumnas={mostrarTodasColumnas}
+            >
+              <TablaEncabezado>
+                <TablaFila>
+                  <TablaCeldaEncabezado scope="col" fija>{t("views.opsAgents.queues.colQueue")}</TablaCeldaEncabezado>
+                  <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colPending")}</TablaCeldaEncabezado>
+                  <TablaCeldaEncabezado scope="col" prioridad="media">{t("views.opsAgents.queues.colClaimed")}</TablaCeldaEncabezado>
+                  <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colFailed")}</TablaCeldaEncabezado>
+                  <TablaCeldaEncabezado scope="col" prioridad="baja">{t("views.opsAgents.queues.colMaxAge")}</TablaCeldaEncabezado>
+                  <TablaCeldaEncabezado scope="col">{t("views.opsAgents.queues.colStatus")}</TablaCeldaEncabezado>
+                </TablaFila>
+              </TablaEncabezado>
+              <TablaCuerpo>
+                {colasOrdenadas.map((cola) => {
+                  const pendientes = cola.pendientes ?? cola.profundidad ?? null;
+                  const reclamados = cola.reclamados ?? cola.no_confirmados ?? null;
+                  const fallidos = cola.fallidos ?? cola.dlq ?? null;
+                  const badge = badgeEstadoCola(cola.estado, t);
 
-                    return (
-                      <TablaFila key={cola.nombre} data-testid={`fila-cola-${cola.nombre}`}>
-                        <TablaCelda>
-                          <strong>{cola.nombre}</strong>
-                        </TablaCelda>
-                        <TablaCelda>
-                          {pendientes !== null ? formatNumber(pendientes, undefined, lang) : t("common.states.noData")}
-                        </TablaCelda>
-                        <TablaCelda>
-                          {reclamados !== null ? formatNumber(reclamados, undefined, lang) : t("common.states.noData")}
-                        </TablaCelda>
-                        <TablaCelda>
-                          {fallidos !== null ? formatNumber(fallidos, undefined, lang) : t("common.states.noData")}
-                        </TablaCelda>
-                        <TablaCelda>
-                          {cola.antiguedad_max_s !== null && cola.antiguedad_max_s !== undefined
-                            ? t("views.opsAgents.queues.secondsValue", {
-                                seconds: formatNumber(cola.antiguedad_max_s, undefined, lang),
-                              })
-                            : t("common.states.noData")}
-                        </TablaCelda>
-                        <TablaCelda>
-                          <Badge variante={badge.variante} punto>
-                            {badge.etiqueta}
-                          </Badge>
-                        </TablaCelda>
-                      </TablaFila>
-                    );
-                  })}
-                </TablaCuerpo>
-              </Tabla>
-            </div>
+                  return (
+                    <TablaFila key={cola.nombre} data-testid={`fila-cola-${cola.nombre}`}>
+                      <TablaCelda fija>
+                        <strong>{cola.nombre}</strong>
+                      </TablaCelda>
+                      <TablaCelda>
+                        {pendientes !== null ? formatNumber(pendientes, undefined, lang) : t("common.states.noData")}
+                      </TablaCelda>
+                      <TablaCelda prioridad="media">
+                        {reclamados !== null ? formatNumber(reclamados, undefined, lang) : t("common.states.noData")}
+                      </TablaCelda>
+                      <TablaCelda>
+                        {fallidos !== null ? formatNumber(fallidos, undefined, lang) : t("common.states.noData")}
+                      </TablaCelda>
+                      <TablaCelda prioridad="baja">
+                        {cola.antiguedad_max_s !== null && cola.antiguedad_max_s !== undefined
+                          ? t("views.opsAgents.queues.secondsValue", {
+                              seconds: formatNumber(cola.antiguedad_max_s, undefined, lang),
+                            })
+                          : t("common.states.noData")}
+                      </TablaCelda>
+                      <TablaCelda>
+                        <Badge variante={badge.variante} punto>
+                          {badge.etiqueta}
+                        </Badge>
+                      </TablaCelda>
+                    </TablaFila>
+                  );
+                })}
+              </TablaCuerpo>
+            </Tabla>
           </ContenedorEstado>
         </section>
       </ContenedorEstado>
