@@ -7,15 +7,23 @@
 
 import React, { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth, RolStaff } from "../estado/auth";
+import { changeAppLanguage, normalizeLanguage, SupportedLanguage } from "../i18n";
 import { Badge } from "./Badge";
 import { Boton } from "./Boton";
 import { LogoKalliCode } from "./LogoKalliCode";
 
 export const AdminLayout: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const { usuario, logout, cargando } = useAuth();
   const location = useLocation();
   const [menuMovilAbierto, setMenuMovilAbierto] = useState<boolean>(false);
+  const idiomaActual = normalizeLanguage(i18n.resolvedLanguage || i18n.language);
+
+  const manejarCambioIdioma = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    void changeAppLanguage(e.target.value as SupportedLanguage);
+  };
 
   const rol = usuario?.role as RolStaff | undefined;
   const tienePermisoNegocio = rol === "staff_negocio" || rol === "staff_admin";
@@ -61,7 +69,7 @@ export const AdminLayout: React.FC = () => {
             }}
           >
             <LogoKalliCode variante="isotipo" altura={24} />
-            <span>KalliCode Consola</span>
+            <span>{t("layout.consoleTitle")}</span>
           </Link>
 
           {/* Menú de Escritorio (>= 900px) */}
@@ -80,7 +88,7 @@ export const AdminLayout: React.FC = () => {
                     fontWeight: isActive("/overview") ? 600 : 400,
                   }}
                 >
-                  Panel Negocio
+                  {t("layout.nav.overview")}
                 </Link>
                 <Link
                   to="/business/subscriptions"
@@ -101,7 +109,7 @@ export const AdminLayout: React.FC = () => {
                       isActive("/business/subscriptions") || isActive("/subscriptions") ? 600 : 400,
                   }}
                 >
-                  Suscripciones
+                  {t("layout.nav.subscriptions")}
                 </Link>
                 <Link
                   to="/business/tokens"
@@ -122,7 +130,7 @@ export const AdminLayout: React.FC = () => {
                       isActive("/business/tokens") || isActive("/tokens") ? 600 : 400,
                   }}
                 >
-                  Consumo Tokens
+                  {t("layout.nav.tokens")}
                 </Link>
               </>
             )}
@@ -147,7 +155,7 @@ export const AdminLayout: React.FC = () => {
                     isActive("/business/customers") || isActive("/customers") ? 600 : 400,
                 }}
               >
-                Clientes
+                {t("layout.nav.customers")}
               </Link>
             )}
 
@@ -165,7 +173,7 @@ export const AdminLayout: React.FC = () => {
                     fontWeight: isActive("/ops/agents") ? 600 : 400,
                   }}
                 >
-                  Agentes
+                  {t("layout.nav.agents")}
                 </Link>
               </>
             )}
@@ -184,7 +192,7 @@ export const AdminLayout: React.FC = () => {
                     fontWeight: isActive("/ops/models") ? 600 : 400,
                   }}
                 >
-                  Modelos
+                  {t("layout.nav.models")}
                 </Link>
                 <Link
                   to="/ops/sla"
@@ -198,7 +206,7 @@ export const AdminLayout: React.FC = () => {
                   fontWeight: isActive("/ops/sla") ? 600 : 400,
                 }}
               >
-                SLA
+                {t("layout.nav.sla")}
               </Link>
               </>
             )}
@@ -207,6 +215,27 @@ export const AdminLayout: React.FC = () => {
 
         {/* Sección Usuario de Escritorio (>= 900px) */}
         <div className="nav-user-desktop">
+          <select
+            data-testid="selector-idioma"
+            aria-label={t("layout.language.ariaLabel")}
+            value={idiomaActual}
+            onChange={manejarCambioIdioma}
+            className="kc-select"
+            style={{
+              fontSize: "0.75rem",
+              padding: "0.25rem 0.5rem",
+              minWidth: "96px",
+              width: "auto",
+              backgroundColor: "var(--surface2, #334155)",
+              color: "var(--text, #f8fafc)",
+              border: "1px solid var(--border, #475569)",
+              borderRadius: "var(--radius-sm, 0.375rem)",
+            }}
+          >
+            <option value="es">{t("layout.language.es")}</option>
+            <option value="en">{t("layout.language.en")}</option>
+          </select>
+
           {usuario && (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <div style={{ textAlign: "right" }}>
@@ -228,7 +257,7 @@ export const AdminLayout: React.FC = () => {
             cargando={cargando}
             style={{ color: "var(--muted, #94a3b8)" }}
           >
-            Cerrar Sesión
+            {t("layout.logout")}
           </Boton>
         </div>
 
@@ -241,7 +270,7 @@ export const AdminLayout: React.FC = () => {
             type="button"
             className="nav-mobile-toggle"
             onClick={() => setMenuMovilAbierto((prev) => !prev)}
-            aria-label={menuMovilAbierto ? "Cerrar menú de navegación" : "Abrir menú de navegación"}
+            aria-label={menuMovilAbierto ? t("layout.mobile.closeMenu") : t("layout.mobile.openMenu")}
             aria-expanded={menuMovilAbierto}
           >
             {menuMovilAbierto ? "✕" : "☰"}
@@ -251,7 +280,7 @@ export const AdminLayout: React.FC = () => {
 
       {/* Cajón Desplegable Móvil (< 900px) */}
       {menuMovilAbierto && (
-        <div className="nav-mobile-drawer" role="dialog" aria-modal="true" aria-label="Navegación móvil">
+        <div className="nav-mobile-drawer" role="dialog" aria-modal="true" aria-label={t("layout.mobile.drawerLabel")}>
           {usuario && (
             <div
               style={{
@@ -280,7 +309,7 @@ export const AdminLayout: React.FC = () => {
                   onClick={cerrarMenuMovil}
                   className={`nav-link-mobile ${isActive("/overview") ? "active" : ""}`}
                 >
-                  Panel Negocio
+                  {t("layout.nav.overview")}
                 </Link>
                 <Link
                   to="/business/subscriptions"
@@ -289,14 +318,14 @@ export const AdminLayout: React.FC = () => {
                     isActive("/business/subscriptions") || isActive("/subscriptions") ? "active" : ""
                   }`}
                 >
-                  Suscripciones
+                  {t("layout.nav.subscriptions")}
                 </Link>
                 <Link
                   to="/business/tokens"
                   onClick={cerrarMenuMovil}
                   className={`nav-link-mobile ${isActive("/business/tokens") || isActive("/tokens") ? "active" : ""}`}
                 >
-                  Consumo Tokens
+                  {t("layout.nav.tokens")}
                 </Link>
               </>
             )}
@@ -309,7 +338,7 @@ export const AdminLayout: React.FC = () => {
                   isActive("/business/customers") || isActive("/customers") ? "active" : ""
                 }`}
               >
-                Clientes
+                {t("layout.nav.customers")}
               </Link>
             )}
 
@@ -319,7 +348,7 @@ export const AdminLayout: React.FC = () => {
                 onClick={cerrarMenuMovil}
                 className={`nav-link-mobile ${isActive("/ops/agents") ? "active" : ""}`}
               >
-                Agentes
+                {t("layout.nav.agents")}
               </Link>
             )}
 
@@ -330,20 +359,34 @@ export const AdminLayout: React.FC = () => {
                   onClick={cerrarMenuMovil}
                   className={`nav-link-mobile ${isActive("/ops/models") ? "active" : ""}`}
                 >
-                  Modelos
+                  {t("layout.nav.models")}
                 </Link>
                 <Link
                   to="/ops/sla"
                   onClick={cerrarMenuMovil}
                   className={`nav-link-mobile ${isActive("/ops/sla") ? "active" : ""}`}
                 >
-                  SLA
+                  {t("layout.nav.sla")}
                 </Link>
               </>
             )}
           </nav>
 
-          <div style={{ marginTop: "auto", paddingTop: "1rem" }}>
+          <div style={{ marginTop: "auto", paddingTop: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.8125rem", color: "var(--muted)" }}>
+              <span>{t("layout.language.label")}</span>
+              <select
+                data-testid="selector-idioma-movil"
+                aria-label={t("layout.language.ariaLabel")}
+                value={idiomaActual}
+                onChange={manejarCambioIdioma}
+                className="kc-select"
+              >
+                <option value="es">{t("layout.language.es")}</option>
+                <option value="en">{t("layout.language.en")}</option>
+              </select>
+            </label>
+
             <Boton
               variante="secondary"
               tamano="md"
@@ -353,7 +396,7 @@ export const AdminLayout: React.FC = () => {
               }}
               style={{ width: "100%", justifyContent: "center" }}
             >
-              Cerrar Sesión
+              {t("layout.logout")}
             </Boton>
           </div>
         </div>

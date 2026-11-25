@@ -13,8 +13,10 @@
 
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { useAuth } from "../estado/auth";
+import { formatCurrencyEUR, formatDateTime, formatNumber, formatPercent } from "../i18n/formatters";
 import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 import { Select } from "../componentes/Select";
@@ -69,37 +71,42 @@ export interface OverviewResponse {
 export type PeriodoRango = "mes_actual" | "mes_anterior" | "trimestre" | "ano";
 export type ComparacionRango = "periodo_anterior" | "mismo_periodo_ano_anterior";
 
-const OPCIONES_PERIODO = [
-  { valor: "mes_actual", etiqueta: "Mes actual" },
-  { valor: "mes_anterior", etiqueta: "Mes anterior" },
-  { valor: "trimestre", etiqueta: "Trimestre en curso" },
-  { valor: "ano", etiqueta: "Año en curso" },
-];
-
-const OPCIONES_COMPARACION = [
-  { valor: "periodo_anterior", etiqueta: "Periodo anterior" },
-  { valor: "mismo_periodo_ano_anterior", etiqueta: "Mismo periodo año anterior" },
-];
-
 const LIMITE_FRESCURA_MS = 6 * 60 * 60 * 1000; // 6 horas
 
-function formatearFrescuraRelativa(fechaIso: string): string {
-  const timestamp = new Date(fechaIso).getTime();
-  if (isNaN(timestamp)) return "Fecha no disponible";
-  const diffSegundos = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (diffSegundos < 60) return "Actualizado hace unos segundos";
-  const diffMinutos = Math.floor(diffSegundos / 60);
-  if (diffMinutos < 60) return `Actualizado hace ${diffMinutos} min`;
-  const diffHoras = Math.floor(diffMinutos / 60);
-  if (diffHoras < 24) return `Actualizado hace ${diffHoras} h`;
-  const diffDias = Math.floor(diffHoras / 24);
-  return `Actualizado hace ${diffDias} d`;
-}
-
 export const BizOverview: React.FC = () => {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage || i18n.language;
   const { usuario } = useAuth();
   const [periodo, setPeriodo] = useState<PeriodoRango>("mes_actual");
   const [compararCon, setCompararCon] = useState<ComparacionRango>("periodo_anterior");
+
+  const opcionesPeriodo = [
+    { valor: "mes_actual", etiqueta: t("views.bizOverview.filters.periods.mes_actual") },
+    { valor: "mes_anterior", etiqueta: t("views.bizOverview.filters.periods.mes_anterior") },
+    { valor: "trimestre", etiqueta: t("views.bizOverview.filters.periods.trimestre") },
+    { valor: "ano", etiqueta: t("views.bizOverview.filters.periods.ano") },
+  ];
+
+  const opcionesComparacion = [
+    { valor: "periodo_anterior", etiqueta: t("views.bizOverview.filters.comparisons.periodo_anterior") },
+    {
+      valor: "mismo_periodo_ano_anterior",
+      etiqueta: t("views.bizOverview.filters.comparisons.mismo_periodo_ano_anterior"),
+    },
+  ];
+
+  const formatearFrescuraRelativa = (fechaIso: string): string => {
+    const timestamp = new Date(fechaIso).getTime();
+    if (isNaN(timestamp)) return t("views.bizOverview.freshness.unavailable");
+    const diffSegundos = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (diffSegundos < 60) return t("views.bizOverview.freshness.secondsAgo");
+    const diffMinutos = Math.floor(diffSegundos / 60);
+    if (diffMinutos < 60) return t("views.bizOverview.freshness.minutesAgo", { count: diffMinutos });
+    const diffHoras = Math.floor(diffMinutos / 60);
+    if (diffHoras < 24) return t("views.bizOverview.freshness.hoursAgo", { count: diffHoras });
+    const diffDias = Math.floor(diffHoras / 24);
+    return t("views.bizOverview.freshness.daysAgo", { count: diffDias });
+  };
 
   // Validación de acceso RBAC a nivel de componente
   const rolNoAutorizado =
@@ -138,11 +145,11 @@ export const BizOverview: React.FC = () => {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Badge variante="error">ACCESO DENEGADO</Badge>
-          <strong style={{ fontSize: "1.1rem" }}>403 ROL_STAFF_INSUFICIENTE</strong>
+          <Badge variante="error">{t("common.errors.accessDeniedBadge")}</Badge>
+          <strong style={{ fontSize: "1.1rem" }}>{t("common.errors.accessDeniedCode")}</strong>
         </div>
         <p style={{ color: "var(--muted)", margin: "0.5rem 0" }}>
-          Acceso denegado para el rol {usuario?.role}. Esta pantalla es de visualización exclusiva para personal de negocio o administración.
+          {t("views.bizOverview.rbacDenied", { role: usuario?.role })}
         </p>
       </main>
     );
@@ -170,15 +177,15 @@ export const BizOverview: React.FC = () => {
       dataTestIdTrace="overview-trace-id"
       tituloError={
         es503
-          ? "AGREGADOS EN REFRESCO"
+          ? t("common.errors.aggregatesRefreshing")
           : es403
-          ? "ACCESO DENEGADO"
-          : "ERROR EN DATOS DE NEGOCIO"
+          ? t("common.errors.accessDeniedBadge")
+          : t("views.bizOverview.errorTitle")
       }
       mensajeError={
-        apiErr?.message || (es503 ? "Los agregados de negocio están recalculándose en PostgreSQL." : undefined)
+        apiErr?.message || (es503 ? t("views.bizOverview.error503Message") : undefined)
       }
-      textoBotonReintento="Reintentar consulta"
+      textoBotonReintento={t("common.actions.retryQuery")}
       alReintentar={() => void refetch()}
     >
       {data && (
@@ -206,7 +213,7 @@ export const BizOverview: React.FC = () => {
               margin: 0,
             }}
           >
-            Panel General de Negocio
+            {t("views.bizOverview.title")}
           </h1>
           <p
             style={{
@@ -215,7 +222,7 @@ export const BizOverview: React.FC = () => {
               margin: "0.25rem 0 0 0",
             }}
           >
-            Métricas ejecutivas consolidadas desde la capa de agregados en PostgreSQL.
+            {t("views.bizOverview.subtitle")}
           </p>
         </div>
 
@@ -226,16 +233,18 @@ export const BizOverview: React.FC = () => {
         >
           {esFrescuraAlta ? (
             <Badge variante="warn" data-testid="badge-frescura-warn">
-              {"Datos desactualizados (> 6h)"}
+              {t("views.bizOverview.freshness.staleBadge")}
             </Badge>
           ) : (
             <Badge variante="good" data-testid="badge-frescura-ok">
-              ACTIVO
+              {t("views.bizOverview.freshness.activeBadge")}
             </Badge>
           )}
           <span
             style={{ fontSize: "0.75rem", color: "var(--muted)" }}
-            title={`Frescura exacta: ${new Date(data.frescura).toLocaleString("es-ES")}`}
+            title={t("views.bizOverview.freshness.exactTitle", {
+              date: formatDateTime(data.frescura, undefined, lang),
+            })}
           >
             <time dateTime={data.frescura}>
               {formatearFrescuraRelativa(data.frescura)}
@@ -243,7 +252,7 @@ export const BizOverview: React.FC = () => {
           </span>
           {isFetching && (
             <span style={{ fontSize: "0.75rem", color: "var(--accent)" }} aria-hidden="true">
-              (Actualizando...)
+              {t("views.bizOverview.freshness.updating")}
             </span>
           )}
         </div>
@@ -251,7 +260,7 @@ export const BizOverview: React.FC = () => {
 
       {/* Controles de Periodo y Comparación */}
       <section
-        aria-label="Controles de rango temporal y comparación"
+        aria-label={t("views.bizOverview.filters.regionLabel")}
         style={{
           display: "flex",
           flexWrap: "wrap",
@@ -266,8 +275,8 @@ export const BizOverview: React.FC = () => {
         <div style={{ minWidth: "180px" }}>
           <Select
             id="filtro-periodo"
-            etiqueta="Periodo"
-            opciones={OPCIONES_PERIODO}
+            etiqueta={t("views.bizOverview.filters.periodLabel")}
+            opciones={opcionesPeriodo}
             value={periodo}
             onChange={(e) => setPeriodo(e.target.value as PeriodoRango)}
           />
@@ -276,8 +285,8 @@ export const BizOverview: React.FC = () => {
         <div style={{ minWidth: "220px" }}>
           <Select
             id="filtro-comparacion"
-            etiqueta="Comparar con"
-            opciones={OPCIONES_COMPARACION}
+            etiqueta={t("views.bizOverview.filters.compareLabel")}
+            opciones={opcionesComparacion}
             value={compararCon}
             onChange={(e) => setCompararCon(e.target.value as ComparacionRango)}
           />
@@ -289,16 +298,16 @@ export const BizOverview: React.FC = () => {
             tamano="sm"
             onClick={() => void refetch()}
             disabled={isFetching}
-            aria-label="Refrescar métricas de negocio"
+            aria-label={t("views.bizOverview.filters.refreshAria")}
           >
-            Refrescar métricas
+            {t("views.bizOverview.filters.refreshButton")}
           </Boton>
         </div>
       </section>
 
       {/* 4 Bloques Principales de Métricas Consolidadas (KPIs) */}
       <section
-        aria-label="Tarjetas principales de indicadores de negocio"
+        aria-label={t("views.bizOverview.kpis.regionLabel")}
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
@@ -328,7 +337,7 @@ export const BizOverview: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              Ingreso Recurrente Mensual
+              {t("views.bizOverview.kpis.mrrTitle")}
             </span>
           </header>
 
@@ -341,12 +350,12 @@ export const BizOverview: React.FC = () => {
               marginBottom: "0.35rem",
             }}
           >
-            {data.mrr_eur.toLocaleString("es-ES", { minimumFractionDigits: 2 })} €
+            {formatCurrencyEUR(data.mrr_eur, data.ingresos?.moneda || "EUR", lang)}
           </div>
 
           <footer style={{ fontSize: "0.75rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ color: "var(--muted)" }}>
-              Moneda: {data.ingresos?.moneda || "EUR"}
+              {t("views.bizOverview.kpis.currency", { currency: data.ingresos?.moneda || "EUR" })}
             </span>
             {variacionMrr !== undefined && variacionMrr !== null && (
               <span
@@ -355,7 +364,7 @@ export const BizOverview: React.FC = () => {
                   color: variacionMrr >= 0 ? "var(--good)" : "var(--bad)",
                 }}
               >
-                {variacionMrr >= 0 ? `+${variacionMrr}%` : `${variacionMrr}%`}
+                {formatPercent(variacionMrr, { decimals: 1, includeSign: true, lang })}
               </span>
             )}
           </footer>
@@ -384,7 +393,7 @@ export const BizOverview: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              Clientes Activos
+              {t("views.bizOverview.kpis.activeCustomersTitle")}
             </span>
           </header>
 
@@ -397,7 +406,7 @@ export const BizOverview: React.FC = () => {
               marginBottom: "0.35rem",
             }}
           >
-            {data.clientes.activos}
+            {formatNumber(data.clientes.activos, undefined, lang)}
           </div>
 
           <footer
@@ -409,8 +418,12 @@ export const BizOverview: React.FC = () => {
               gap: "0.5rem",
             }}
           >
-            <span style={{ color: "var(--good)" }}>+{altasClientes} altas</span>
-            <span style={{ color: "var(--bad)" }}>-{data.clientes.perdidos} cancelaciones</span>
+            <span style={{ color: "var(--good)" }}>
+              {t("views.bizOverview.kpis.signups", { count: altasClientes })}
+            </span>
+            <span style={{ color: "var(--bad)" }}>
+              {t("views.bizOverview.kpis.cancellations", { count: data.clientes.perdidos })}
+            </span>
           </footer>
         </article>
 
@@ -437,7 +450,7 @@ export const BizOverview: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              Consumo de Tokens (Ciclo)
+              {t("views.bizOverview.kpis.tokensTitle")}
             </span>
           </header>
 
@@ -450,7 +463,7 @@ export const BizOverview: React.FC = () => {
               marginBottom: "0.35rem",
             }}
           >
-            {data.consumo.tokens.toLocaleString("es-ES")}
+            {formatNumber(data.consumo.tokens, undefined, lang)}
           </div>
 
           <footer
@@ -462,8 +475,16 @@ export const BizOverview: React.FC = () => {
               gap: "0.2rem",
             }}
           >
-            <span>{data.consumo.loc.toLocaleString("es-ES")} LOC</span>
-            <span>Coste: {data.consumo.coste_estimado.toFixed(2)} €</span>
+            <span>
+              {t("views.bizOverview.kpis.locCount", {
+                count: formatNumber(data.consumo.loc, undefined, lang),
+              })}
+            </span>
+            <span>
+              {t("views.bizOverview.kpis.estimatedCost", {
+                cost: formatCurrencyEUR(data.consumo.coste_estimado, "EUR", lang),
+              })}
+            </span>
           </footer>
         </article>
 
@@ -490,7 +511,7 @@ export const BizOverview: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              Tickets Entregados
+              {t("views.bizOverview.kpis.deliveredTicketsTitle")}
             </span>
           </header>
 
@@ -503,7 +524,7 @@ export const BizOverview: React.FC = () => {
               marginBottom: "0.35rem",
             }}
           >
-            {data.pipeline.tickets_entregados}
+            {formatNumber(data.pipeline.tickets_entregados, undefined, lang)}
           </div>
 
           <footer
@@ -515,15 +536,27 @@ export const BizOverview: React.FC = () => {
               gap: "0.2rem",
             }}
           >
-            <span>Escalado humano: {data.pipeline.escalado_humano_pct}%</span>
-            <span>Tiempo p50: {data.pipeline.tiempo_e2e_p50_h ?? 0}h</span>
+            <span>
+              {t("views.bizOverview.kpis.humanEscalation", {
+                pct: formatPercent(data.pipeline.escalado_humano_pct, { decimals: 1, lang }),
+              })}
+            </span>
+            <span>
+              {t("views.bizOverview.kpis.p50Time", {
+                hours: formatNumber(
+                  data.pipeline.tiempo_e2e_p50_h ?? 0,
+                  { minimumFractionDigits: 1, maximumFractionDigits: 1 },
+                  lang
+                ),
+              })}
+            </span>
           </footer>
         </article>
       </section>
 
       {/* Desglose de Organizaciones por Plan */}
       <section
-        aria-label="Desglose por plan de suscripción"
+        aria-label={t("views.bizOverview.plansBreakdown.regionLabel")}
         style={{
           padding: "1.25rem",
           backgroundColor: "var(--card)",
@@ -539,7 +572,7 @@ export const BizOverview: React.FC = () => {
             margin: "0 0 1rem 0",
           }}
         >
-          Distribución de Organizaciones por Plan
+          {t("views.bizOverview.plansBreakdown.title")}
         </h2>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
@@ -563,7 +596,7 @@ export const BizOverview: React.FC = () => {
                   fontWeight: 500,
                 }}
               >
-                {plan}
+                {t(`common.plans.${plan.toLowerCase()}`, { defaultValue: plan })}
               </span>
               <div
                 style={{
@@ -573,7 +606,7 @@ export const BizOverview: React.FC = () => {
                   marginTop: "0.25rem",
                 }}
               >
-                {cantidad}
+                {formatNumber(cantidad, undefined, lang)}
               </div>
             </div>
           ))}

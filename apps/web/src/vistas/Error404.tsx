@@ -4,9 +4,11 @@
 
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Boton } from "../componentes/Boton";
 
 export const Error404: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -56,7 +58,7 @@ export const Error404: React.FC = () => {
             marginBottom: "0.75rem",
           }}
         >
-          Página No Encontrada
+          {t("auth.error404.title")}
         </h1>
         <p
           style={{
@@ -66,7 +68,7 @@ export const Error404: React.FC = () => {
             lineHeight: "1.5",
           }}
         >
-          La ruta que intentas consultar no existe o ha sido reubicada dentro de la consola.
+          {t("auth.error404.description")}
         </p>
 
         <div style={{ display: "flex", justifyContent: "center" }}>
@@ -74,7 +76,7 @@ export const Error404: React.FC = () => {
             variante="primary"
             onClick={() => navigate("/")}
           >
-            Volver al Panel
+            {t("auth.error404.backPanel")}
           </Boton>
         </div>
       </div>

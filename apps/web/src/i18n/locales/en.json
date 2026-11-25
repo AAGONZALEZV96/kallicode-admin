@@ -1,0 +1,905 @@
+{
+  "common": {
+    "brand": "KalliCode",
+    "actions": {
+      "retry": "Retry",
+      "retrying": "Retrying...",
+      "retryQuery": "Retry query",
+      "close": "Close",
+      "closeModal": "Close modal",
+      "closeNotification": "Close notification",
+      "cancel": "Cancel",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing...",
+      "clearFilters": "Clear filters",
+      "resetFilters": "Reset filters",
+      "backHome": "Go to home",
+      "export": "Export",
+      "understood": "Got it",
+      "requestAccess": "Request access",
+      "requestJustifiedAccess": "Request justified access",
+      "view360": "View 360°"
+    },
+    "states": {
+      "loading": "Loading data...",
+      "emptyTitle": "No data available",
+      "emptyDescription": "No records matched your query or applied filters.",
+      "noData": "—",
+      "notApplicable": "N/A",
+      "masked": "MASKED",
+      "unmasked": "UNMASKED",
+      "unknown": "Unknown",
+      "noPlan": "No plan",
+      "inProgress": "In progress",
+      "general": "General"
+    },
+    "errors": {
+      "unexpectedTitle": "An unexpected error occurred",
+      "unexpectedDescription": "The console encountered a rendering error. Your session and audit data remain safe.",
+      "unknown": "Unknown error",
+      "traceId": "Trace ID:",
+      "accessDeniedBadge": "ACCESS DENIED",
+      "accessDeniedCode": "403 ROL_STAFF_INSUFICIENTE",
+      "aggregatesRefreshing": "AGGREGATES REFRESHING",
+      "http503": {
+        "title": "Analytics Service Temporarily Refreshing (503)",
+        "message": "The analytical aggregates layer is currently refreshing or recalculating. Data will be available shortly."
+      },
+      "http403": {
+        "title": "Restricted Access (403 ROL_STAFF_INSUFICIENTE)",
+        "message": "Your staff role does not have the required permissions to view this information."
+      },
+      "http404": {
+        "title": "Resource Not Found (404)",
+        "message": "The requested resource or organization does not exist or is unavailable."
+      },
+      "network": {
+        "title": "Network Connection Error",
+        "message": "Unable to reach the admin API server. Please check your network connection."
+      },
+      "generic": {
+        "title": "Error Loading Information",
+        "message": "An unexpected error occurred while communicating with the server. Please try again."
+      }
+    },
+    "pagination": {
+      "recordsPerPage": "Records per page",
+      "itemsPerPage": "Items per page",
+      "rowsPerPage": "Rows per page:",
+      "perPageOption": "{{count}} / page",
+      "perPageOptionLong": "{{count}} per page",
+      "pageOf": "Page {{page}} of {{pages}}",
+      "pageOfParens": "(Page {{page}} of {{pages}})",
+      "showingRange": "Showing {{from}} to {{to}} of {{total}} organizations",
+      "firstPage": "First page",
+      "previous": "Previous",
+      "previousPage": "Previous page",
+      "next": "Next",
+      "nextPage": "Next page",
+      "lastPage": "Last page"
+    },
+    "plans": {
+      "all": "All plans",
+      "starter": "Starter",
+      "growth": "Growth",
+      "enterprise": "Enterprise"
+    },
+    "statuses": {
+      "all": "All statuses",
+      "activa": "Active",
+      "periodo_gracia": "Grace Period",
+      "periodo_gracia_moroso": "Grace period / Past due",
+      "suspendida": "Suspended",
+      "finalizada": "Ended",
+      "finalizada_baja": "Ended / Churned",
+      "pendiente": "Pending",
+      "atendida": "Fulfilled",
+      "rechazada": "Rejected"
+    }
+  },
+  "layout": {
+    "consoleTitle": "KalliCode Console",
+    "nav": {
+      "overview": "Business Overview",
+      "subscriptions": "Subscriptions",
+      "tokens": "Token Usage",
+      "customers": "Customers",
+      "agents": "Agents",
+      "models": "Models",
+      "sla": "SLA"
+    },
+    "mobile": {
+      "openMenu": "Open navigation menu",
+      "closeMenu": "Close navigation menu",
+      "drawerLabel": "Mobile navigation"
+    },
+    "language": {
+      "label": "Language",
+      "ariaLabel": "Select console language",
+      "es": "Español",
+      "en": "English"
+    },
+    "logout": "Sign Out"
+  },
+  "components": {
+    "liveRefresh": {
+      "regionLabel": "Live refresh controls",
+      "live": "LIVE",
+      "paused": "PAUSED",
+      "pausedHidden": "PAUSED (Hidden tab)",
+      "pause": "Pause",
+      "resume": "Resume",
+      "pauseAria": "Pause automatic refresh",
+      "resumeAria": "Resume automatic refresh",
+      "frequencyAria": "Auto-refresh frequency",
+      "refreshNow": "Refresh now",
+      "refreshNowAria": "Manually refresh data now",
+      "updating": "Updating...",
+      "pausedByVisibility": "Paused while tab is hidden",
+      "pending": "Pending update",
+      "updatedNow": "Updated just now",
+      "lastAgo": "Last: {{seconds}}s ago",
+      "nextIn": "Next in {{seconds}}s · {{freshness}}",
+      "frequencies": {
+        "s15": "Every 15 seconds (Recommended)",
+        "s30": "Every 30 seconds",
+        "s60": "Every 60 seconds",
+        "manual": "Paused / Manual"
+      }
+    },
+    "exportReport": {
+      "button": "Export Report",
+      "modalTitle": "Export Report · {{type}}",
+      "description": "Generates a deterministic exportable file with a SHA-256 integrity seal. Under privacy policy (ADM-G09), company names are exported masked by default.",
+      "formatLabel": "Export format",
+      "fromLabel": "From",
+      "toLabel": "To",
+      "invalidRange": "The selected date range is invalid.",
+      "genericError": "Unable to generate the report.",
+      "successTitle": "Report generated and downloaded",
+      "idLabel": "ID: {{id}}",
+      "shaLabel": "SHA-256: {{hash}}...",
+      "downloadAgain": "Download again (.{{format}})",
+      "generating": "Generating...",
+      "generateAndDownload": "Generate & Download",
+      "types": {
+        "consumo": "Token Usage & LLM Costs",
+        "clientes": "Customers & Usage Summary",
+        "suscripciones": "Subscriptions & Renewals",
+        "sla": "SLA Compliance & Incidents"
+      },
+      "formats": {
+        "csv": "CSV (Comma-separated values)",
+        "xlsx": "Excel (.xlsx)",
+        "pdf": "PDF (Executive report with SHA-256 seal)"
+      }
+    },
+    "accessGrant": {
+      "defaultTitle": "Request Customer Data Reveal (E6)",
+      "notice": "Business and personal data are masked by default. An approved access grant allows temporarily revealing protected fields. Every granted query is immutably logged in the platform audit trail.",
+      "success": "✓ Access grant authorized and logged. Refreshing unmasked data...",
+      "fields": {
+        "tenantId": "Organization (tenant_id) *",
+        "tenantPlaceholder": "org_acme_corp",
+        "protectedName": "Protected Legal Name:",
+        "reason": "Justified Reason (Minimum 20 characters and ticket reference) *",
+        "reasonPlaceholder": "E.g.: Token usage review and cost audit per ticket KC-1049...",
+        "charCount": "Characters: {{count}}/20 min. Must reference KC-#### or SUP-####.",
+        "reference": "Ticket Reference (Optional if included in reason)",
+        "referencePlaceholder": "E.g.: KC-1049 or SUP-8821",
+        "scope": "Required Scope *",
+        "duration": "Grant Duration *"
+      },
+      "scopes": {
+        "datos_negocio": "Business Data (Recommended)",
+        "expediente": "Full Dossier",
+        "contenido_codigo": "Code Content"
+      },
+      "durations": {
+        "15": "15 minutes",
+        "30": "30 minutes",
+        "60": "60 minutes (1 hour)",
+        "240": "240 minutes (4 hours)",
+        "480": "480 minutes (8 hours)"
+      },
+      "validation": {
+        "missingTenant": "You must specify the organization identifier (tenant_id).",
+        "minReason": "The reason must contain at least 20 characters justifying the access.",
+        "missingTicket": "You must include a mandatory reference to a valid ticket (e.g. KC-1234 or SUP-5678).",
+        "apiError": "Error processing the access grant request.",
+        "unexpectedError": "Unexpected error connecting to the server."
+      },
+      "submitting": "Registering Grant...",
+      "submit": "Confirm & Reveal"
+    },
+    "slaClock": {
+      "title": "Service clock breakdown",
+      "titleWithJob": "Service clock breakdown: {{jobId}}",
+      "loading": "Loading SLA clock timeline segments...",
+      "errorTitle": "Unable to retrieve SLA clock breakdown",
+      "emptyTitle": "No clock data for this case",
+      "emptyDescription": "No segments are recorded for the selected identifier.",
+      "fields": {
+        "ticket": "Ticket",
+        "customerTenant": "Customer / Tenant",
+        "planAndTarget": "Plan & Target",
+        "stageAndResult": "Stage & Result",
+        "noTarget": "No target",
+        "targetHours": "{{hours}} h"
+      },
+      "equation": {
+        "regionLabel": "SLA clock consistency equation",
+        "formula": "Consistency equation: Gross Time = Computed Time + Justified Pause Hours",
+        "gross": "Gross Time",
+        "computed": "Computed Time (Net)",
+        "paused": "Justified Pause Hours",
+        "barAria": "Clock distribution: {{computed}} computable hours and {{paused}} justified pause hours",
+        "computableTitle": "Computable: {{hours}} h",
+        "pausedTitle": "Justified pause: {{hours}} h"
+      },
+      "timeline": {
+        "regionLabel": "Chronological segments timeline",
+        "title": "Chronological segments timeline",
+        "empty": "No segments recorded for this case.",
+        "computableBadge": "Counts toward SLA",
+        "pausedBadge": "Justified pause"
+      },
+      "rules": {
+        "regionLabel": "Rules applied to service level calculation",
+        "title": "Criteria and deductions applied to the clock",
+        "sanitizedTable": "internal service level record"
+      },
+      "pauseCauses": {
+        "default": "Justified pause",
+        "espera_firma_cliente": "Awaiting customer sign-off",
+        "escalado_humano": "Escalated to human review",
+        "ventana_mantenimiento": "Scheduled maintenance window",
+        "indisponibilidad_proveedor_llm": "LLM provider unavailability",
+        "otro": "Other justified pause"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "subtitle": "Staff Administration Console",
+      "emailLabel": "Email Address (@kallicode.com)",
+      "emailPlaceholder": "name@kallicode.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "••••••••••••",
+      "submit": "Continue to Second Factor",
+      "errors": {
+        "missingFields": "Please enter your email address and password.",
+        "invalidCredentials": "Invalid credentials."
+      }
+    },
+    "mfa": {
+      "title": "Two-Step Verification",
+      "subtitle": "Enter the 6-digit code from your authenticator app (TOTP)",
+      "codeLabel": "Verification Code",
+      "codePlaceholder": "123456",
+      "submit": "Verify & Sign In",
+      "backToLogin": "Back to Login",
+      "errors": {
+        "invalidLength": "Enter the 6-digit TOTP code.",
+        "invalidCode": "Invalid verification code."
+      }
+    },
+    "error403": {
+      "title": "Restricted Access (403)",
+      "description": "Your current staff role does not have sufficient permissions in the access matrix to view this section.",
+      "assignedRole": "Assigned role:",
+      "backHome": "Back to Home"
+    },
+    "error404": {
+      "title": "Page Not Found",
+      "description": "The route you are trying to visit does not exist or has been moved within the console.",
+      "backPanel": "Back to Dashboard"
+    }
+  },
+  "views": {
+    "bizOverview": {
+      "title": "Business Overview",
+      "subtitle": "Consolidated executive metrics from the PostgreSQL aggregates layer.",
+      "rbacDenied": "Access denied for role {{role}}. This view is exclusively for business or administration staff.",
+      "errorTitle": "BUSINESS DATA ERROR",
+      "error503Message": "Business aggregates are currently recalculating in PostgreSQL.",
+      "freshness": {
+        "staleBadge": "Stale data (> 6h)",
+        "activeBadge": "ACTIVE",
+        "exactTitle": "Exact freshness: {{date}}",
+        "updating": "(Updating...)",
+        "unavailable": "Date unavailable",
+        "secondsAgo": "Updated a few seconds ago",
+        "minutesAgo": "Updated {{count}} min ago",
+        "hoursAgo": "Updated {{count}} h ago",
+        "daysAgo": "Updated {{count}} d ago"
+      },
+      "filters": {
+        "regionLabel": "Date range and comparison controls",
+        "periodLabel": "Period",
+        "compareLabel": "Compare with",
+        "refreshButton": "Refresh metrics",
+        "refreshAria": "Refresh business metrics",
+        "periods": {
+          "mes_actual": "Current month",
+          "mes_anterior": "Previous month",
+          "trimestre": "Current quarter",
+          "ano": "Year to date"
+        },
+        "comparisons": {
+          "periodo_anterior": "Previous period",
+          "mismo_periodo_ano_anterior": "Same period last year"
+        }
+      },
+      "kpis": {
+        "regionLabel": "Main business KPI cards",
+        "mrrTitle": "Monthly Recurring Revenue",
+        "currency": "Currency: {{currency}}",
+        "activeCustomersTitle": "Active Customers",
+        "signups": "+{{count}} new",
+        "cancellations": "-{{count}} churned",
+        "tokensTitle": "Token Usage (Cycle)",
+        "locCount": "{{count}} LOC",
+        "estimatedCost": "Cost: {{cost}}",
+        "deliveredTicketsTitle": "Delivered Tickets",
+        "humanEscalation": "Human escalation: {{pct}}",
+        "p50Time": "p50 time: {{hours}}h"
+      },
+      "plansBreakdown": {
+        "regionLabel": "Subscription plan breakdown",
+        "title": "Organizations by Plan"
+      }
+    },
+    "bizCustomers": {
+      "title": "Customers & Organizations Directory",
+      "subtitle": "Cross-tenant overview of subscriptions, usage, and operational activity.",
+      "rbacDenied": "Access denied for role {{role}}. The customers and organizations directory is exclusively for support, business, and administration staff.",
+      "error503Message": "The analytical aggregates layer is refreshing in PostgreSQL.",
+      "exportButton": "Export Customers",
+      "privacyPolicyButton": "Privacy & Masking Policy",
+      "privacyPolicyAria": "View masking policy information",
+      "refreshAria": "Refresh customer list",
+      "maskingBanner": {
+        "badge": "MASKING ACTIVE",
+        "text": "Sensitive customer data is protected by default under the privacy policy. An approved access grant is required to view unmasked values."
+      },
+      "filters": {
+        "regionLabel": "Organization search and filter controls",
+        "searchLabel": "Search by ID or organization",
+        "searchPlaceholder": "org_acme, Acme...",
+        "planLabel": "Commercial plan",
+        "statusLabel": "Status"
+      },
+      "empty": {
+        "title": "No organizations found",
+        "description": "Try adjusting your search criteria or selected filters."
+      },
+      "table": {
+        "regionLabel": "Customer organizations list",
+        "colTenant": "Tenant ID",
+        "colName": "Legal Name",
+        "colPlan": "Plan",
+        "colStatus": "Status",
+        "colLines": "Lines",
+        "colUsage": "Usage (Cycle)",
+        "colLastActivity": "Last Activity",
+        "colPrivacy": "Privacy",
+        "colActions": "Actions",
+        "viewDetailsAria": "View details for {{tenantId}}",
+        "maskedTitle": "Data masked by privacy and default masking policy",
+        "activeLines": "({{count}} act.)",
+        "locLabel": "{{count}} LOC",
+        "tokensQuota": "{{tokens}} tok ({{pct}})"
+      },
+      "privacyModal": {
+        "title": "Privacy & Justified Access Policy",
+        "intro": "Under KalliCode Admin Console security directives, legal names, emails, and sensitive customer data are shown masked by default to all staff.",
+        "conditionsTitle": "Conditions for unmasked reveal:",
+        "cond1": "An approved access grant request with operational justification must exist.",
+        "cond2": "Every query against revealed data is recorded in the platform's immutable audit trail.",
+        "cond3": "Grants are temporary and expire automatically after their validity window."
+      }
+    },
+    "customerDetail": {
+      "missingTenantError": "Missing customer identifier",
+      "rbacDenied": "Staff with role staff_operaciones are not authorized to view the 360° dossier or commercial customer data.",
+      "goToAgents": "Go to Agent Operations",
+      "error404Title": "Customer Organization Not Found (404)",
+      "error503Title": "Analytical Aggregates Unavailable (503)",
+      "backToList": "Back to List",
+      "backToDirectory": "← Back to Customers Directory",
+      "metaLine": "Corporate domain: {{domain}} · Joined on {{date}}",
+      "requestReveal": "Request Data Reveal",
+      "activeGrantBadge": "✓ Active Grant (Unmasked Data)",
+      "grantModalTitle": "Customer Data Access Grant Request",
+      "grantSuccessFeedback": "Access grant authorized. Sensitive data has been unmasked.",
+      "privacyBanner": {
+        "title": "PII Protection & Default Masking Privacy Policy",
+        "description": "To enforce least privilege and immutable auditing, identification, users, and integrations blocks are returned obfuscated without a justified temporary grant.",
+        "protectedBlocks": "Protected blocks:",
+        "unlockButton": "Unlock Dossier"
+      },
+      "sections": {
+        "identification": "1. Identification & Subscription",
+        "lines": "2. Production Lines",
+        "usage": "3. Cycle Usage & History (Last 6 Cycles)",
+        "users": "4. Organization Users ({{count}})",
+        "integrations": "5. Connected Integrations ({{count}})",
+        "pipelineGraph": "6. Pipeline Activity & CodeMapping Structure"
+      },
+      "fields": {
+        "tenantId": "Tenant ID",
+        "companyName": "Legal Name",
+        "domain": "Domain",
+        "createdAt": "Sign-up Date",
+        "plan": "Commercial Plan",
+        "subscriptionStatus": "Subscription Status",
+        "renewalDate": "Renewal Date",
+        "monthlyAmount": "Monthly Amount",
+        "pendingPlanChanges": "Pending Plan Change Requests:",
+        "noPendingRequests": "No pending requests",
+        "contractedLines": "Contracted Lines",
+        "activeLines": "Active Lines",
+        "avgUtilization": "Average Cycle Utilization:",
+        "cycleLocProcessed": "LOC processed in cycle:",
+        "accumulatedCost": "Accumulated commercial cost:",
+        "locConsumed": "LOC Consumed",
+        "tokensConsumed": "Tokens Consumed",
+        "quotaUsed": "Quota Used",
+        "historyTitle": "Last 6 Commercial Cycles History",
+        "colCycle": "Commercial Cycle",
+        "colLoc": "LOC Consumed",
+        "colTokens": "Tokens",
+        "colQuota": "% Quota",
+        "noHistory": "No commercial cycle history available.",
+        "maskedEmails": "[Masked Emails]",
+        "colUserEmail": "User / Email",
+        "colRole": "Role",
+        "colLanguage": "Language",
+        "colStatus": "Status",
+        "noUsers": "No registered users.",
+        "maskedPaths": "[Masked Paths]",
+        "colType": "Type",
+        "colIdentifier": "Identifier / Name",
+        "noIntegrations": "No configured integrations.",
+        "graphCoverage": "Graph Coverage",
+        "indexedNodes": "Indexed Nodes",
+        "dependencyEdges": "Dependency Edges",
+        "e2ePerformance": "End-to-End Throughput (p50)",
+        "hoursValue": "{{hours}} h",
+        "graphNote": "* The CodeMapping graph reflects architectural relationships without exposing file contents unless a scoped grant is active."
+      }
+    },
+    "bizSubscriptions": {
+      "title": "Subscriptions & Renewals Management",
+      "subtitle": "Commercial cycle oversight, renewals radar, and plan change request queue.",
+      "rbacDenied": "Commercial management of subscriptions and plan change requests is restricted exclusively to staff_negocio and staff_admin.",
+      "goToOps": "Go to Operations",
+      "tabsAria": "Subscriptions views",
+      "tabRenewals": "Renewals Radar",
+      "tabUpgrades": "Upgrades Queue",
+      "maskedTooltip": "Data masked by privacy policy. Click to request justified reveal.",
+      "renewals": {
+        "regionLabel": "Directory and Renewals Radar",
+        "searchPlaceholder": "Search tenant or customer...",
+        "searchAria": "Search subscriptions",
+        "planAria": "Filter by plan",
+        "statusAria": "Filter by status",
+        "windowAria": "Filter by renewal window",
+        "refreshAria": "Refresh subscription data",
+        "refreshLabel": "↻ Refresh",
+        "emptyTitle": "No subscriptions found",
+        "emptyDescription": "No contracts matched the applied commercial filters.",
+        "tableAria": "Subscriptions list and renewals radar",
+        "colTenant": "Organization (Tenant)",
+        "colName": "Legal Name",
+        "colPlan": "Plan",
+        "colStatus": "Status",
+        "colStart": "Starts On",
+        "colRenew": "Renews On",
+        "colDays": "Days to Renewal",
+        "colAmount": "Amount / Month",
+        "colQuota": "% Quota Used",
+        "daysShort": "{{days}}d",
+        "critical15": "≤ 15 days",
+        "warning30": "≤ 30 days",
+        "showing": "Showing {{count}} of {{total}} subscriptions (Page {{page}} of {{pages}})",
+        "windows": {
+          "all": "Any window",
+          "d15": "Next 15 days (Critical)",
+          "d30": "Next 30 days",
+          "d60": "Next 60 days",
+          "d90": "Next 90 days"
+        }
+      },
+      "upgrades": {
+        "regionLabel": "Upgrade Requests Queue",
+        "statusAria": "Filter requests by status",
+        "desiredPlanAria": "Filter by target plan",
+        "autoOrderHint": "Automatic order: oldest first (descending age).",
+        "refreshAria": "Refresh requests",
+        "emptyTitle": "No upgrade requests",
+        "emptyDescription": "There are no pending plan change requests matching the selected filters.",
+        "emptyAction": "View all requests",
+        "tableAria": "Upgrade and plan change requests queue",
+        "colId": "Request ID",
+        "colTenant": "Organization",
+        "colName": "Legal Name",
+        "colTransition": "Plan Transition",
+        "colRequested": "Requested On",
+        "colAge": "Age",
+        "colPriority": "Priority",
+        "colStatus": "Status",
+        "ageHours": "{{hours}}h",
+        "urgent": "🔥 Urgent",
+        "normal": "Normal",
+        "showing": "Showing {{count}} of {{total}} requests (Page {{page}} of {{pages}})",
+        "prevAria": "Previous requests page",
+        "nextAria": "Next requests page",
+        "statuses": {
+          "pendiente": "Pending (Default)",
+          "todos": "All statuses",
+          "atendida": "Fulfilled",
+          "rechazada": "Rejected"
+        }
+      }
+    },
+    "bizTokens": {
+      "title": "Token Usage & FinOps",
+      "subtitle": "Financial oversight of LLM inference consumption, per-tier costs, quota tracking, and billing reconciliation.",
+      "rbacDenied": "Access denied for role {{role}}. Analytical oversight of token usage and inference costs is exclusively for business or administration staff.",
+      "freshness": "Freshness: {{time}}",
+      "updating": "Updating data...",
+      "refreshing": "Refreshing...",
+      "discrepancyBanner": {
+        "title": "Critical Alert: Discrepancy Detected Between Usage and Billing",
+        "description": "Computed lines of code or tokens differ from billed units in the cycle. Affected customers: {{clients}}.",
+        "defaultClients": "Audited organizations",
+        "badge": "AUDIT REQUIRED"
+      },
+      "liveFilterAnnouncement": "Active filters: Period {{period}}, Plan {{plan}}, Group by {{groupBy}}{{queryPart}}",
+      "liveFilterQueryPart": ", Search {{query}}",
+      "filters": {
+        "regionLabel": "Analytical Filters & Controls",
+        "periodLabel": "Time Period",
+        "planLabel": "Commercial Plan",
+        "groupLabel": "Analytical Grouping",
+        "searchLabel": "Search Customer / Organization",
+        "searchPlaceholder": "Search by tenant_id or name...",
+        "sortLabel": "Sort Order",
+        "periods": {
+          "mes_actual": "Current month (default)",
+          "mes_anterior": "Previous month",
+          "trimestre": "Last quarter",
+          "ano": "Year to date"
+        },
+        "groupBy": {
+          "cliente": "By customer (organization)",
+          "tier": "By model tier",
+          "dia": "By daily series"
+        },
+        "sortOptions": {
+          "coste_desc": "Cost (High to Low)",
+          "coste_asc": "Cost (Low to High)",
+          "tokens_total_desc": "Total Tokens (High to Low)",
+          "tokens_total_asc": "Total Tokens (Low to High)",
+          "tokens_in_desc": "Tokens In (High to Low)",
+          "tokens_out_desc": "Tokens Out (High to Low)",
+          "cuota_pct_desc": "% Quota (High to Low)",
+          "cuota_pct_asc": "% Quota (Low to High)",
+          "loc_consumidas_desc": "Lines of Code (High to Low)"
+        }
+      },
+      "errors": {
+        "title503": "Analytical aggregates refreshing",
+        "titleGeneric": "Error loading token usage",
+        "msg503": "Compute aggregates are recalculating. Trace: {{traceId}}",
+        "msgGeneric": "Could not retrieve token report. {{message}}"
+      },
+      "empty": {
+        "title": "No token usage data",
+        "description": "No inference usage records exist for the selected filters and period.",
+        "action": "Clear Filters"
+      },
+      "kpis": {
+        "regionLabel": "FinOps Executive Summary",
+        "totalTokens": "Total Tokens Consumed",
+        "totalTokensSub": "Accumulated LLM inference in period ({{period}})",
+        "consolidatedCost": "Consolidated Cost",
+        "consolidatedCostSub": "Estimated compute monetary cost",
+        "avgQuota": "Average Quota Usage",
+        "avgQuotaSub": "Average against contracted organization capacity",
+        "quotaSaturated": "SATURATED (>100%)",
+        "quotaWarn": "WARNING (>80%)",
+        "quotaNormal": "NORMAL",
+        "billingMatch": "Billing Reconciliation",
+        "billingMismatchBadge": "MISMATCH",
+        "billingMatchedBadge": "RECONCILED",
+        "billingMismatchValue": "Active Discrepancy",
+        "billingMatchedValue": "100% Reconciled",
+        "billingMismatchSub": "Inconsistency between aggregates and billed cycles",
+        "billingMatchedSub": "Usage validated against billing cycles"
+      },
+      "tiersPanel": {
+        "regionLabel": "Model tier trends and breakdown panel",
+        "title": "Analytical Breakdown by LLM Inference Tier",
+        "description": "Token volume audit by architectural tier. The fable tier is broken out separately from pro due to cost and model divergence.",
+        "badge": "Fable vs Pro Separation Required",
+        "barAria": "Distribution by tier: Flash {{flash}}%, Pro {{pro}}%, Fable {{fable}}%",
+        "volumePct": "{{pct}} of token volume",
+        "volumePctSpecialized": "{{pct}} of token volume (specialized compute)",
+        "flashTitle": "Flash Tier",
+        "flashBadge": "High Speed",
+        "proTitle": "Pro Tier",
+        "proBadge": "Standard Capacity",
+        "fableTitle": "Fable Tier",
+        "fableBadge": "Advanced Reasoning",
+        "a11yTableSummary": "Accessible summary table of tokens consumed by model tier",
+        "a11yColTier": "Tier",
+        "a11yColCategory": "Category",
+        "a11yColTokens": "Tokens",
+        "a11yColPercent": "Percentage",
+        "catFlash": "Lightweight Inference",
+        "catPro": "General Inference",
+        "catFable": "Agentic Reasoning"
+      },
+      "table": {
+        "titleByClient": "Token Usage by Customer Organization",
+        "titleByTier": "Consolidated Aggregate by Model Tier",
+        "titleByDay": "Daily Consumption Time Series",
+        "showingRecords": "Showing {{count}} of {{total}} records",
+        "cycleBadge": "Cycle: {{cycle}}",
+        "maskedBanner": "DATA MASKED UNDER PRIVACY POLICY",
+        "colClient": "Organization / Customer",
+        "colPlan": "Plan",
+        "colTokensIn": "Tokens In",
+        "colTokensOut": "Tokens Out",
+        "colTokensTotal": "Total Tokens",
+        "colTiers": "Tier Breakdown",
+        "colEstCost": "Est. Cost",
+        "colEstimatedCost": "Estimated Cost",
+        "colUsageQuota": "Usage Quota",
+        "colBilling": "Billing",
+        "colPrivacy": "Privacy",
+        "colTierModel": "Model Tier",
+        "colDate": "Date / Day",
+        "quotaExceeded": "Exceeded",
+        "quotaAlert": "Alert",
+        "matchOkTitle": "Usage matches issued billing",
+        "matchOk": "✅ Matched",
+        "matchErrTitle": "Discrepancy detected between usage and billing",
+        "matchErr": "🚨 Mismatch",
+        "reconciledBadge": "✅ Reconciled",
+        "fableNote": "(Specialized Agentic Reasoning)"
+      }
+    },
+    "opsAgents": {
+      "title": "Production Agents & Queues Status",
+      "subtitle": "Aggregated monitoring of production lines, per-stage capacity, and queue depth",
+      "rbacDenied": "Role {{role}} is not authorized to view operational status of agents and queues.",
+      "windowGroupAria": "Time window",
+      "loadingMessage": "Querying agents and queues telemetry...",
+      "errorTitle": "Operational telemetry unavailable",
+      "telemetry": {
+        "regionLabel": "Telemetry status",
+        "down": "Telemetry down",
+        "stale": "Stale telemetry",
+        "available": "Telemetry available",
+        "noTelemetry": "No telemetry",
+        "secondsAgo": "Updated {{count}} s ago",
+        "minutesAgo": "Updated {{count}} min ago",
+        "hoursAgo": "Updated {{count}} h ago",
+        "windowSuffix": "{{relative}} · Window {{window}}",
+        "activeAlertsCount": "{{count}} active alert(s)",
+        "bannerTitle": "No telemetry available: agent and stage counters without recent signal",
+        "bannerSubtitle": "Indicators are shown without values to distinguish signal loss from zero workload.",
+        "staleBannerPrefix": "Operational freshness notice:",
+        "staleBannerBody": "the latest reading is over 5 minutes old ({{relative}})."
+      },
+      "summary": {
+        "regionLabel": "Aggregated operational summary",
+        "linesTitle": "Production Lines",
+        "linesActive": "{{count}} active",
+        "linesMaintenance": "Maintenance:",
+        "linesFree": "Free:",
+        "agentsTitle": "Agents Summary",
+        "agentsBusy": "{{busy}} / {{total}} busy",
+        "agentsTotal": "Total:",
+        "agentsDown": "Down:",
+        "queuesTitle": "Queues Summary",
+        "queuesPending": "{{count}} pending",
+        "queuesFailed": "Failed (DLQ):",
+        "queuesAttention": "Attention/critical:"
+      },
+      "alerts": {
+        "regionLabel": "Active pipeline alerts",
+        "title": "Active alerts in pipeline stages",
+        "thresholdExceeded": "Threshold exceeded ({{type}})",
+        "defaultType": "operational"
+      },
+      "stages": {
+        "regionLabel": "Software pipeline stages",
+        "title": "Throughput by Pipeline Stage",
+        "noTelemetryBadge": "No stage telemetry",
+        "badgeAlert": "Alert",
+        "badgeNoTelemetry": "No telemetry",
+        "badgeOperational": "Operational",
+        "totalAgents": "Total agents",
+        "busy": "Busy",
+        "down": "Down",
+        "completedJobs": "Completed jobs",
+        "p95Duration": "p95 duration",
+        "secondsValue": "{{seconds}} s"
+      },
+      "queues": {
+        "regionLabel": "Pipeline queues",
+        "title": "Pipeline Queues & Dead Letter Queues",
+        "includeDlq": "Include Dead Letter Queues (DLQ)",
+        "errorTitle": "Could not retrieve queues telemetry",
+        "emptyTitle": "No active queues",
+        "emptyDescription": "No queues are registered for the selected criteria.",
+        "colQueue": "Queue",
+        "colPending": "Pending",
+        "colClaimed": "Claimed",
+        "colFailed": "Failed (DLQ)",
+        "colMaxAge": "Max age",
+        "colStatus": "Status",
+        "secondsValue": "{{seconds}} s",
+        "statuses": {
+          "critico": "CRITICAL",
+          "atencion": "WARNING",
+          "normal": "NORMAL"
+        }
+      }
+    },
+    "opsModels": {
+      "title": "LLM Models & Core Services Metrics",
+      "subtitle": "Availability, latency, error rate, tier escalations, and financial segregation",
+      "rbacDenied": "Role {{role}} is not authorized to view LLM model and provider telemetry.",
+      "loadingMessage": "Querying LLM models and providers metrics...",
+      "errorTitle": "Model telemetry unavailable",
+      "emptyTitle": "No model metrics for applied filter",
+      "emptyDescription": "Adjust provider, tier, or time window to view results.",
+      "filters": {
+        "regionLabel": "Model telemetry filters",
+        "windowLabel": "Time window",
+        "windowAria": "Model time window",
+        "providerLabel": "Provider",
+        "tierLabel": "Tier",
+        "all": "All",
+        "comparePrevious": "Compare with previous period"
+      },
+      "health": {
+        "regionLabel": "Dependencies and infrastructure health",
+        "title": "Core Services & Dependencies Health",
+        "operational": "OPERATIONAL",
+        "degraded": "DEGRADED",
+        "services": {
+          "postgres": "Postgres",
+          "blob": "Blob Storage",
+          "telemetria": "Telemetry",
+          "agregados": "Aggregates"
+        }
+      },
+      "availabilityAlert": {
+        "title": "Critical availability alert (< 99% in 1-hour window):",
+        "item": "{{availability}} availability"
+      },
+      "escalations": {
+        "regionLabel": "LLM tier escalations",
+        "flashToPro": "Flash -> Pro Escalations",
+        "proToFable": "Pro -> Fable Escalations",
+        "toHuman": "Human Escalations (Fallback)",
+        "vsPrevious": "vs previous: {{delta}}",
+        "noChange": "no change"
+      },
+      "tiers": {
+        "regionLabel": "Tokens and estimated cost by tier",
+        "flashTitle": "Flash Tier Usage",
+        "proTitle": "Pro Tier Usage",
+        "fableTitle": "Fable Tier Usage (Segregated)",
+        "tokensSuffix": "{{tokens}} tokens",
+        "estimatedCost": "Estimated cost:",
+        "independentCost": "Independent cost:"
+      },
+      "tables": {
+        "standardTitle": "Performance by Model & Provider — Standard Tiers (Flash & Pro)",
+        "standardSubtitle": "Standard operational execution aggregated by selected window, never mixed with Fable.",
+        "fableTitle": "Fable Tier — Advanced Reasoning (Strict Segregation)",
+        "fableSubtitle": "Reported independently: its calls, latencies, and rates are never averaged with Flash or Pro.",
+        "colProvider": "Provider",
+        "colModel": "Model",
+        "colTier": "Tier",
+        "colCalls": "Calls",
+        "colAvailability": "Availability %",
+        "colLatencyP50": "P50 Latency (ms)",
+        "colLatencyP95": "P95 Latency (ms)",
+        "colErrorRate": "Error Rate %",
+        "colDelta": "Delta vs previous period",
+        "msValue": "{{ms}} ms",
+        "deltaCalls": "Calls {{delta}}",
+        "deltaP95": "P95 {{delta}}"
+      }
+    },
+    "opsSla": {
+      "title": "SLA Compliance & Service Incidents",
+      "subtitle": "Operational observability of service level agreements, justified pauses, and per-case clock.",
+      "rbacDenied": "Role {{role}} is not authorized to view service level agreement compliance.",
+      "exportButton": "Export SLA",
+      "loadingMessage": "Loading SLA compliance metrics and cases...",
+      "errorTitle": "Error loading service level agreement compliance",
+      "emptyTitle": "No SLA cases for selected filters",
+      "emptyDescription": "No executions or service level incidents were recorded for the chosen cycle or plan.",
+      "emptyAction": "View full current cycle",
+      "freshness": {
+        "staleBadge": "Stale data (> 6 h)",
+        "okBadge": "Operational freshness",
+        "recent": "Recent update",
+        "syncing": "Syncing update...",
+        "unavailable": "Update date unavailable",
+        "secondsAgo": "Updated a few seconds ago",
+        "minutesAgo": "Updated {{count}} min ago",
+        "hoursAgo": "Updated {{count}} h ago",
+        "daysAgo": "Updated {{count}} d ago"
+      },
+      "filters": {
+        "regionLabel": "SLA compliance filters",
+        "cycleLabel": "Commercial cycle (YYYY-MM)",
+        "currentCycleOption": "{{cycle}} (Current cycle)",
+        "planLabel": "Commercial plan",
+        "planWithHours": "{{plan}} ({{hours}} h)",
+        "onlyRiskOrBreached": "At-risk or breached cases only"
+      },
+      "kpis": {
+        "regionLabel": "SLA executive summary",
+        "globalCompliance": "Global Compliance",
+        "insufficientSample": "Insufficient sample (minimum 5 evaluated cases)",
+        "withinTarget": "{{within}} within target out of {{evaluated}} evaluated",
+        "atRisk": "Cases at Risk",
+        "atRiskBadge": "Alert > 75%",
+        "atRiskSub": "Active runs exceeding 75% of target",
+        "breached": "Breached Cases",
+        "breachedTickets": "Tickets: {{tickets}}",
+        "noBreachedTickets": "No breached tickets in current view",
+        "totalEvaluated": "Total Evaluated",
+        "cycleVolume": "Total cycle volume: {{total}} cases"
+      },
+      "planBreakdown": {
+        "regionLabel": "Compliance breakdown by commercial plan",
+        "title": "Breakdown by Commercial Plan",
+        "planHours": "{{plan}} ({{hours}} hours)",
+        "casesCount": "{{count}} cases",
+        "complianceLabel": "Compliance:",
+        "p95Value": "p95: {{value}}",
+        "hoursValue": "{{hours}} h",
+        "progressAria": "Compliance for plan {{plan}}"
+      },
+      "table": {
+        "regionLabel": "Cases and SLA clock table",
+        "title": "Per-Case Clock Tracking ({{count}})",
+        "hint": "Select a Job ID to inspect the chronological breakdown and justified pauses.",
+        "emptyFiltered": "No individual cases match the applied filter.",
+        "tableAria": "SLA compliance cases and clock tracking",
+        "colJobId": "Job ID",
+        "colTicket": "Ticket",
+        "colCustomerTenant": "Customer / Tenant",
+        "colPlan": "Plan",
+        "colTarget": "SLA Target (h)",
+        "colElapsed": "Elapsed (h)",
+        "colGross": "Gross (h)",
+        "colPaused": "Paused (h)",
+        "colResult": "Result",
+        "inspectClockAria": "View SLA clock breakdown for {{jobId}}",
+        "hoursValue": "{{hours}} h",
+        "showingPage": "Showing page {{page}} of {{pages}} · Total: {{total}} cases"
+      },
+      "results": {
+        "dentro": "WITHIN SLA",
+        "en_riesgo": "AT RISK",
+        "incumplido": "BREACHED",
+        "en_curso": "IN PROGRESS",
+        "sin_objetivo": "NO TARGET"
+      }
+    }
+  }
+}

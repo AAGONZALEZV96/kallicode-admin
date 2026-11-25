@@ -17,8 +17,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { useAuth } from "../estado/auth";
+import { formatCurrencyEUR, formatDate, formatPercent } from "../i18n/formatters";
 import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 import { Select } from "../componentes/Select";
@@ -87,71 +89,48 @@ export interface UpgradeRequestsResponse {
   alguna_enmascarada?: boolean;
 }
 
-// ------------------------------------------------------------------ Opciones Selectores
-const OPCIONES_PLAN = [
-  { valor: "todos", etiqueta: "Todos los planes" },
-  { valor: "starter", etiqueta: "Starter" },
-  { valor: "growth", etiqueta: "Growth" },
-  { valor: "enterprise", etiqueta: "Enterprise" },
-];
-
-const OPCIONES_ESTADO_SUBS = [
-  { valor: "todos", etiqueta: "Todos los estados" },
-  { valor: "activa", etiqueta: "Activa" },
-  { valor: "periodo_gracia", etiqueta: "Periodo de gracia" },
-  { valor: "suspendida", etiqueta: "Suspendida" },
-  { valor: "finalizada", etiqueta: "Finalizada / Baja" },
-];
-
-const OPCIONES_RANGO_RENOVACION = [
-  { valor: "todos", etiqueta: "Cualquier plazo" },
-  { valor: "15", etiqueta: "Próximos 15 días (Crítico)" },
-  { valor: "30", etiqueta: "Próximos 30 días" },
-  { valor: "60", etiqueta: "Próximos 60 días" },
-  { valor: "90", etiqueta: "Próximos 90 días" },
-];
-
-const OPCIONES_ESTADO_UPGRADE = [
-  { valor: "pendiente", etiqueta: "Pendientes (Por defecto)" },
-  { valor: "todos", etiqueta: "Todos los estados" },
-  { valor: "atendida", etiqueta: "Atendidas" },
-  { valor: "rechazada", etiqueta: "Rechazadas" },
-];
-
-const OPCIONES_PAGE_SIZE = [
-  { valor: 10, etiqueta: "10 por pág." },
-  { valor: 25, etiqueta: "25 por pág." },
-  { valor: 50, etiqueta: "50 por pág." },
-  { valor: 100, etiqueta: "100 por pág." },
-];
-
-function formatearMoneda(importe: number, moneda = "EUR"): string {
-  try {
-    return new Intl.NumberFormat("es-ES", {
-      style: "currency",
-      currency: moneda || "EUR",
-      minimumFractionDigits: 2,
-    }).format(importe);
-  } catch {
-    return `${importe.toFixed(2)} ${moneda}`;
-  }
-}
-
-function formatearFecha(fechaStr?: string | null): string {
-  if (!fechaStr) return "—";
-  try {
-    const d = new Date(fechaStr);
-    return isNaN(d.getTime())
-      ? fechaStr
-      : d.toLocaleDateString("es-ES", { year: "numeric", month: "short", day: "numeric" });
-  } catch {
-    return fechaStr;
-  }
-}
-
 export const BizSubscriptions: React.FC = () => {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage || i18n.language;
   const { usuario } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const opcionesPlan = [
+    { valor: "todos", etiqueta: t("common.plans.all") },
+    { valor: "starter", etiqueta: t("common.plans.starter") },
+    { valor: "growth", etiqueta: t("common.plans.growth") },
+    { valor: "enterprise", etiqueta: t("common.plans.enterprise") },
+  ];
+
+  const opcionesEstadoSubs = [
+    { valor: "todos", etiqueta: t("common.statuses.all") },
+    { valor: "activa", etiqueta: t("common.statuses.activa") },
+    { valor: "periodo_gracia", etiqueta: t("common.statuses.periodo_gracia") },
+    { valor: "suspendida", etiqueta: t("common.statuses.suspendida") },
+    { valor: "finalizada", etiqueta: t("common.statuses.finalizada_baja") },
+  ];
+
+  const opcionesRangoRenovacion = [
+    { valor: "todos", etiqueta: t("views.bizSubscriptions.renewals.windows.all") },
+    { valor: "15", etiqueta: t("views.bizSubscriptions.renewals.windows.d15") },
+    { valor: "30", etiqueta: t("views.bizSubscriptions.renewals.windows.d30") },
+    { valor: "60", etiqueta: t("views.bizSubscriptions.renewals.windows.d60") },
+    { valor: "90", etiqueta: t("views.bizSubscriptions.renewals.windows.d90") },
+  ];
+
+  const opcionesEstadoUpgrade = [
+    { valor: "pendiente", etiqueta: t("views.bizSubscriptions.upgrades.statuses.pendiente") },
+    { valor: "todos", etiqueta: t("views.bizSubscriptions.upgrades.statuses.todos") },
+    { valor: "atendida", etiqueta: t("views.bizSubscriptions.upgrades.statuses.atendida") },
+    { valor: "rechazada", etiqueta: t("views.bizSubscriptions.upgrades.statuses.rechazada") },
+  ];
+
+  const opcionesPageSize = [
+    { valor: 10, etiqueta: t("common.pagination.perPageOption", { count: 10 }) },
+    { valor: 25, etiqueta: t("common.pagination.perPageOption", { count: 25 }) },
+    { valor: 50, etiqueta: t("common.pagination.perPageOption", { count: 50 }) },
+    { valor: 100, etiqueta: t("common.pagination.perPageOption", { count: 100 }) },
+  ];
 
   // Gestión de pestaña activa (sincronizada en URL: tab=renovaciones | tab=solicitudes)
   const tabActiva = searchParams.get("tab") === "solicitudes" ? "solicitudes" : "renovaciones";
@@ -324,17 +303,16 @@ export const BizSubscriptions: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
             <span style={{ fontSize: "1.75rem" }} aria-hidden="true">🚫</span>
             <h2 style={{ margin: 0, fontSize: "1.25rem", color: "var(--bad, #ef4444)" }}>
-              Acceso Restringido (403 ROL_STAFF_INSUFICIENTE)
+              {t("common.errors.http403.title")}
             </h2>
           </div>
           <p style={{ color: "var(--text)", margin: "0 0 1rem 0", fontSize: "0.9375rem" }}>
-            La gestión comercial de suscripciones y solicitudes de cambio de plan está restringida exclusivamente a{" "}
-            <strong>staff_negocio</strong> y <strong>staff_admin</strong>.
+            {t("views.bizSubscriptions.rbacDenied")}
           </p>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <Link to="/ops/agents">
               <Boton variante="secondary" tamano="sm">
-                Ir a Operaciones
+                {t("views.bizSubscriptions.goToOps")}
               </Boton>
             </Link>
           </div>
@@ -374,17 +352,17 @@ export const BizSubscriptions: React.FC = () => {
               gap: "0.5rem",
             }}
           >
-            Gestión de Suscripciones y Renovaciones
+            {t("views.bizSubscriptions.title")}
           </h1>
           <p style={{ color: "var(--muted)", margin: "0.25rem 0 0 0", fontSize: "0.875rem" }}>
-            Supervisión del ciclo comercial, radar de renovaciones y tramitación de solicitudes de cambio de plan.
+            {t("views.bizSubscriptions.subtitle")}
           </p>
         </div>
 
         {/* Selector de Pestañas */}
         <div
           role="tablist"
-          aria-label="Vistas de suscripciones"
+          aria-label={t("views.bizSubscriptions.tabsAria")}
           style={{
             display: "flex",
             backgroundColor: "var(--surface)",
@@ -414,7 +392,8 @@ export const BizSubscriptions: React.FC = () => {
               transition: "all 0.15s ease",
             }}
           >
-            Radar de Renovaciones {dataSubs?.total !== undefined ? `(${dataSubs.total})` : ""}
+            {t("views.bizSubscriptions.tabRenewals")}{" "}
+            {dataSubs?.total !== undefined ? `(${dataSubs.total})` : ""}
           </button>
           <button
             role="tab"
@@ -433,14 +412,18 @@ export const BizSubscriptions: React.FC = () => {
               transition: "all 0.15s ease",
             }}
           >
-            Cola de Upgrades {dataUpgrades?.total !== undefined ? `(${dataUpgrades.total})` : ""}
+            {t("views.bizSubscriptions.tabUpgrades")}{" "}
+            {dataUpgrades?.total !== undefined ? `(${dataUpgrades.total})` : ""}
           </button>
         </div>
       </header>
 
       {/* ---------------------------------------------------------------- PANEL 1: RENOVACIONES */}
       {tabActiva === "renovaciones" && (
-        <section aria-label="Directorio y Radar de Renovaciones" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <section
+          aria-label={t("views.bizSubscriptions.renewals.regionLabel")}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           {/* Barra de Filtros y Búsqueda */}
           <div
             style={{
@@ -460,10 +443,10 @@ export const BizSubscriptions: React.FC = () => {
                 <Input
                   id="filtro-busqueda-subs"
                   data-testid="input-busqueda-subs"
-                  placeholder="Buscar tenant o cliente..."
+                  placeholder={t("views.bizSubscriptions.renewals.searchPlaceholder")}
                   value={terminoBusqueda}
                   onChange={(e) => setTerminoBusqueda(e.target.value)}
-                  aria-label="Buscar suscripciones"
+                  aria-label={t("views.bizSubscriptions.renewals.searchAria")}
                 />
               </div>
 
@@ -471,10 +454,10 @@ export const BizSubscriptions: React.FC = () => {
                 <Select
                   id="filtro-plan-subs"
                   data-testid="select-plan-subs"
-                  opciones={OPCIONES_PLAN}
+                  opciones={opcionesPlan}
                   value={planSubs}
                   onChange={(e) => actualizarParams({ plan: e.target.value, page: 1 })}
-                  aria-label="Filtrar por plan"
+                  aria-label={t("views.bizSubscriptions.renewals.planAria")}
                 />
               </div>
 
@@ -482,10 +465,10 @@ export const BizSubscriptions: React.FC = () => {
                 <Select
                   id="filtro-estado-subs"
                   data-testid="select-estado-subs"
-                  opciones={OPCIONES_ESTADO_SUBS}
+                  opciones={opcionesEstadoSubs}
                   value={estadoSubs}
                   onChange={(e) => actualizarParams({ estado: e.target.value, page: 1 })}
-                  aria-label="Filtrar por estado"
+                  aria-label={t("views.bizSubscriptions.renewals.statusAria")}
                 />
               </div>
 
@@ -493,10 +476,10 @@ export const BizSubscriptions: React.FC = () => {
                 <Select
                   id="filtro-renovacion-subs"
                   data-testid="select-renovacion-subs"
-                  opciones={OPCIONES_RANGO_RENOVACION}
+                  opciones={opcionesRangoRenovacion}
                   value={renuevaEnDiasSubs}
                   onChange={(e) => actualizarParams({ renueva_en_dias: e.target.value, page: 1 })}
-                  aria-label="Filtrar por plazo de renovación"
+                  aria-label={t("views.bizSubscriptions.renewals.windowAria")}
                 />
               </div>
             </div>
@@ -507,9 +490,11 @@ export const BizSubscriptions: React.FC = () => {
                 tamano="sm"
                 onClick={() => refetchSubs()}
                 disabled={cargandoSubs || refrescandoSubs}
-                aria-label="Refrescar datos de suscripciones"
+                aria-label={t("views.bizSubscriptions.renewals.refreshAria")}
               >
-                {refrescandoSubs ? "Actualizando..." : "↻ Refrescar"}
+                {refrescandoSubs
+                  ? t("common.actions.refreshing")
+                  : t("views.bizSubscriptions.renewals.refreshLabel")}
               </Boton>
             </div>
           </div>
@@ -523,12 +508,12 @@ export const BizSubscriptions: React.FC = () => {
             filasCarga={5}
             columnasCarga={9}
             alReintentar={() => refetchSubs()}
-            tituloVacio="No se encontraron suscripciones"
-            descripcionVacio="No existen contratos que coincidan con los filtros comerciales aplicados."
+            tituloVacio={t("views.bizSubscriptions.renewals.emptyTitle")}
+            descripcionVacio={t("views.bizSubscriptions.renewals.emptyDescription")}
             alAccionarVacio={() =>
               actualizarParams({ plan: null, estado: null, renueva_en_dias: null, q: null, page: 1 })
             }
-            textoAccionVacio="Limpiar filtros"
+            textoAccionVacio={t("common.actions.clearFilters")}
           >
             {dataSubs && (
               <div
@@ -540,38 +525,38 @@ export const BizSubscriptions: React.FC = () => {
                 }}
               >
                 <div style={{ overflowX: "auto" }}>
-                  <Tabla aria-label="Listado de suscripciones y radar de renovaciones">
+                  <Tabla aria-label={t("views.bizSubscriptions.renewals.tableAria")}>
                     <TablaEncabezado>
                       <TablaFila>
                         <TablaCeldaEncabezado
                           onClick={() => alternarOrdenSubs("tenant_id")}
                           style={{ cursor: "pointer" }}
                         >
-                          Organización (Tenant){getIndicadorOrden("tenant_id")}
+                          {t("views.bizSubscriptions.renewals.colTenant")}{getIndicadorOrden("tenant_id")}
                         </TablaCeldaEncabezado>
                         <TablaCeldaEncabezado
                           onClick={() => alternarOrdenSubs("nombre")}
                           style={{ cursor: "pointer" }}
                         >
-                          Razón Social{getIndicadorOrden("nombre")}
+                          {t("views.bizSubscriptions.renewals.colName")}{getIndicadorOrden("nombre")}
                         </TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Plan</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Estado</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Inicia El</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colPlan")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colStatus")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colStart")}</TablaCeldaEncabezado>
                         <TablaCeldaEncabezado
                           onClick={() => alternarOrdenSubs("renovacion")}
                           style={{ cursor: "pointer" }}
                         >
-                          Renueva El{getIndicadorOrden("renovacion")}
+                          {t("views.bizSubscriptions.renewals.colRenew")}{getIndicadorOrden("renovacion")}
                         </TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Días Renovación</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colDays")}</TablaCeldaEncabezado>
                         <TablaCeldaEncabezado
                           onClick={() => alternarOrdenSubs("importe")}
                           style={{ cursor: "pointer" }}
                         >
-                          Importe / Mes{getIndicadorOrden("importe")}
+                          {t("views.bizSubscriptions.renewals.colAmount")}{getIndicadorOrden("importe")}
                         </TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>% Cuota Uso</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colQuota")}</TablaCeldaEncabezado>
                       </TablaFila>
                     </TablaEncabezado>
                     <TablaCuerpo>
@@ -611,7 +596,7 @@ export const BizSubscriptions: React.FC = () => {
                                 {sub.enmascarado ? (
                                   <button
                                     onClick={() => handleAbrirConcesion(sub.tenant_id, sub.razon_social)}
-                                    title="Dato enmascarado por política de privacidad. Clic para solicitar revelación justificada."
+                                    title={t("views.bizSubscriptions.maskedTooltip")}
                                     style={{
                                       background: "none",
                                       border: "none",
@@ -620,10 +605,10 @@ export const BizSubscriptions: React.FC = () => {
                                     }}
                                     data-testid={`btn-revelar-${sub.tenant_id}`}
                                   >
-                                    <Badge variante="warn">ENMASCARADO</Badge>
+                                    <Badge variante="warn">{t("common.states.masked")}</Badge>
                                   </button>
                                 ) : (
-                                  <Badge variante="good">EN CLARO</Badge>
+                                  <Badge variante="good">{t("common.states.unmasked")}</Badge>
                                 )}
                               </div>
                             </TablaCelda>
@@ -657,31 +642,35 @@ export const BizSubscriptions: React.FC = () => {
                             </TablaCelda>
 
                             <TablaCelda style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                              {formatearFecha(sub.inicia_el)}
+                              {formatDate(sub.inicia_el, undefined, lang)}
                             </TablaCelda>
 
                             <TablaCelda style={{ fontSize: "0.8125rem" }}>
-                              {formatearFecha(sub.renueva_el)}
+                              {formatDate(sub.renueva_el, undefined, lang)}
                             </TablaCelda>
 
                             <TablaCelda>
                               <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
-                                <span style={{ fontWeight: 600 }}>{sub.dias_para_renovacion}d</span>
+                                <span style={{ fontWeight: 600 }}>
+                                  {t("views.bizSubscriptions.renewals.daysShort", {
+                                    days: sub.dias_para_renovacion,
+                                  })}
+                                </span>
                                 {esCritica && (
                                   <Badge variante="bad" data-testid="alerta-renovacion-critica">
-                                    ≤ 15 días
+                                    {t("views.bizSubscriptions.renewals.critical15")}
                                   </Badge>
                                 )}
                                 {esAdvertencia && (
                                   <Badge variante="warn" data-testid="alerta-renovacion-aviso">
-                                    ≤ 30 días
+                                    {t("views.bizSubscriptions.renewals.warning30")}
                                   </Badge>
                                 )}
                               </div>
                             </TablaCelda>
 
                             <TablaCelda style={{ fontWeight: 600 }}>
-                              {formatearMoneda(sub.importe_mes, sub.moneda)}
+                              {formatCurrencyEUR(sub.importe_mes, sub.moneda, lang)}
                             </TablaCelda>
 
                             <TablaCelda>
@@ -710,11 +699,13 @@ export const BizSubscriptions: React.FC = () => {
                                     />
                                   </div>
                                   <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                                    {sub.cuota_uso_pct.toFixed(1)}%
+                                    {formatPercent(sub.cuota_uso_pct, { decimals: 1, lang })}
                                   </span>
                                 </div>
                               ) : (
-                                <span style={{ color: "var(--muted)", fontSize: "0.8125rem" }}>—</span>
+                                <span style={{ color: "var(--muted)", fontSize: "0.8125rem" }}>
+                                  {t("common.states.noData")}
+                                </span>
                               )}
                             </TablaCelda>
                           </TablaFila>
@@ -738,8 +729,12 @@ export const BizSubscriptions: React.FC = () => {
                   }}
                 >
                   <div style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                    Mostrando {dataSubs.items.length} de {dataSubs.total} suscripciones (Pág. {dataSubs.page} de{" "}
-                    {dataSubs.pages})
+                    {t("views.bizSubscriptions.renewals.showing", {
+                      count: dataSubs.items.length,
+                      total: dataSubs.total,
+                      page: dataSubs.page,
+                      pages: dataSubs.pages,
+                    })}
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -747,10 +742,10 @@ export const BizSubscriptions: React.FC = () => {
                       <Select
                         id="select-pagesize-subs"
                         data-testid="select-pagesize-subs"
-                        opciones={OPCIONES_PAGE_SIZE}
+                        opciones={opcionesPageSize}
                         value={pageSizeSubs}
                         onChange={(e) => actualizarParams({ page_size: Number(e.target.value), page: 1 })}
-                        aria-label="Elementos por página"
+                        aria-label={t("common.pagination.itemsPerPage")}
                       />
                     </div>
 
@@ -759,18 +754,18 @@ export const BizSubscriptions: React.FC = () => {
                       tamano="sm"
                       disabled={pageSubs <= 1}
                       onClick={() => actualizarParams({ page: pageSubs - 1 })}
-                      aria-label="Página anterior"
+                      aria-label={t("common.pagination.previousPage")}
                     >
-                      Anterior
+                      {t("common.pagination.previous")}
                     </Boton>
                     <Boton
                       variante="secondary"
                       tamano="sm"
                       disabled={pageSubs >= dataSubs.pages}
                       onClick={() => actualizarParams({ page: pageSubs + 1 })}
-                      aria-label="Página siguiente"
+                      aria-label={t("common.pagination.nextPage")}
                     >
-                      Siguiente
+                      {t("common.pagination.next")}
                     </Boton>
                   </div>
                 </footer>
@@ -782,7 +777,10 @@ export const BizSubscriptions: React.FC = () => {
 
       {/* ---------------------------------------------------------------- PANEL 2: SOLICITUDES UPGRADE */}
       {tabActiva === "solicitudes" && (
-        <section aria-label="Cola de Solicitudes de Upgrade" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <section
+          aria-label={t("views.bizSubscriptions.upgrades.regionLabel")}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           {/* Barra de Filtros de Solicitudes */}
           <div
             style={{
@@ -802,10 +800,10 @@ export const BizSubscriptions: React.FC = () => {
                 <Select
                   id="filtro-estado-upg"
                   data-testid="select-estado-upg"
-                  opciones={OPCIONES_ESTADO_UPGRADE}
+                  opciones={opcionesEstadoUpgrade}
                   value={estadoUpgrades}
                   onChange={(e) => actualizarParams({ estado_upg: e.target.value, page_upg: 1 })}
-                  aria-label="Filtrar solicitudes por estado"
+                  aria-label={t("views.bizSubscriptions.upgrades.statusAria")}
                 />
               </div>
 
@@ -813,15 +811,15 @@ export const BizSubscriptions: React.FC = () => {
                 <Select
                   id="filtro-plan-deseado-upg"
                   data-testid="select-plan-deseado-upg"
-                  opciones={OPCIONES_PLAN}
+                  opciones={opcionesPlan}
                   value={planDeseadoUpgrades}
                   onChange={(e) => actualizarParams({ plan_deseado_upg: e.target.value, page_upg: 1 })}
-                  aria-label="Filtrar por plan deseado"
+                  aria-label={t("views.bizSubscriptions.upgrades.desiredPlanAria")}
                 />
               </div>
 
               <div style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                Orden automático: <strong>más antiguas primero</strong> (antigüedad descendente).
+                {t("views.bizSubscriptions.upgrades.autoOrderHint")}
               </div>
             </div>
 
@@ -830,9 +828,11 @@ export const BizSubscriptions: React.FC = () => {
               tamano="sm"
               onClick={() => refetchUpgrades()}
               disabled={cargandoUpgrades || refrescandoUpgrades}
-              aria-label="Refrescar solicitudes"
+              aria-label={t("views.bizSubscriptions.upgrades.refreshAria")}
             >
-              {refrescandoUpgrades ? "Actualizando..." : "↻ Refrescar"}
+              {refrescandoUpgrades
+                ? t("common.actions.refreshing")
+                : t("views.bizSubscriptions.renewals.refreshLabel")}
             </Boton>
           </div>
 
@@ -845,10 +845,10 @@ export const BizSubscriptions: React.FC = () => {
             filasCarga={4}
             columnasCarga={8}
             alReintentar={() => refetchUpgrades()}
-            tituloVacio="No hay solicitudes de upgrade"
-            descripcionVacio="No constan peticiones de cambio de plan pendientes o con los filtros seleccionados."
+            tituloVacio={t("views.bizSubscriptions.upgrades.emptyTitle")}
+            descripcionVacio={t("views.bizSubscriptions.upgrades.emptyDescription")}
             alAccionarVacio={() => actualizarParams({ estado_upg: "todos", plan_deseado_upg: null, page_upg: 1 })}
-            textoAccionVacio="Ver todas las solicitudes"
+            textoAccionVacio={t("views.bizSubscriptions.upgrades.emptyAction")}
           >
             {dataUpgrades && (
               <div
@@ -860,17 +860,17 @@ export const BizSubscriptions: React.FC = () => {
                 }}
               >
                 <div style={{ overflowX: "auto" }}>
-                  <Tabla aria-label="Cola de solicitudes de upgrade y cambio de plan">
+                  <Tabla aria-label={t("views.bizSubscriptions.upgrades.tableAria")}>
                     <TablaEncabezado>
                       <TablaFila>
-                        <TablaCeldaEncabezado>ID Solicitud</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Organización</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Razón Social</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Transición de Plan</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Solicitado El</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Antigüedad</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Prioridad</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>Estado</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colId")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colTenant")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colName")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colTransition")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colRequested")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colAge")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colPriority")}</TablaCeldaEncabezado>
+                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colStatus")}</TablaCeldaEncabezado>
                       </TablaFila>
                     </TablaEncabezado>
                     <TablaCuerpo>
@@ -900,7 +900,7 @@ export const BizSubscriptions: React.FC = () => {
                               {upg.enmascarado ? (
                                 <button
                                   onClick={() => handleAbrirConcesion(upg.tenant_id, upg.razon_social)}
-                                  title="Dato enmascarado por política de privacidad. Clic para solicitar revelación justificada."
+                                  title={t("views.bizSubscriptions.maskedTooltip")}
                                   style={{
                                     background: "none",
                                     border: "none",
@@ -909,10 +909,10 @@ export const BizSubscriptions: React.FC = () => {
                                   }}
                                   data-testid={`btn-revelar-upg-${upg.solicitud_id}`}
                                 >
-                                  <Badge variante="warn">ENMASCARADO</Badge>
+                                  <Badge variante="warn">{t("common.states.masked")}</Badge>
                                 </button>
                               ) : (
-                                <Badge variante="good">EN CLARO</Badge>
+                                <Badge variante="good">{t("common.states.unmasked")}</Badge>
                               )}
                             </div>
                           </TablaCelda>
@@ -926,20 +926,22 @@ export const BizSubscriptions: React.FC = () => {
                           </TablaCelda>
 
                           <TablaCelda style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                            {formatearFecha(upg.solicitado_el)}
+                            {formatDate(upg.solicitado_el, undefined, lang)}
                           </TablaCelda>
 
                           <TablaCelda>
-                            <span style={{ fontWeight: 600 }}>{upg.antiguedad_h}h</span>
+                            <span style={{ fontWeight: 600 }}>
+                              {t("views.bizSubscriptions.upgrades.ageHours", { hours: upg.antiguedad_h })}
+                            </span>
                           </TablaCelda>
 
                           <TablaCelda>
                             {upg.urgente ? (
                               <Badge variante="bad" data-testid="badge-urgente">
-                                🔥 Urgente
+                                {t("views.bizSubscriptions.upgrades.urgent")}
                               </Badge>
                             ) : (
-                              <Badge variante="neutro">Normal</Badge>
+                              <Badge variante="neutro">{t("views.bizSubscriptions.upgrades.normal")}</Badge>
                             )}
                           </TablaCelda>
 
@@ -976,8 +978,12 @@ export const BizSubscriptions: React.FC = () => {
                   }}
                 >
                   <div style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                    Mostrando {dataUpgrades.items.length} de {dataUpgrades.total} solicitudes (Pág.{" "}
-                    {dataUpgrades.page} de {dataUpgrades.pages})
+                    {t("views.bizSubscriptions.upgrades.showing", {
+                      count: dataUpgrades.items.length,
+                      total: dataUpgrades.total,
+                      page: dataUpgrades.page,
+                      pages: dataUpgrades.pages,
+                    })}
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -986,18 +992,18 @@ export const BizSubscriptions: React.FC = () => {
                       tamano="sm"
                       disabled={pageUpgrades <= 1}
                       onClick={() => actualizarParams({ page_upg: pageUpgrades - 1 })}
-                      aria-label="Página anterior de solicitudes"
+                      aria-label={t("views.bizSubscriptions.upgrades.prevAria")}
                     >
-                      Anterior
+                      {t("common.pagination.previous")}
                     </Boton>
                     <Boton
                       variante="secondary"
                       tamano="sm"
                       disabled={pageUpgrades >= dataUpgrades.pages}
                       onClick={() => actualizarParams({ page_upg: pageUpgrades + 1 })}
-                      aria-label="Página siguiente de solicitudes"
+                      aria-label={t("views.bizSubscriptions.upgrades.nextAria")}
                     >
-                      Siguiente
+                      {t("common.pagination.next")}
                     </Boton>
                   </div>
                 </footer>

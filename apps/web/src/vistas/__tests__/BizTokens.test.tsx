@@ -114,7 +114,7 @@ describe("BizTokens — Pruebas de Componentes React y Gráficos de Tendencias [
       // Cuota de Consumo Media
       const cardCuota = screen.getByTestId("card-porcentaje-cuota");
       expect(cardCuota.textContent).toContain("Consumo Medio de Cuota");
-      expect(cardCuota.textContent).toContain("83.8%");
+      expect(cardCuota.textContent).toMatch(/83,8\s*%/);
       expect(cardCuota.textContent).toContain("AVISO");
 
       // Cuadre con Facturación
@@ -166,7 +166,7 @@ describe("BizTokens — Pruebas de Componentes React y Gráficos de Tendencias [
 
       const cardCuota = screen.getByTestId("card-porcentaje-cuota");
       expect(cardCuota.textContent).toContain("SATURADA (>100%)");
-      expect(cardCuota.textContent).toContain("120.0%");
+      expect(cardCuota.textContent).toMatch(/120,0\s*%/);
     });
 
     it("muestra badge NORMAL cuando la cuota media es inferior al 80%", async () => {
@@ -212,7 +212,7 @@ describe("BizTokens — Pruebas de Componentes React y Gráficos de Tendencias [
 
       const cardCuota = screen.getByTestId("card-porcentaje-cuota");
       expect(cardCuota.textContent).toContain("NORMAL");
-      expect(cardCuota.textContent).toContain("55.0%");
+      expect(cardCuota.textContent).toMatch(/55,0\s*%/);
     });
   });
 

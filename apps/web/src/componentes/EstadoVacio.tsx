@@ -9,6 +9,7 @@
  */
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Boton } from "./Boton";
 
 export interface EstadoVacioProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -23,11 +24,11 @@ export interface EstadoVacioProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export const EstadoVacio: React.FC<EstadoVacioProps> = ({
-  titulo = "Sin datos disponibles",
-  descripcion = "No se encontraron registros que coincidan con la consulta o los filtros aplicados.",
+  titulo,
+  descripcion,
   icono,
   alAccionar,
-  textoAccion = "Limpiar filtros",
+  textoAccion,
   accion,
   compacto = false,
   className = "",
@@ -35,10 +36,15 @@ export const EstadoVacio: React.FC<EstadoVacioProps> = ({
   "data-testid": dataTestId = "estado-vacio",
   ...props
 }) => {
+  const { t } = useTranslation();
+  const tituloEfectivo = titulo ?? t("common.states.emptyTitle");
+  const descripcionEfectiva = descripcion ?? t("common.states.emptyDescription");
+  const textoAccionEfectivo = textoAccion ?? t("common.actions.clearFilters");
+
   return (
     <div
       role="region"
-      aria-label={titulo}
+      aria-label={tituloEfectivo}
       data-testid={dataTestId}
       className={`kc-estado-vacio card ${className}`.trim()}
       style={{
@@ -82,7 +88,7 @@ export const EstadoVacio: React.FC<EstadoVacioProps> = ({
           margin: 0,
         }}
       >
-        {titulo}
+        {tituloEfectivo}
       </h3>
 
       {/* Descripción amigable */}
@@ -95,7 +101,7 @@ export const EstadoVacio: React.FC<EstadoVacioProps> = ({
           lineHeight: "var(--leading-normal, 1.5)",
         }}
       >
-        {descripcion}
+        {descripcionEfectiva}
       </p>
 
       {/* Acción sugerida */}
@@ -108,7 +114,7 @@ export const EstadoVacio: React.FC<EstadoVacioProps> = ({
                 onClick={alAccionar}
                 data-testid="btn-accion-vacio"
               >
-                {textoAccion}
+                {textoAccionEfectivo}
               </Boton>
             )
           )}

@@ -15,8 +15,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi, ApiError } from "../api/clienteApi";
 import { useAuth } from "../estado/auth";
+import { formatDate, formatNumber, formatPercent, formatTokens } from "../i18n/formatters";
 import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 import { Select } from "../componentes/Select";
@@ -67,31 +69,33 @@ export interface ClientesResponse {
   alguna_enmascarada?: boolean;
 }
 
-const OPCIONES_PLAN = [
-  { valor: "todos", etiqueta: "Todos los planes" },
-  { valor: "starter", etiqueta: "Starter" },
-  { valor: "growth", etiqueta: "Growth" },
-  { valor: "enterprise", etiqueta: "Enterprise" },
-];
-
-const OPCIONES_ESTADO = [
-  { valor: "todos", etiqueta: "Todos los estados" },
-  { valor: "activa", etiqueta: "Activa" },
-  { valor: "periodo_gracia", etiqueta: "Periodo de gracia / Moroso" },
-  { valor: "suspendida", etiqueta: "Suspendida" },
-  { valor: "finalizada", etiqueta: "Finalizada / Baja" },
-];
-
-const OPCIONES_PAGE_SIZE = [
-  { valor: 10, etiqueta: "10 por pág." },
-  { valor: 25, etiqueta: "25 por pág." },
-  { valor: 50, etiqueta: "50 por pág." },
-  { valor: 100, etiqueta: "100 por pág." },
-];
-
 export const BizCustomers: React.FC = () => {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage || i18n.language;
   const { usuario } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const opcionesPlan = [
+    { valor: "todos", etiqueta: t("common.plans.all") },
+    { valor: "starter", etiqueta: t("common.plans.starter") },
+    { valor: "growth", etiqueta: t("common.plans.growth") },
+    { valor: "enterprise", etiqueta: t("common.plans.enterprise") },
+  ];
+
+  const opcionesEstado = [
+    { valor: "todos", etiqueta: t("common.statuses.all") },
+    { valor: "activa", etiqueta: t("common.statuses.activa") },
+    { valor: "periodo_gracia", etiqueta: t("common.statuses.periodo_gracia_moroso") },
+    { valor: "suspendida", etiqueta: t("common.statuses.suspendida") },
+    { valor: "finalizada", etiqueta: t("common.statuses.finalizada_baja") },
+  ];
+
+  const opcionesPageSize = [
+    { valor: 10, etiqueta: t("common.pagination.perPageOption", { count: 10 }) },
+    { valor: 25, etiqueta: t("common.pagination.perPageOption", { count: 25 }) },
+    { valor: 50, etiqueta: t("common.pagination.perPageOption", { count: 50 }) },
+    { valor: 100, etiqueta: t("common.pagination.perPageOption", { count: 100 }) },
+  ];
 
   // Control de modales: explicativo y operativo de concesión
   const [modalInformativoAbierto, setModalInformativoAbierto] = useState<boolean>(false);
@@ -197,11 +201,11 @@ export const BizCustomers: React.FC = () => {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Badge variante="error">ACCESO DENEGADO</Badge>
-          <strong style={{ fontSize: "1.1rem" }}>403 ROL_STAFF_INSUFICIENTE</strong>
+          <Badge variante="error">{t("common.errors.accessDeniedBadge")}</Badge>
+          <strong style={{ fontSize: "1.1rem" }}>{t("common.errors.accessDeniedCode")}</strong>
         </div>
         <p style={{ color: "var(--muted)", margin: "0.5rem 0" }}>
-          Acceso denegado para el rol {usuario?.role}. El directorio de clientes y organizaciones es exclusivo para personal de soporte, negocio y administración.
+          {t("views.bizCustomers.rbacDenied", { role: usuario?.role })}
         </p>
       </main>
     );
@@ -248,15 +252,15 @@ export const BizCustomers: React.FC = () => {
       dataTestIdTrace="customers-trace-id"
       tituloError={
         (error as ApiError)?.status === 503 || (error as ApiError)?.codigo === "AGREGADO_NO_DISPONIBLE"
-          ? "AGREGADOS EN REFRESCO"
+          ? t("common.errors.aggregatesRefreshing")
           : undefined
       }
       mensajeError={
         (error as ApiError)?.status === 503 || (error as ApiError)?.codigo === "AGREGADO_NO_DISPONIBLE"
-          ? "La capa de agregados analíticos está en refresco en PostgreSQL."
+          ? t("views.bizCustomers.error503Message")
           : undefined
       }
-      textoBotonReintento="Reintentar consulta"
+      textoBotonReintento={t("common.actions.retryQuery")}
       alReintentar={() => void refetch()}
     >
       {data && (
@@ -277,10 +281,10 @@ export const BizCustomers: React.FC = () => {
           >
             <div>
               <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>
-                Directorio de Clientes y Organizaciones
+                {t("views.bizCustomers.title")}
               </h1>
               <p style={{ fontSize: "0.875rem", color: "var(--muted)", margin: "0.25rem 0 0 0" }}>
-                Supervisión cross-tenant de suscripciones, consumo y actividad operativa.
+                {t("views.bizCustomers.subtitle")}
               </p>
             </div>
 
@@ -290,14 +294,14 @@ export const BizCustomers: React.FC = () => {
                   variante="ghost"
                   tamano="sm"
                   onClick={() => setModalInformativoAbierto(true)}
-                  aria-label="Ver información sobre política de enmascaramiento"
+                  aria-label={t("views.bizCustomers.privacyPolicyAria")}
                 >
-                  Política de Privacidad y Enmascaramiento
+                  {t("views.bizCustomers.privacyPolicyButton")}
                 </Boton>
               )}
               <ControlExportarReporte
                 tipo="clientes"
-                etiquetaBoton="Exportar Clientes"
+                etiquetaBoton={t("views.bizCustomers.exportButton")}
                 formatosPermitidos={["csv", "xlsx", "pdf"]}
                 rolesPermitidos={["staff_negocio", "staff_admin"]}
               />
@@ -306,9 +310,9 @@ export const BizCustomers: React.FC = () => {
                 tamano="sm"
                 onClick={() => void refetch()}
                 disabled={isFetching}
-                aria-label="Refrescar listado de clientes"
+                aria-label={t("views.bizCustomers.refreshAria")}
               >
-                {isFetching ? "Actualizando..." : "Refrescar"}
+                {isFetching ? t("common.actions.refreshing") : t("common.actions.refresh")}
               </Boton>
             </div>
           </header>
@@ -330,9 +334,9 @@ export const BizCustomers: React.FC = () => {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Badge variante="warn">ENMASCARADO ACTIVO</Badge>
+                <Badge variante="warn">{t("views.bizCustomers.maskingBanner.badge")}</Badge>
                 <span style={{ fontSize: "0.8125rem", color: "var(--text)" }}>
-                  Los datos sensibles de clientes están protegidos por defecto bajo la política de privacidad. Para ver en claro se requiere una solicitud de concesión aprobada.
+                  {t("views.bizCustomers.maskingBanner.text")}
                 </span>
               </div>
               <Boton
@@ -348,14 +352,14 @@ export const BizCustomers: React.FC = () => {
                   setModalConcesionAbierto(true);
                 }}
               >
-                Solicitar acceso justificado
+                {t("common.actions.requestJustifiedAccess")}
               </Boton>
             </div>
           )}
 
       {/* Barra de Filtros, Búsqueda y Ordenación */}
       <section
-        aria-label="Controles de búsqueda y filtros de organizaciones"
+        aria-label={t("views.bizCustomers.filters.regionLabel")}
         style={{
           display: "flex",
           flexWrap: "wrap",
@@ -371,8 +375,8 @@ export const BizCustomers: React.FC = () => {
         <div style={{ flex: "1 1 200px", minWidth: "min(100%, 200px)" }}>
           <Input
             id="filtro-busqueda-clientes"
-            etiqueta="Buscar por ID u organización"
-            placeholder="org_acme, Acme..."
+            etiqueta={t("views.bizCustomers.filters.searchLabel")}
+            placeholder={t("views.bizCustomers.filters.searchPlaceholder")}
             value={busquedaInput}
             onChange={(e) => setBusquedaInput(e.target.value)}
           />
@@ -382,8 +386,8 @@ export const BizCustomers: React.FC = () => {
         <div style={{ flex: "1 1 140px", minWidth: "min(100%, 140px)" }}>
           <Select
             id="filtro-plan-clientes"
-            etiqueta="Plan comercial"
-            opciones={OPCIONES_PLAN}
+            etiqueta={t("views.bizCustomers.filters.planLabel")}
+            opciones={opcionesPlan}
             value={plan}
             onChange={(e) => actualizarParams({ plan: e.target.value, page: 1 })}
           />
@@ -393,8 +397,8 @@ export const BizCustomers: React.FC = () => {
         <div style={{ flex: "1 1 150px", minWidth: "min(100%, 150px)" }}>
           <Select
             id="filtro-estado-clientes"
-            etiqueta="Estado"
-            opciones={OPCIONES_ESTADO}
+            etiqueta={t("views.bizCustomers.filters.statusLabel")}
+            opciones={opcionesEstado}
             value={estado}
             onChange={(e) => actualizarParams({ estado: e.target.value, page: 1 })}
           />
@@ -411,24 +415,24 @@ export const BizCustomers: React.FC = () => {
                 setSearchParams({});
               }}
             >
-              Limpiar filtros
+              {t("common.actions.clearFilters")}
             </Boton>
           </div>
         )}
       </section>
 
       {/* Tabla Densa de Organizaciones */}
-      <section aria-label="Listado de organizaciones cliente">
+      <section aria-label={t("views.bizCustomers.table.regionLabel")}>
         <Tabla
           densidad="alta"
           estadoVacio={
             items.length === 0 ? (
               <div data-testid="estado-vacio-clientes" style={{ padding: "2rem", textAlign: "center" }}>
                 <p style={{ color: "var(--text)", fontWeight: 600, margin: "0 0 0.5rem 0" }}>
-                  No se encontraron organizaciones
+                  {t("views.bizCustomers.empty.title")}
                 </p>
                 <p style={{ color: "var(--muted)", fontSize: "0.875rem", margin: 0 }}>
-                  Prueba a ajustar los criterios de búsqueda o filtros seleccionados.
+                  {t("views.bizCustomers.empty.description")}
                 </p>
               </div>
             ) : undefined
@@ -441,7 +445,7 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("tenant_id") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                Tenant ID{iconoOrden("tenant_id")}
+                {t("views.bizCustomers.table.colTenant")}{iconoOrden("tenant_id")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -449,7 +453,7 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("nombre") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                Razón Social{iconoOrden("nombre")}
+                {t("views.bizCustomers.table.colName")}{iconoOrden("nombre")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -457,7 +461,7 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("plan") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                Plan{iconoOrden("plan")}
+                {t("views.bizCustomers.table.colPlan")}{iconoOrden("plan")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -465,11 +469,11 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("estado") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                Estado{iconoOrden("estado")}
+                {t("views.bizCustomers.table.colStatus")}{iconoOrden("estado")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado numerico>
-                Líneas
+                {t("views.bizCustomers.table.colLines")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -478,7 +482,7 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("consumo") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                Consumo (Ciclo){iconoOrden("consumo")}
+                {t("views.bizCustomers.table.colUsage")}{iconoOrden("consumo")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -486,15 +490,15 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("actualizado_en") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                Última Actividad{iconoOrden("actualizado_en")}
+                {t("views.bizCustomers.table.colLastActivity")}{iconoOrden("actualizado_en")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado>
-                Privacidad
+                {t("views.bizCustomers.table.colPrivacy")}
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado style={{ textAlign: "right" }}>
-                Acciones
+                {t("views.bizCustomers.table.colActions")}
               </TablaCeldaEncabezado>
             </TablaFila>
           </TablaEncabezado>
@@ -512,7 +516,7 @@ export const BizCustomers: React.FC = () => {
                       textDecoration: "none",
                       fontWeight: 600,
                     }}
-                    aria-label={`Ver detalles de ${c.tenant_id}`}
+                    aria-label={t("views.bizCustomers.table.viewDetailsAria", { tenantId: c.tenant_id })}
                   >
                     {c.tenant_id}
                   </Link>
@@ -524,7 +528,7 @@ export const BizCustomers: React.FC = () => {
                     <span
                       data-testid={`razon-enmascarada-${c.tenant_id}`}
                       style={{ color: "var(--muted)", fontStyle: "italic" }}
-                      title="Dato enmascarado por política de privacidad y enmascaramiento"
+                      title={t("views.bizCustomers.table.maskedTitle")}
                     >
                       {c.razon_social}
                     </span>
@@ -560,11 +564,11 @@ export const BizCustomers: React.FC = () => {
                 {/* 5. Líneas Contratadas */}
                 <TablaCelda numerico>
                   <span style={{ fontWeight: 600, color: "var(--text)" }}>
-                    {c.lineas_contratadas}
+                    {formatNumber(c.lineas_contratadas, undefined, lang)}
                   </span>
                   {c.lineas_activas !== undefined && (
                     <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.25rem" }}>
-                      ({c.lineas_activas} act.)
+                      {t("views.bizCustomers.table.activeLines", { count: c.lineas_activas })}
                     </span>
                   )}
                 </TablaCelda>
@@ -573,22 +577,23 @@ export const BizCustomers: React.FC = () => {
                 <TablaCelda numerico>
                   <div>
                     <span style={{ fontWeight: 600, color: "var(--text)" }}>
-                      {c.consumo_ciclo.loc.toLocaleString("es-ES")} LOC
+                      {t("views.bizCustomers.table.locLabel", {
+                        count: formatNumber(c.consumo_ciclo.loc, undefined, lang),
+                      })}
                     </span>
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                    {(c.consumo_ciclo.tokens / 1000000).toFixed(1)}M tok ({c.consumo_ciclo.cuota_pct}%)
+                    {t("views.bizCustomers.table.tokensQuota", {
+                      tokens: formatTokens(c.consumo_ciclo.tokens, { compact: true, lang }),
+                      pct: formatPercent(c.consumo_ciclo.cuota_pct, { decimals: 1, lang }),
+                    })}
                   </div>
                 </TablaCelda>
 
                 {/* 7. Última Actividad */}
                 <TablaCelda>
                   <time dateTime={c.ultima_actividad} style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                    {new Date(c.ultima_actividad).toLocaleDateString("es-ES", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {formatDate(c.ultima_actividad, { year: "numeric", month: "short", day: "numeric" }, lang)}
                   </time>
                 </TablaCelda>
 
@@ -597,7 +602,7 @@ export const BizCustomers: React.FC = () => {
                   {c.enmascarado ? (
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
                       <Badge variante="warn" data-testid={`badge-enmascarado-${c.tenant_id}`} punto>
-                        ENMASCARADO
+                        {t("common.states.masked")}
                       </Badge>
                       <Boton
                         variante="ghost"
@@ -609,12 +614,12 @@ export const BizCustomers: React.FC = () => {
                         data-testid={`btn-solicitar-concesion-${c.tenant_id}`}
                         style={{ fontSize: "0.6875rem", padding: "2px 6px" }}
                       >
-                        Solicitar acceso
+                        {t("common.actions.requestAccess")}
                       </Boton>
                     </div>
                   ) : (
                     <Badge variante="good" data-testid={`badge-claro-${c.tenant_id}`}>
-                      EN CLARO
+                      {t("common.states.unmasked")}
                     </Badge>
                   )}
                 </TablaCelda>
@@ -626,7 +631,7 @@ export const BizCustomers: React.FC = () => {
                     className="btn btn-secondary btn-sm"
                     style={{ textDecoration: "none", fontSize: "0.75rem" }}
                   >
-                    Ver 360°
+                    {t("common.actions.view360")}
                   </Link>
                 </TablaCelda>
               </TablaFila>
@@ -652,9 +657,7 @@ export const BizCustomers: React.FC = () => {
       >
         {/* Recuento de items */}
         <div style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-          Mostrando <strong style={{ color: "var(--text)" }}>{inicioRango}</strong> a{" "}
-          <strong style={{ color: "var(--text)" }}>{finRango}</strong> de{" "}
-          <strong style={{ color: "var(--text)" }}>{total}</strong> organizaciones
+          {t("common.pagination.showingRange", { from: inicioRango, to: finRango, total })}
         </div>
 
         {/* Controles de página y tamaño */}
@@ -663,16 +666,15 @@ export const BizCustomers: React.FC = () => {
           <div style={{ minWidth: "120px" }}>
             <Select
               id="filtro-tamano-pagina"
-              aria-label="Registros por página"
-              opciones={OPCIONES_PAGE_SIZE}
+              aria-label={t("common.pagination.recordsPerPage")}
+              opciones={opcionesPageSize}
               value={pageSize}
               onChange={(e) => actualizarParams({ page_size: parseInt(e.target.value, 10), page: 1 })}
             />
           </div>
 
           <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-            Página <strong style={{ color: "var(--text)" }}>{page}</strong> de{" "}
-            <strong style={{ color: "var(--text)" }}>{Math.max(1, pages)}</strong>
+            {t("common.pagination.pageOf", { page, pages: Math.max(1, pages) })}
           </span>
 
           {/* Botones de navegación de página */}
@@ -682,7 +684,7 @@ export const BizCustomers: React.FC = () => {
               tamano="sm"
               disabled={page <= 1}
               onClick={() => actualizarParams({ page: 1 })}
-              aria-label="Primera página"
+              aria-label={t("common.pagination.firstPage")}
             >
               «
             </Boton>
@@ -691,25 +693,25 @@ export const BizCustomers: React.FC = () => {
               tamano="sm"
               disabled={page <= 1}
               onClick={() => actualizarParams({ page: page - 1 })}
-              aria-label="Página anterior"
+              aria-label={t("common.pagination.previousPage")}
             >
-              Anterior
+              {t("common.pagination.previous")}
             </Boton>
             <Boton
               variante="secondary"
               tamano="sm"
               disabled={page >= pages}
               onClick={() => actualizarParams({ page: page + 1 })}
-              aria-label="Página siguiente"
+              aria-label={t("common.pagination.nextPage")}
             >
-              Siguiente
+              {t("common.pagination.next")}
             </Boton>
             <Boton
               variante="ghost"
               tamano="sm"
               disabled={page >= pages}
               onClick={() => actualizarParams({ page: pages })}
-              aria-label="Última página"
+              aria-label={t("common.pagination.lastPage")}
             >
               »
             </Boton>
@@ -721,11 +723,11 @@ export const BizCustomers: React.FC = () => {
       <Modal
         abierto={modalInformativoAbierto}
         alCerrar={() => setModalInformativoAbierto(false)}
-        titulo="Política de Privacidad y Acceso Justificado"
+        titulo={t("views.bizCustomers.privacyModal.title")}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <p style={{ color: "var(--text)", margin: 0, fontSize: "0.875rem" }}>
-            Bajo las directivas de seguridad de la Consola de Administración de KalliCode, la razón social, correos y datos sensibles de clientes se muestran <strong>enmascarados por defecto</strong> para todo el personal.
+            {t("views.bizCustomers.privacyModal.intro")}
           </p>
           <div
             style={{
@@ -738,17 +740,17 @@ export const BizCustomers: React.FC = () => {
             }}
           >
             <p style={{ margin: "0 0 0.5rem 0", color: "var(--text)", fontWeight: 600 }}>
-              Condiciones para revelación en claro:
+              {t("views.bizCustomers.privacyModal.conditionsTitle")}
             </p>
             <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-              <li>Debe existir una solicitud de concesión aprobada autorizada con justificación operativa.</li>
-              <li>Toda consulta sobre datos revelados queda registrada en la cadena de auditoría inmutable de la plataforma.</li>
-              <li>Las concesiones son temporales y expiran automáticamente tras su ventana de validez.</li>
+              <li>{t("views.bizCustomers.privacyModal.cond1")}</li>
+              <li>{t("views.bizCustomers.privacyModal.cond2")}</li>
+              <li>{t("views.bizCustomers.privacyModal.cond3")}</li>
             </ul>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <Boton variante="primary" tamano="sm" onClick={() => setModalInformativoAbierto(false)}>
-              Entendido
+              {t("common.actions.understood")}
             </Boton>
           </div>
         </div>

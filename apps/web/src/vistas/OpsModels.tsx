@@ -12,9 +12,11 @@ import {
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { peticionApi } from "../api/clienteApi";
 import { useOptionalAuth } from "../estado/auth";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
+import { formatCurrencyEUR, formatNumber, formatPercent, formatTokens } from "../i18n/formatters";
 import { ControlesLiveRefresh } from "../componentes/ControlesLiveRefresh";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { Badge } from "../componentes/Badge";
@@ -170,23 +172,14 @@ const DATOS_DEFECTO: OpsModelsDatos = {
   },
 };
 
-function formatearTokens(tokens: number | undefined): string {
-  if (tokens === undefined || !Number.isFinite(tokens)) return "—";
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)} M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)} k`;
-  return String(tokens);
-}
-
-function formatearEuro(importe: number | undefined): string {
-  if (importe === undefined || !Number.isFinite(importe)) return "—";
-  return `${importe.toFixed(2)} €`;
-}
-
-function calcularDeltaPorcentual(actual: number, previo: number | undefined): string | null {
+function calcularDeltaPorcentual(
+  actual: number,
+  previo: number | undefined,
+  lang?: string
+): string | null {
   if (previo === undefined || !Number.isFinite(previo) || previo === 0) return null;
   const pct = ((actual - previo) / previo) * 100;
-  const signo = pct > 0 ? "+" : "";
-  return `${signo}${pct.toFixed(1)}%`;
+  return formatPercent(pct, { decimals: 1, includeSign: true, lang });
 }
 
 function estiloBadgeTier(tier: TierModelo): React.CSSProperties {
@@ -230,6 +223,9 @@ const TablaModelosSeccion: React.FC<TablaModelosSeccionProps> = ({
   comparacion,
   mostrarComparativa,
 }) => {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage || i18n.language;
+
   const prevPorModelo = useMemo(() => {
     const mapa = new Map<string, ModeloMetrica>();
     for (const prev of comparacion?.proveedores ?? []) {
@@ -258,27 +254,27 @@ const TablaModelosSeccion: React.FC<TablaModelosSeccionProps> = ({
         <Tabla densidad="alta">
           <TablaEncabezado>
             <TablaFila>
-              <TablaCeldaEncabezado scope="col">Proveedor</TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col">Modelo</TablaCeldaEncabezado>
-              <TablaCeldaEncabezado scope="col">Tier</TablaCeldaEncabezado>
+              <TablaCeldaEncabezado scope="col">{t("views.opsModels.tables.colProvider")}</TablaCeldaEncabezado>
+              <TablaCeldaEncabezado scope="col">{t("views.opsModels.tables.colModel")}</TablaCeldaEncabezado>
+              <TablaCeldaEncabezado scope="col">{t("views.opsModels.tables.colTier")}</TablaCeldaEncabezado>
               <TablaCeldaEncabezado scope="col" numerico>
-                Llamadas
+                {t("views.opsModels.tables.colCalls")}
               </TablaCeldaEncabezado>
               <TablaCeldaEncabezado scope="col" numerico>
-                Disponibilidad %
+                {t("views.opsModels.tables.colAvailability")}
               </TablaCeldaEncabezado>
               <TablaCeldaEncabezado scope="col" numerico>
-                Latencia P50 (ms)
+                {t("views.opsModels.tables.colLatencyP50")}
               </TablaCeldaEncabezado>
               <TablaCeldaEncabezado scope="col" numerico>
-                Latencia P95 (ms)
+                {t("views.opsModels.tables.colLatencyP95")}
               </TablaCeldaEncabezado>
               <TablaCeldaEncabezado scope="col" numerico>
-                Tasa de Error %
+                {t("views.opsModels.tables.colErrorRate")}
               </TablaCeldaEncabezado>
               {mostrarComparativa && (
                 <TablaCeldaEncabezado scope="col" numerico>
-                  Delta vs período anterior
+                  {t("views.opsModels.tables.colDelta")}
                 </TablaCeldaEncabezado>
               )}
             </TablaFila>
@@ -290,10 +286,10 @@ const TablaModelosSeccion: React.FC<TablaModelosSeccionProps> = ({
               const previo = prevPorModelo.get(m.modelo);
               const deltaLlamadas =
                 previo && m.llamadas !== undefined
-                  ? calcularDeltaPorcentual(m.llamadas, previo.llamadas)
+                  ? calcularDeltaPorcentual(m.llamadas, previo.llamadas, lang)
                   : null;
               const deltaLatencia = previo
-                ? calcularDeltaPorcentual(m.latencia_p95_ms, previo.latencia_p95_ms)
+                ? calcularDeltaPorcentual(m.latencia_p95_ms, previo.latencia_p95_ms, lang)
                 : null;
 
               return (
@@ -328,8 +324,8 @@ const TablaModelosSeccion: React.FC<TablaModelosSeccionProps> = ({
                   </TablaCelda>
                   <TablaCelda numerico>
                     {m.llamadas !== undefined && Number.isFinite(m.llamadas)
-                      ? m.llamadas.toLocaleString("es-ES")
-                      : "—"}
+                      ? formatNumber(m.llamadas, undefined, lang)
+                      : t("common.states.noData")}
                   </TablaCelda>
                   <TablaCelda numerico>
                     <span
@@ -342,24 +338,36 @@ const TablaModelosSeccion: React.FC<TablaModelosSeccionProps> = ({
                         fontWeight: 600,
                       }}
                     >
-                      {m.disponibilidad_pct.toFixed(2)}%
+                      {formatPercent(m.disponibilidad_pct, { decimals: 2, lang })}
                     </span>
                   </TablaCelda>
                   <TablaCelda numerico>
                     {m.latencia_p50_ms !== null && m.latencia_p50_ms !== undefined
-                      ? `${m.latencia_p50_ms} ms`
-                      : "—"}
+                      ? t("views.opsModels.tables.msValue", {
+                          ms: formatNumber(m.latencia_p50_ms, undefined, lang),
+                        })
+                      : t("common.states.noData")}
                   </TablaCelda>
-                  <TablaCelda numerico>{m.latencia_p95_ms} ms</TablaCelda>
-                  <TablaCelda numerico>{m.tasa_error_pct.toFixed(2)}%</TablaCelda>
+                  <TablaCelda numerico>
+                    {t("views.opsModels.tables.msValue", {
+                      ms: formatNumber(m.latencia_p95_ms, undefined, lang),
+                    })}
+                  </TablaCelda>
+                  <TablaCelda numerico>
+                    {formatPercent(m.tasa_error_pct, { decimals: 2, lang })}
+                  </TablaCelda>
                   {mostrarComparativa && (
                     <TablaCelda numerico>
                       <span
                         data-testid={`delta-${m.modelo}`}
                         style={{ fontSize: "12px", color: "var(--muted)" }}
                       >
-                        {deltaLlamadas ? `Llamadas ${deltaLlamadas}` : "—"}
-                        {deltaLatencia ? ` · P95 ${deltaLatencia}` : ""}
+                        {deltaLlamadas
+                          ? t("views.opsModels.tables.deltaCalls", { delta: deltaLlamadas })
+                          : t("common.states.noData")}
+                        {deltaLatencia
+                          ? ` · ${t("views.opsModels.tables.deltaP95", { delta: deltaLatencia })}`
+                          : ""}
                       </span>
                     </TablaCelda>
                   )}
@@ -382,6 +390,8 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
   datosIniciales,
   usarFallbackLocal = false,
 }) => {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage || i18n.language;
   const auth = useOptionalAuth();
   const usuario = auth?.usuario ?? null;
 
@@ -577,11 +587,11 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-          <Badge variante="error">ACCESO DENEGADO</Badge>
-          <strong>403 ROL_STAFF_INSUFICIENTE</strong>
+          <Badge variante="error">{t("common.errors.accessDeniedBadge")}</Badge>
+          <strong>{t("common.errors.accessDeniedCode")}</strong>
         </div>
         <p style={{ color: "var(--muted)", margin: 0 }}>
-          El rol {usuario?.role} no tiene autorización para consultar la telemetría de modelos LLM y proveedores.
+          {t("views.opsModels.rbacDenied", { role: usuario?.role })}
         </p>
       </main>
     );
@@ -615,10 +625,10 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
       >
         <div>
           <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0, color: "var(--text)" }}>
-            Métricas de Modelos LLM y Servicios Core
+            {t("views.opsModels.title")}
           </h1>
           <p style={{ fontSize: "0.8125rem", color: "var(--muted)", margin: "4px 0 0 0" }}>
-            Disponibilidad, latencia, tasa de error, escalados entre tiers y segregación financiera
+            {t("views.opsModels.subtitle")}
           </p>
         </div>
 
@@ -627,7 +637,7 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
 
       {/* Filtros reactivos */}
       <section
-        aria-label="Filtros de telemetría de modelos"
+        aria-label={t("views.opsModels.filters.regionLabel")}
         className="card"
         style={{
           display: "flex",
@@ -638,11 +648,11 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>
-            Ventana temporal
+            {t("views.opsModels.filters.windowLabel")}
           </span>
           <div
             role="group"
-            aria-label="Ventana temporal de modelos"
+            aria-label={t("views.opsModels.filters.windowAria")}
             data-testid="selector-ventana-models"
             style={{
               display: "inline-flex",
@@ -681,12 +691,12 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
         <div style={{ minWidth: "180px" }}>
           <Select
             id="ops-models-proveedor"
-            etiqueta="Proveedor"
+            etiqueta={t("views.opsModels.filters.providerLabel")}
             data-testid="filtro-proveedor"
             value={proveedorFiltro}
             onChange={(e) => setProveedorFiltro(e.target.value)}
             opciones={[
-              { valor: "todos", etiqueta: "Todos" },
+              { valor: "todos", etiqueta: t("views.opsModels.filters.all") },
               { valor: "anthropic", etiqueta: "Anthropic" },
               { valor: "google", etiqueta: "Google" },
               { valor: "deepseek", etiqueta: "DeepSeek" },
@@ -698,12 +708,12 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
         <div style={{ minWidth: "150px" }}>
           <Select
             id="ops-models-tier"
-            etiqueta="Tier"
+            etiqueta={t("views.opsModels.filters.tierLabel")}
             data-testid="filtro-tier"
             value={tierFiltro}
             onChange={(e) => setTierFiltro(e.target.value)}
             opciones={[
-              { valor: "todos", etiqueta: "Todos" },
+              { valor: "todos", etiqueta: t("views.opsModels.filters.all") },
               { valor: "flash", etiqueta: "Flash" },
               { valor: "pro", etiqueta: "Pro" },
               { valor: "fable", etiqueta: "Fable" },
@@ -727,21 +737,25 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
             checked={compararPeriodo}
             onChange={(e) => setCompararPeriodo(e.target.checked)}
           />
-          Comparar con período anterior
+          {t("views.opsModels.filters.comparePrevious")}
         </label>
       </section>
 
       {/* Salud de Servicios y Dependencias Core */}
-      <section className="card" aria-label="Salud de dependencias e infraestructura" data-testid="panel-salud-servicios">
+      <section
+        className="card"
+        aria-label={t("views.opsModels.health.regionLabel")}
+        data-testid="panel-salud-servicios"
+      >
         <h2 style={{ fontSize: "14px", fontWeight: 650, margin: "0 0 12px 0" }}>
-          Salud de Servicios y Dependencias Core
+          {t("views.opsModels.health.title")}
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
           {[
-            { clave: "postgres", etiqueta: "Postgres", ok: serviciosCore.postgres },
-            { clave: "blob", etiqueta: "Blob Storage", ok: serviciosCore.blob },
-            { clave: "telemetria", etiqueta: "Telemetría", ok: serviciosCore.telemetria },
-            { clave: "agregados", etiqueta: "Agregados", ok: serviciosCore.agregados },
+            { clave: "postgres", etiqueta: t("views.opsModels.health.services.postgres"), ok: serviciosCore.postgres },
+            { clave: "blob", etiqueta: t("views.opsModels.health.services.blob"), ok: serviciosCore.blob },
+            { clave: "telemetria", etiqueta: t("views.opsModels.health.services.telemetria"), ok: serviciosCore.telemetria },
+            { clave: "agregados", etiqueta: t("views.opsModels.health.services.agregados"), ok: serviciosCore.agregados },
           ].map((srv) => (
             <div
               key={srv.clave}
@@ -757,7 +771,7 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
             >
               <span style={{ fontSize: "13px", fontWeight: 500 }}>{srv.etiqueta}</span>
               <Badge variante={srv.ok ? "good" : "bad"} punto>
-                {srv.ok ? "OPERATIVO" : "DEGRADADO"}
+                {srv.ok ? t("views.opsModels.health.operational") : t("views.opsModels.health.degraded")}
               </Badge>
             </div>
           ))}
@@ -772,10 +786,10 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
         tipoCarga="tabla"
         filasCarga={5}
         columnasCarga={8}
-        mensajeCarga="Consultando métricas de modelos LLM y proveedores..."
-        tituloError="Telemetría de modelos no disponible"
-        tituloVacio="Sin métricas de modelos para el filtro aplicado"
-        descripcionVacio="Ajusta el proveedor, el tier o la ventana temporal para visualizar resultados."
+        mensajeCarga={t("views.opsModels.loadingMessage")}
+        tituloError={t("views.opsModels.errorTitle")}
+        tituloVacio={t("views.opsModels.emptyTitle")}
+        descripcionVacio={t("views.opsModels.emptyDescription")}
         dataTestIdCarga="ops-models-loading"
         dataTestIdError="ops-models-error"
         dataTestIdTrace="ops-models-trace-id"
@@ -797,12 +811,15 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
               }}
             >
               <strong style={{ fontSize: "14px" }}>
-                Alerta crítica de disponibilidad (&lt; 99% en ventana de 1 hora):
+                {t("views.opsModels.availabilityAlert.title")}
               </strong>
               <ul style={{ margin: "6px 0 0 18px", fontSize: "13px" }}>
                 {proveedoresDegradados1h.map((p) => (
                   <li key={`${p.proveedor}-${p.modelo}`}>
-                    <strong>{p.proveedor}</strong> ({p.modelo}): {p.disponibilidad_pct.toFixed(2)}% de disponibilidad
+                    <strong>{p.proveedor}</strong> ({p.modelo}):{" "}
+                    {t("views.opsModels.availabilityAlert.item", {
+                      availability: formatPercent(p.disponibilidad_pct, { decimals: 2, lang }),
+                    })}
                   </li>
                 ))}
               </ul>
@@ -811,53 +828,68 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
 
           {/* Tarjetas de Escalados LLM */}
           <section
-            aria-label="Escalados entre tiers LLM"
+            aria-label={t("views.opsModels.escalations.regionLabel")}
             style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}
           >
             <article className="card" data-testid="kpi-escalado-flash-pro">
-              <div style={{ fontSize: "12px", color: "var(--muted)" }}>Escalados Flash -&gt; Pro</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {t("views.opsModels.escalations.flashToPro")}
+              </div>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--accent)", marginTop: "4px" }}>
-                {escalados.flash_a_pro}
+                {formatNumber(escalados.flash_a_pro, undefined, lang)}
               </div>
               {comparacionActiva && (
                 <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
-                  vs anterior:{" "}
-                  {calcularDeltaPorcentual(
-                    escalados.flash_a_pro,
-                    modelsData?.comparacion?.escalados.flash_a_pro
-                  ) ?? "sin cambio"}
+                  {t("views.opsModels.escalations.vsPrevious", {
+                    delta:
+                      calcularDeltaPorcentual(
+                        escalados.flash_a_pro,
+                        modelsData?.comparacion?.escalados.flash_a_pro,
+                        lang
+                      ) ?? t("views.opsModels.escalations.noChange"),
+                  })}
                 </div>
               )}
             </article>
 
             <article className="card" data-testid="kpi-escalado-pro-fable">
-              <div style={{ fontSize: "12px", color: "var(--muted)" }}>Escalados Pro -&gt; Fable</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {t("views.opsModels.escalations.proToFable")}
+              </div>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--purple)", marginTop: "4px" }}>
-                {escalados.pro_a_fable}
+                {formatNumber(escalados.pro_a_fable, undefined, lang)}
               </div>
               {comparacionActiva && (
                 <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
-                  vs anterior:{" "}
-                  {calcularDeltaPorcentual(
-                    escalados.pro_a_fable,
-                    modelsData?.comparacion?.escalados.pro_a_fable
-                  ) ?? "sin cambio"}
+                  {t("views.opsModels.escalations.vsPrevious", {
+                    delta:
+                      calcularDeltaPorcentual(
+                        escalados.pro_a_fable,
+                        modelsData?.comparacion?.escalados.pro_a_fable,
+                        lang
+                      ) ?? t("views.opsModels.escalations.noChange"),
+                  })}
                 </div>
               )}
             </article>
 
             <article className="card" data-testid="kpi-escalado-humano">
-              <div style={{ fontSize: "12px", color: "var(--muted)" }}>Escalados a Humano (Fallback)</div>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {t("views.opsModels.escalations.toHuman")}
+              </div>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--warn)", marginTop: "4px" }}>
-                {escalados.a_humano}
+                {formatNumber(escalados.a_humano, undefined, lang)}
               </div>
               {comparacionActiva && (
                 <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
-                  vs anterior:{" "}
-                  {calcularDeltaPorcentual(
-                    escalados.a_humano,
-                    modelsData?.comparacion?.escalados.a_humano
-                  ) ?? "sin cambio"}
+                  {t("views.opsModels.escalations.vsPrevious", {
+                    delta:
+                      calcularDeltaPorcentual(
+                        escalados.a_humano,
+                        modelsData?.comparacion?.escalados.a_humano,
+                        lang
+                      ) ?? t("views.opsModels.escalations.noChange"),
+                  })}
                 </div>
               )}
             </article>
@@ -865,37 +897,43 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
 
           {/* Desglose de Tokens Consumidos y Coste Estimado por Tier (sin mezclar Fable) */}
           <section
-            aria-label="Tokens y coste estimado por tier"
+            aria-label={t("views.opsModels.tiers.regionLabel")}
             data-testid="desglose-costes-por-tier"
             style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}
           >
             <article className="card" data-testid="card-tier-flash">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>
-                  Consumo Tier Flash
+                  {t("views.opsModels.tiers.flashTitle")}
                 </span>
                 <Badge style={estiloBadgeTier("flash")}>Flash</Badge>
               </div>
               <div style={{ fontSize: "20px", fontWeight: 700, marginTop: "6px" }}>
-                {formatearTokens(tokensTier.flash)} tokens
+                {t("views.opsModels.tiers.tokensSuffix", {
+                  tokens: formatTokens(tokensTier.flash, { compact: true, lang }),
+                })}
               </div>
               <div style={{ fontSize: "13px", color: "var(--muted)", marginTop: "4px" }}>
-                Coste estimado: <strong>{formatearEuro(costeTier.flash)}</strong>
+                {t("views.opsModels.tiers.estimatedCost")}{" "}
+                <strong>{formatCurrencyEUR(costeTier.flash, "EUR", lang)}</strong>
               </div>
             </article>
 
             <article className="card" data-testid="card-tier-pro">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>
-                  Consumo Tier Pro
+                  {t("views.opsModels.tiers.proTitle")}
                 </span>
                 <Badge style={estiloBadgeTier("pro")}>Pro</Badge>
               </div>
               <div style={{ fontSize: "20px", fontWeight: 700, marginTop: "6px" }}>
-                {formatearTokens(tokensTier.pro)} tokens
+                {t("views.opsModels.tiers.tokensSuffix", {
+                  tokens: formatTokens(tokensTier.pro, { compact: true, lang }),
+                })}
               </div>
               <div style={{ fontSize: "13px", color: "var(--muted)", marginTop: "4px" }}>
-                Coste estimado: <strong>{formatearEuro(costeTier.pro)}</strong>
+                {t("views.opsModels.tiers.estimatedCost")}{" "}
+                <strong>{formatCurrencyEUR(costeTier.pro, "EUR", lang)}</strong>
               </div>
             </article>
 
@@ -906,15 +944,18 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>
-                  Consumo Tier Fable (Segregado)
+                  {t("views.opsModels.tiers.fableTitle")}
                 </span>
                 <Badge style={estiloBadgeTier("fable")}>Fable</Badge>
               </div>
               <div style={{ fontSize: "20px", fontWeight: 700, marginTop: "6px" }}>
-                {formatearTokens(tokensTier.fable)} tokens
+                {t("views.opsModels.tiers.tokensSuffix", {
+                  tokens: formatTokens(tokensTier.fable, { compact: true, lang }),
+                })}
               </div>
               <div style={{ fontSize: "13px", color: "var(--muted)", marginTop: "4px" }}>
-                Coste independiente: <strong>{formatearEuro(costeTier.fable)}</strong>
+                {t("views.opsModels.tiers.independentCost")}{" "}
+                <strong>{formatCurrencyEUR(costeTier.fable, "EUR", lang)}</strong>
               </div>
             </article>
           </section>
@@ -923,8 +964,8 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
           {modelosEstandar.length > 0 && (
             <TablaModelosSeccion
               testId="tabla-modelos-estandar"
-              titulo="Rendimiento por Modelo y Proveedor — Tiers Estándar (Flash y Pro)"
-              subtitulo="Ejecución operativa estándar agregada por ventana seleccionada, sin mezcla con Fable."
+              titulo={t("views.opsModels.tables.standardTitle")}
+              subtitulo={t("views.opsModels.tables.standardSubtitle")}
               modelos={modelosEstandar}
               ventana={ventana}
               comparacion={modelsData?.comparacion}
@@ -936,8 +977,8 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
           {modelosFable.length > 0 && (
             <TablaModelosSeccion
               testId="seccion-fable-segregada"
-              titulo="Tier Fable — Razonamiento Avanzado (Segregación Estricta)"
-              subtitulo="Reportado de forma independiente: sus llamadas, latencias y tarifas no se promedian con Flash ni Pro."
+              titulo={t("views.opsModels.tables.fableTitle")}
+              subtitulo={t("views.opsModels.tables.fableSubtitle")}
               modelos={modelosFable}
               ventana={ventana}
               comparacion={modelsData?.comparacion}

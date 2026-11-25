@@ -80,12 +80,12 @@ describe("OpsModels — Telemetría LLM, Escalados y Segregación Fable", () => 
     expect(screen.getByTestId("kpi-escalado-humano").textContent).toContain("3");
 
     // Tokens y coste segregados por tier
-    expect(screen.getByTestId("card-tier-flash").textContent).toContain("80.0 M tokens");
-    expect(screen.getByTestId("card-tier-flash").textContent).toContain("120.50 €");
-    expect(screen.getByTestId("card-tier-pro").textContent).toContain("35.0 M tokens");
-    expect(screen.getByTestId("card-tier-pro").textContent).toContain("310.20 €");
-    expect(screen.getByTestId("card-tier-fable").textContent).toContain("10.0 M tokens");
-    expect(screen.getByTestId("card-tier-fable").textContent).toContain("450.00 €");
+    expect(screen.getByTestId("card-tier-flash").textContent).toMatch(/80,0\s*M tokens/);
+    expect(screen.getByTestId("card-tier-flash").textContent).toMatch(/120,50\s*€/);
+    expect(screen.getByTestId("card-tier-pro").textContent).toMatch(/35,0\s*M tokens/);
+    expect(screen.getByTestId("card-tier-pro").textContent).toMatch(/310,20\s*€/);
+    expect(screen.getByTestId("card-tier-fable").textContent).toMatch(/10,0\s*M tokens/);
+    expect(screen.getByTestId("card-tier-fable").textContent).toMatch(/450,00\s*€/);
 
     // Cabeceras accesibles con scope="col"
     const headers = container.querySelectorAll("th[scope='col']");
@@ -191,7 +191,7 @@ describe("OpsModels — Telemetría LLM, Escalados y Segregación Fable", () => 
     // Activar comparación con período anterior
     fireEvent.click(screen.getByTestId("toggle-comparar-periodo"));
     await waitFor(() => {
-      expect(screen.getByTestId("delta-gemini-3-flash").textContent).toContain("+25.0%");
+      expect(screen.getByTestId("delta-gemini-3-flash").textContent).toMatch(/\+25,0\s*%/);
     });
 
     // Filtrar por proveedor Anthropic
@@ -259,7 +259,7 @@ describe("OpsModels — Telemetría LLM, Escalados y Segregación Fable", () => 
     const alerta = screen.getByTestId("alerta-disponibilidad-1h");
     expect(alerta.getAttribute("role")).toBe("alert");
     expect(alerta.textContent).toContain("DeepSeek");
-    expect(alerta.textContent).toContain("97.80%");
+    expect(alerta.textContent).toMatch(/97,80\s*%/);
   });
 
   it("5. maneja HTTP 503 TELEMETRIA_NO_DISPONIBLE con ContenedorEstado, X-Trace-Id y recuperación al reintentar", async () => {

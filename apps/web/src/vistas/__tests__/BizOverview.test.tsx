@@ -73,7 +73,7 @@ describe("BizOverview — Panel General de Negocio", () => {
     const kpiMrr = screen.getByTestId("kpi-mrr");
     expect(kpiMrr.textContent).toContain("45.000");
     expect(kpiMrr.textContent).toContain("EUR");
-    expect(kpiMrr.textContent).toContain("+12.5%");
+    expect(kpiMrr.textContent).toMatch(/\+12,5\s*%/);
 
     // 3. Bloque 2: Clientes Activos (total, altas, cancelaciones)
     const kpiClientes = screen.getByTestId("kpi-clientes-activos");
@@ -90,8 +90,8 @@ describe("BizOverview — Panel General de Negocio", () => {
     // 5. Bloque 4: Rendimiento del Pipeline (Tickets, p50 y tasa de escalado)
     const kpiPipeline = screen.getByTestId("kpi-pipeline");
     expect(kpiPipeline.textContent).toContain("450");
-    expect(kpiPipeline.textContent).toContain("p50: 2.4h");
-    expect(kpiPipeline.textContent).toContain("4.5%");
+    expect(kpiPipeline.textContent).toContain("p50: 2,4h");
+    expect(kpiPipeline.textContent).toMatch(/4,5\s*%/);
 
     // 6. Distribución por planes
     expect(screen.getByTestId("plan-starter")).toBeDefined();
