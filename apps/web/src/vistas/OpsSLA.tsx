@@ -315,6 +315,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [jobSeleccionado, setJobSeleccionado] = useState<string | null>(null);
+  const [mostrarTodasColumnas, setMostrarTodasColumnas] = useState<boolean>(false);
 
   const rolNoAutorizado = Boolean(usuario) && !ROLES_SLA_PERMITIDOS.has(usuario?.role ?? "");
 
@@ -477,7 +478,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <div className="kc-toolbar-actions">
           <div
             data-testid="indicador-frescura-sla"
             style={{
@@ -518,42 +519,35 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
       {/* Barra de filtros dinámicos */}
       <section
         aria-label={t("views.opsSla.filters.regionLabel")}
-        className="card"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "14px",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-        }}
+        className="card kc-filter-bar"
       >
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "flex-end" }}>
-          <div style={{ minWidth: "180px" }}>
-            <Select
-              id="filtro-ciclo-sla"
-              etiqueta={t("views.opsSla.filters.cycleLabel")}
-              value={ciclo}
-              onChange={(e) => {
-                setCiclo(e.target.value);
-                setPage(1);
-              }}
-              opciones={opcionesCiclo}
-            />
-          </div>
+        <div className="kc-filter-item">
+          <Select
+            id="filtro-ciclo-sla"
+            etiqueta={t("views.opsSla.filters.cycleLabel")}
+            value={ciclo}
+            onChange={(e) => {
+              setCiclo(e.target.value);
+              setPage(1);
+            }}
+            opciones={opcionesCiclo}
+          />
+        </div>
 
-          <div style={{ minWidth: "190px" }}>
-            <Select
-              id="filtro-plan-sla"
-              etiqueta={t("views.opsSla.filters.planLabel")}
-              value={planFiltro}
-              onChange={(e) => {
-                setPlanFiltro(e.target.value);
-                setPage(1);
-              }}
-              opciones={opcionesPlan}
-            />
-          </div>
+        <div className="kc-filter-item">
+          <Select
+            id="filtro-plan-sla"
+            etiqueta={t("views.opsSla.filters.planLabel")}
+            value={planFiltro}
+            onChange={(e) => {
+              setPlanFiltro(e.target.value);
+              setPage(1);
+            }}
+            opciones={opcionesPlan}
+          />
+        </div>
 
+        <div className="kc-filter-item-wide">
           <label
             htmlFor="filtro-solo-riesgo-sla"
             style={{
@@ -582,17 +576,19 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
         </div>
 
         {(planFiltro !== "todos" || soloRiesgoOIncumplidos) && (
-          <Boton
-            variante="ghost"
-            tamano="sm"
-            onClick={() => {
-              setPlanFiltro("todos");
-              setSoloRiesgoOIncumplidos(false);
-              setPage(1);
-            }}
-          >
-            {t("common.actions.resetFilters")}
-          </Boton>
+          <div className="kc-filter-actions">
+            <Boton
+              variante="ghost"
+              tamano="sm"
+              onClick={() => {
+                setPlanFiltro("todos");
+                setSoloRiesgoOIncumplidos(false);
+                setPage(1);
+              }}
+            >
+              {t("common.actions.resetFilters")}
+            </Boton>
+          </div>
         )}
       </section>
 
@@ -823,12 +819,27 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                   marginBottom: "12px",
                 }}
               >
-                <h2 style={{ fontSize: "14px", fontWeight: 650, margin: 0 }}>
-                  {t("views.opsSla.table.title", { count: totalRegistros })}
-                </h2>
-                <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-                  {t("views.opsSla.table.hint")}
-                </span>
+                <div>
+                  <h2 style={{ fontSize: "14px", fontWeight: 650, margin: 0 }}>
+                    {t("views.opsSla.table.title", { count: totalRegistros })}
+                  </h2>
+                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                    {t("views.opsSla.table.hint")}
+                  </span>
+                </div>
+                <Boton
+                  variante="ghost"
+                  tamano="sm"
+                  className="kc-columns-toggle"
+                  data-testid="toggle-columnas-completas"
+                  aria-pressed={mostrarTodasColumnas}
+                  aria-label={t("components.table.toggleColumnsAria")}
+                  onClick={() => setMostrarTodasColumnas((prev) => !prev)}
+                >
+                  {mostrarTodasColumnas
+                    ? t("components.table.compactColumns")
+                    : t("components.table.showAllColumns")}
+                </Boton>
               </div>
 
               {filasCasos.length === 0 ? (
@@ -838,26 +849,27 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
               ) : (
                 <Tabla
                   densidad="alta"
+                  mostrarTodasColumnas={mostrarTodasColumnas}
                   aria-label={t("views.opsSla.table.tableAria")}
                 >
                   <TablaEncabezado>
                     <TablaFila>
-                      <TablaCeldaEncabezado scope="col">{t("views.opsSla.table.colJobId")}</TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col">{t("views.opsSla.table.colTicket")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado scope="col" fija>{t("views.opsSla.table.colJobId")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado scope="col" prioridad="baja">{t("views.opsSla.table.colTicket")}</TablaCeldaEncabezado>
                       <TablaCeldaEncabezado scope="col">
                         {t("views.opsSla.table.colCustomerTenant")}
                       </TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col">{t("views.opsSla.table.colPlan")}</TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col" numerico>
+                      <TablaCeldaEncabezado scope="col" prioridad="media">{t("views.opsSla.table.colPlan")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado scope="col" numerico prioridad="media">
                         {t("views.opsSla.table.colTarget")}
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado scope="col" numerico>
                         {t("views.opsSla.table.colElapsed")}
                       </TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col" numerico>
+                      <TablaCeldaEncabezado scope="col" numerico prioridad="baja">
                         {t("views.opsSla.table.colGross")}
                       </TablaCeldaEncabezado>
-                      <TablaCeldaEncabezado scope="col" numerico>
+                      <TablaCeldaEncabezado scope="col" numerico prioridad="baja">
                         {t("views.opsSla.table.colPaused")}
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado scope="col">{t("views.opsSla.table.colResult")}</TablaCeldaEncabezado>
@@ -877,7 +889,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
 
                       return (
                         <TablaFila key={c.job_id} data-testid={`fila-sla-${c.job_id}`}>
-                          <TablaCelda>
+                          <TablaCelda fija>
                             <button
                               type="button"
                               onClick={() => setJobSeleccionado(c.job_id)}
@@ -896,7 +908,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                               {c.job_id}
                             </button>
                           </TablaCelda>
-                          <TablaCelda>
+                          <TablaCelda prioridad="baja">
                             <span className="mono">{c.ticket_numero || c.ticket_id || t("common.states.noData")}</span>
                           </TablaCelda>
                           <TablaCelda>
@@ -907,10 +919,10 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                               </Badge>
                             </div>
                           </TablaCelda>
-                          <TablaCelda>
+                          <TablaCelda prioridad="media">
                             <span style={{ textTransform: "capitalize", fontWeight: 500 }}>{c.plan}</span>
                           </TablaCelda>
-                          <TablaCelda numerico>
+                          <TablaCelda numerico prioridad="media">
                             {c.objetivo_h != null
                               ? t("views.opsSla.table.hoursValue", {
                                   hours: formatDecimal(c.objetivo_h, 1, lang),
@@ -944,12 +956,12 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                               </div>
                             </div>
                           </TablaCelda>
-                          <TablaCelda numerico>
+                          <TablaCelda numerico prioridad="baja">
                             {t("views.opsSla.table.hoursValue", {
                               hours: formatDecimal(bruto, 1, lang),
                             })}
                           </TablaCelda>
-                          <TablaCelda numerico>
+                          <TablaCelda numerico prioridad="baja">
                             {t("views.opsSla.table.hoursValue", {
                               hours: formatDecimal(pausas, 1, lang),
                             })}
@@ -971,12 +983,8 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
               {/* Paginación transversal */}
               <div
                 data-testid="paginacion-ops-sla"
+                className="kc-pagination"
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "12px",
                   marginTop: "14px",
                   paddingTop: "12px",
                   borderTop: "1px solid var(--border, #334155)",
@@ -991,8 +999,8 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
                   })}
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                  <div style={{ width: "140px" }}>
+                <div className="kc-pagination-controls" style={{ gap: "10px" }}>
+                  <div className="kc-pagination-size">
                     <Select
                       id="paginacion-tamano-sla"
                       aria-label={t("common.pagination.recordsPerPage")}

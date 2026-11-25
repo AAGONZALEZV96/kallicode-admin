@@ -246,13 +246,7 @@ export const DetalleRelojSLA: React.FC<DetalleRelojSLAProps> = ({
               </div>
 
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-                  gap: "10px",
-                  alignItems: "center",
-                  marginBottom: "12px",
-                }}
+                className="kc-sla-equation-grid"
               >
                 <div
                   style={{

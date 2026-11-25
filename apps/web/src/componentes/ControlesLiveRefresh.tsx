@@ -127,7 +127,10 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
 
       {/* Selector de frecuencia */}
       {mostrarSelector && (
-        <div style={{ display: "flex", alignItems: "center", minWidth: "200px" }}>
+        <div
+          className="kc-live-refresh-select"
+          style={{ display: "flex", alignItems: "center", minWidth: "200px" }}
+        >
           <Select
             value={activo ? intervaloMs : 0}
             onChange={(e) => {
@@ -179,6 +182,7 @@ export const ControlesLiveRefresh: React.FC<ControlesLiveRefreshProps> = ({
 
       {/* Indicador de próximo refresco, carga y frescura */}
       <span
+        className="kc-live-refresh-status"
         style={{
           marginLeft: "auto",
           fontSize: "12px",

@@ -137,6 +137,7 @@ export const BizSubscriptions: React.FC = () => {
 
   // Modal contextual de concesión de acceso (E6)
   const [modalConcesionAbierto, setModalConcesionAbierto] = useState<boolean>(false);
+  const [mostrarTodasColumnas, setMostrarTodasColumnas] = useState<boolean>(false);
   const [tenantSeleccionadoConcesion, setTenantSeleccionadoConcesion] = useState<{
     id: string;
     nombre: string;
@@ -363,16 +364,13 @@ export const BizSubscriptions: React.FC = () => {
         <div
           role="tablist"
           aria-label={t("views.bizSubscriptions.tabsAria")}
+          className="kc-tabs-scroll"
           style={{
-            display: "flex",
             backgroundColor: "var(--surface)",
             padding: "0.25rem",
             borderRadius: "var(--radius-md, 0.5rem)",
             border: "1px solid var(--border)",
             gap: "0.25rem",
-            overflowX: "auto",
-            maxWidth: "100%",
-            WebkitOverflowScrolling: "touch",
           }}
         >
           <button
@@ -426,65 +424,72 @@ export const BizSubscriptions: React.FC = () => {
         >
           {/* Barra de Filtros y Búsqueda */}
           <div
+            className="kc-filter-bar"
             style={{
               backgroundColor: "var(--card)",
               padding: "1rem",
               borderRadius: "var(--radius-md, 0.5rem)",
               border: "1px solid var(--border)",
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "1rem",
-              justifyContent: "space-between",
             }}
           >
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem", flex: 1 }}>
-              <div style={{ minWidth: "200px", maxWidth: "320px", flex: 1 }}>
-                <Input
-                  id="filtro-busqueda-subs"
-                  data-testid="input-busqueda-subs"
-                  placeholder={t("views.bizSubscriptions.renewals.searchPlaceholder")}
-                  value={terminoBusqueda}
-                  onChange={(e) => setTerminoBusqueda(e.target.value)}
-                  aria-label={t("views.bizSubscriptions.renewals.searchAria")}
-                />
-              </div>
-
-              <div style={{ width: "160px" }}>
-                <Select
-                  id="filtro-plan-subs"
-                  data-testid="select-plan-subs"
-                  opciones={opcionesPlan}
-                  value={planSubs}
-                  onChange={(e) => actualizarParams({ plan: e.target.value, page: 1 })}
-                  aria-label={t("views.bizSubscriptions.renewals.planAria")}
-                />
-              </div>
-
-              <div style={{ width: "180px" }}>
-                <Select
-                  id="filtro-estado-subs"
-                  data-testid="select-estado-subs"
-                  opciones={opcionesEstadoSubs}
-                  value={estadoSubs}
-                  onChange={(e) => actualizarParams({ estado: e.target.value, page: 1 })}
-                  aria-label={t("views.bizSubscriptions.renewals.statusAria")}
-                />
-              </div>
-
-              <div style={{ width: "210px" }}>
-                <Select
-                  id="filtro-renovacion-subs"
-                  data-testid="select-renovacion-subs"
-                  opciones={opcionesRangoRenovacion}
-                  value={renuevaEnDiasSubs}
-                  onChange={(e) => actualizarParams({ renueva_en_dias: e.target.value, page: 1 })}
-                  aria-label={t("views.bizSubscriptions.renewals.windowAria")}
-                />
-              </div>
+            <div className="kc-filter-item-wide">
+              <Input
+                id="filtro-busqueda-subs"
+                data-testid="input-busqueda-subs"
+                placeholder={t("views.bizSubscriptions.renewals.searchPlaceholder")}
+                value={terminoBusqueda}
+                onChange={(e) => setTerminoBusqueda(e.target.value)}
+                aria-label={t("views.bizSubscriptions.renewals.searchAria")}
+              />
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div className="kc-filter-item">
+              <Select
+                id="filtro-plan-subs"
+                data-testid="select-plan-subs"
+                opciones={opcionesPlan}
+                value={planSubs}
+                onChange={(e) => actualizarParams({ plan: e.target.value, page: 1 })}
+                aria-label={t("views.bizSubscriptions.renewals.planAria")}
+              />
+            </div>
+
+            <div className="kc-filter-item">
+              <Select
+                id="filtro-estado-subs"
+                data-testid="select-estado-subs"
+                opciones={opcionesEstadoSubs}
+                value={estadoSubs}
+                onChange={(e) => actualizarParams({ estado: e.target.value, page: 1 })}
+                aria-label={t("views.bizSubscriptions.renewals.statusAria")}
+              />
+            </div>
+
+            <div className="kc-filter-item">
+              <Select
+                id="filtro-renovacion-subs"
+                data-testid="select-renovacion-subs"
+                opciones={opcionesRangoRenovacion}
+                value={renuevaEnDiasSubs}
+                onChange={(e) => actualizarParams({ renueva_en_dias: e.target.value, page: 1 })}
+                aria-label={t("views.bizSubscriptions.renewals.windowAria")}
+              />
+            </div>
+
+            <div className="kc-filter-actions">
+              <Boton
+                variante="ghost"
+                tamano="sm"
+                className="kc-columns-toggle"
+                data-testid="toggle-columnas-completas"
+                aria-pressed={mostrarTodasColumnas}
+                aria-label={t("components.table.toggleColumnsAria")}
+                onClick={() => setMostrarTodasColumnas((prev) => !prev)}
+              >
+                {mostrarTodasColumnas
+                  ? t("components.table.compactColumns")
+                  : t("components.table.showAllColumns")}
+              </Boton>
               <Boton
                 variante="ghost"
                 tamano="sm"
@@ -521,210 +526,210 @@ export const BizSubscriptions: React.FC = () => {
                   backgroundColor: "var(--card)",
                   borderRadius: "var(--radius-md, 0.5rem)",
                   border: "1px solid var(--border)",
-                  overflow: "hidden",
+                  overflowX: "clip",
                 }}
               >
-                <div style={{ overflowX: "auto" }}>
-                  <Tabla aria-label={t("views.bizSubscriptions.renewals.tableAria")}>
-                    <TablaEncabezado>
-                      <TablaFila>
-                        <TablaCeldaEncabezado
-                          onClick={() => alternarOrdenSubs("tenant_id")}
-                          style={{ cursor: "pointer" }}
-                        >
-                          {t("views.bizSubscriptions.renewals.colTenant")}{getIndicadorOrden("tenant_id")}
-                        </TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado
-                          onClick={() => alternarOrdenSubs("nombre")}
-                          style={{ cursor: "pointer" }}
-                        >
-                          {t("views.bizSubscriptions.renewals.colName")}{getIndicadorOrden("nombre")}
-                        </TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colPlan")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colStatus")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colStart")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado
-                          onClick={() => alternarOrdenSubs("renovacion")}
-                          style={{ cursor: "pointer" }}
-                        >
-                          {t("views.bizSubscriptions.renewals.colRenew")}{getIndicadorOrden("renovacion")}
-                        </TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colDays")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado
-                          onClick={() => alternarOrdenSubs("importe")}
-                          style={{ cursor: "pointer" }}
-                        >
-                          {t("views.bizSubscriptions.renewals.colAmount")}{getIndicadorOrden("importe")}
-                        </TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colQuota")}</TablaCeldaEncabezado>
-                      </TablaFila>
-                    </TablaEncabezado>
-                    <TablaCuerpo>
-                      {dataSubs.items.map((sub) => {
-                        const esCritica = sub.dias_para_renovacion <= 15;
-                        const esAdvertencia = sub.dias_para_renovacion <= 30 && !esCritica;
+                <Tabla
+                  densidad="alta"
+                  mostrarTodasColumnas={mostrarTodasColumnas}
+                  aria-label={t("views.bizSubscriptions.renewals.tableAria")}
+                >
+                  <TablaEncabezado>
+                    <TablaFila>
+                      <TablaCeldaEncabezado
+                        fija
+                        onClick={() => alternarOrdenSubs("tenant_id")}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {t("views.bizSubscriptions.renewals.colTenant")}{getIndicadorOrden("tenant_id")}
+                      </TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado
+                        onClick={() => alternarOrdenSubs("nombre")}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {t("views.bizSubscriptions.renewals.colName")}{getIndicadorOrden("nombre")}
+                      </TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado prioridad="media">{t("views.bizSubscriptions.renewals.colPlan")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colStatus")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado prioridad="baja">{t("views.bizSubscriptions.renewals.colStart")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado
+                        onClick={() => alternarOrdenSubs("renovacion")}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {t("views.bizSubscriptions.renewals.colRenew")}{getIndicadorOrden("renovacion")}
+                      </TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colDays")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado
+                        prioridad="media"
+                        onClick={() => alternarOrdenSubs("importe")}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {t("views.bizSubscriptions.renewals.colAmount")}{getIndicadorOrden("importe")}
+                      </TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado prioridad="baja">{t("views.bizSubscriptions.renewals.colQuota")}</TablaCeldaEncabezado>
+                    </TablaFila>
+                  </TablaEncabezado>
+                  <TablaCuerpo>
+                    {dataSubs.items.map((sub) => {
+                      const esCritica = sub.dias_para_renovacion <= 15;
+                      const esAdvertencia = sub.dias_para_renovacion <= 30 && !esCritica;
 
-                        return (
-                          <TablaFila
-                            key={sub.tenant_id}
-                            data-testid={`fila-suscripcion-${sub.tenant_id}`}
-                            style={{
-                              backgroundColor: esCritica
-                                ? "var(--bad-bg, rgba(239, 68, 68, 0.05))"
-                                : esAdvertencia
-                                ? "var(--warn-bg, rgba(245, 158, 11, 0.05))"
-                                : "transparent",
-                            }}
-                          >
-                            <TablaCelda>
-                              <Link
-                                to={`/business/customers/${sub.tenant_id}`}
-                                style={{
-                                  fontWeight: 600,
-                                  color: "var(--accent, #38bdf8)",
-                                  textDecoration: "none",
-                                  fontFamily: "monospace",
-                                }}
-                              >
-                                {sub.tenant_id}
-                              </Link>
-                            </TablaCelda>
+                      return (
+                        <TablaFila
+                          key={sub.tenant_id}
+                          data-testid={`fila-suscripcion-${sub.tenant_id}`}
+                          style={{
+                            backgroundColor: esCritica
+                              ? "var(--bad-bg, rgba(239, 68, 68, 0.05))"
+                              : esAdvertencia
+                              ? "var(--warn-bg, rgba(245, 158, 11, 0.05))"
+                              : "transparent",
+                          }}
+                        >
+                          <TablaCelda fija>
+                            <Link
+                              to={`/business/customers/${sub.tenant_id}`}
+                              style={{
+                                fontWeight: 600,
+                                color: "var(--accent, #38bdf8)",
+                                textDecoration: "none",
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              {sub.tenant_id}
+                            </Link>
+                          </TablaCelda>
 
-                            <TablaCelda>
+                          <TablaCelda>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <span>{sub.razon_social}</span>
+                              {sub.enmascarado ? (
+                                <button
+                                  onClick={() => handleAbrirConcesion(sub.tenant_id, sub.razon_social)}
+                                  title={t("views.bizSubscriptions.maskedTooltip")}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    padding: 0,
+                                    cursor: "pointer",
+                                  }}
+                                  data-testid={`btn-revelar-${sub.tenant_id}`}
+                                >
+                                  <Badge variante="warn">{t("common.states.masked")}</Badge>
+                                </button>
+                              ) : (
+                                <Badge variante="good">{t("common.states.unmasked")}</Badge>
+                              )}
+                            </div>
+                          </TablaCelda>
+
+                          <TablaCelda prioridad="media">
+                            <Badge
+                              variante={
+                                sub.plan === "enterprise"
+                                  ? "accent"
+                                  : sub.plan === "growth"
+                                  ? "good"
+                                  : "neutro"
+                              }
+                            >
+                              {sub.plan}
+                            </Badge>
+                          </TablaCelda>
+
+                          <TablaCelda>
+                            <Badge
+                              variante={
+                                sub.estado === "activa"
+                                  ? "good"
+                                  : sub.estado === "periodo_gracia"
+                                  ? "warn"
+                                  : "bad"
+                              }
+                            >
+                              {sub.estado}
+                            </Badge>
+                          </TablaCelda>
+
+                          <TablaCelda prioridad="baja" style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
+                            {formatDate(sub.inicia_el, undefined, lang)}
+                          </TablaCelda>
+
+                          <TablaCelda style={{ fontSize: "0.8125rem" }}>
+                            {formatDate(sub.renueva_el, undefined, lang)}
+                          </TablaCelda>
+
+                          <TablaCelda>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+                              <span style={{ fontWeight: 600 }}>
+                                {t("views.bizSubscriptions.renewals.daysShort", {
+                                  days: sub.dias_para_renovacion,
+                                })}
+                              </span>
+                              {esCritica && (
+                                <Badge variante="bad" data-testid="alerta-renovacion-critica">
+                                  {t("views.bizSubscriptions.renewals.critical15")}
+                                </Badge>
+                              )}
+                              {esAdvertencia && (
+                                <Badge variante="warn" data-testid="alerta-renovacion-aviso">
+                                  {t("views.bizSubscriptions.renewals.warning30")}
+                                </Badge>
+                              )}
+                            </div>
+                          </TablaCelda>
+
+                          <TablaCelda prioridad="media" style={{ fontWeight: 600 }}>
+                            {formatCurrencyEUR(sub.importe_mes, sub.moneda, lang)}
+                          </TablaCelda>
+
+                          <TablaCelda prioridad="baja">
+                            {sub.cuota_uso_pct !== null && sub.cuota_uso_pct !== undefined ? (
                               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <span>{sub.razon_social}</span>
-                                {sub.enmascarado ? (
-                                  <button
-                                    onClick={() => handleAbrirConcesion(sub.tenant_id, sub.razon_social)}
-                                    title={t("views.bizSubscriptions.maskedTooltip")}
-                                    style={{
-                                      background: "none",
-                                      border: "none",
-                                      padding: 0,
-                                      cursor: "pointer",
-                                    }}
-                                    data-testid={`btn-revelar-${sub.tenant_id}`}
-                                  >
-                                    <Badge variante="warn">{t("common.states.masked")}</Badge>
-                                  </button>
-                                ) : (
-                                  <Badge variante="good">{t("common.states.unmasked")}</Badge>
-                                )}
-                              </div>
-                            </TablaCelda>
-
-                            <TablaCelda>
-                              <Badge
-                                variante={
-                                  sub.plan === "enterprise"
-                                    ? "accent"
-                                    : sub.plan === "growth"
-                                    ? "good"
-                                    : "neutro"
-                                }
-                              >
-                                {sub.plan}
-                              </Badge>
-                            </TablaCelda>
-
-                            <TablaCelda>
-                              <Badge
-                                variante={
-                                  sub.estado === "activa"
-                                    ? "good"
-                                    : sub.estado === "periodo_gracia"
-                                    ? "warn"
-                                    : "bad"
-                                }
-                              >
-                                {sub.estado}
-                              </Badge>
-                            </TablaCelda>
-
-                            <TablaCelda style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                              {formatDate(sub.inicia_el, undefined, lang)}
-                            </TablaCelda>
-
-                            <TablaCelda style={{ fontSize: "0.8125rem" }}>
-                              {formatDate(sub.renueva_el, undefined, lang)}
-                            </TablaCelda>
-
-                            <TablaCelda>
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
-                                <span style={{ fontWeight: 600 }}>
-                                  {t("views.bizSubscriptions.renewals.daysShort", {
-                                    days: sub.dias_para_renovacion,
-                                  })}
-                                </span>
-                                {esCritica && (
-                                  <Badge variante="bad" data-testid="alerta-renovacion-critica">
-                                    {t("views.bizSubscriptions.renewals.critical15")}
-                                  </Badge>
-                                )}
-                                {esAdvertencia && (
-                                  <Badge variante="warn" data-testid="alerta-renovacion-aviso">
-                                    {t("views.bizSubscriptions.renewals.warning30")}
-                                  </Badge>
-                                )}
-                              </div>
-                            </TablaCelda>
-
-                            <TablaCelda style={{ fontWeight: 600 }}>
-                              {formatCurrencyEUR(sub.importe_mes, sub.moneda, lang)}
-                            </TablaCelda>
-
-                            <TablaCelda>
-                              {sub.cuota_uso_pct !== null && sub.cuota_uso_pct !== undefined ? (
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <div
+                                  style={{
+                                    width: "60px",
+                                    height: "6px",
+                                    backgroundColor: "var(--surface2)",
+                                    borderRadius: "3px",
+                                    overflow: "hidden",
+                                  }}
+                                >
                                   <div
                                     style={{
-                                      width: "60px",
-                                      height: "6px",
-                                      backgroundColor: "var(--surface2)",
-                                      borderRadius: "3px",
-                                      overflow: "hidden",
+                                      width: `${Math.min(100, sub.cuota_uso_pct)}%`,
+                                      height: "100%",
+                                      backgroundColor:
+                                        sub.cuota_uso_pct > 90
+                                          ? "var(--bad)"
+                                          : sub.cuota_uso_pct > 75
+                                          ? "var(--warn)"
+                                          : "var(--good)",
                                     }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: `${Math.min(100, sub.cuota_uso_pct)}%`,
-                                        height: "100%",
-                                        backgroundColor:
-                                          sub.cuota_uso_pct > 90
-                                            ? "var(--bad)"
-                                            : sub.cuota_uso_pct > 75
-                                            ? "var(--warn)"
-                                            : "var(--good)",
-                                      }}
-                                    />
-                                  </div>
-                                  <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                                    {formatPercent(sub.cuota_uso_pct, { decimals: 1, lang })}
-                                  </span>
+                                  />
                                 </div>
-                              ) : (
-                                <span style={{ color: "var(--muted)", fontSize: "0.8125rem" }}>
-                                  {t("common.states.noData")}
+                                <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                                  {formatPercent(sub.cuota_uso_pct, { decimals: 1, lang })}
                                 </span>
-                              )}
-                            </TablaCelda>
-                          </TablaFila>
-                        );
-                      })}
-                    </TablaCuerpo>
-                  </Tabla>
-                </div>
+                              </div>
+                            ) : (
+                              <span style={{ color: "var(--muted)", fontSize: "0.8125rem" }}>
+                                {t("common.states.noData")}
+                              </span>
+                            )}
+                          </TablaCelda>
+                        </TablaFila>
+                      );
+                    })}
+                  </TablaCuerpo>
+                </Tabla>
 
                 {/* Barra de Paginación Transversal */}
                 <footer
+                  className="kc-pagination"
                   style={{
                     padding: "0.75rem 1rem",
                     borderTop: "1px solid var(--border)",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "1rem",
                     backgroundColor: "var(--surface)",
                   }}
                 >
@@ -737,8 +742,8 @@ export const BizSubscriptions: React.FC = () => {
                     })}
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <div style={{ width: "120px" }}>
+                  <div className="kc-pagination-controls">
+                    <div className="kc-pagination-size">
                       <Select
                         id="select-pagesize-subs"
                         data-testid="select-pagesize-subs"
@@ -783,57 +788,66 @@ export const BizSubscriptions: React.FC = () => {
         >
           {/* Barra de Filtros de Solicitudes */}
           <div
+            className="kc-filter-bar"
             style={{
               backgroundColor: "var(--card)",
               padding: "1rem",
               borderRadius: "var(--radius-md, 0.5rem)",
               border: "1px solid var(--border)",
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "1rem",
-              justifyContent: "space-between",
             }}
           >
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.75rem", flex: 1 }}>
-              <div style={{ width: "220px" }}>
-                <Select
-                  id="filtro-estado-upg"
-                  data-testid="select-estado-upg"
-                  opciones={opcionesEstadoUpgrade}
-                  value={estadoUpgrades}
-                  onChange={(e) => actualizarParams({ estado_upg: e.target.value, page_upg: 1 })}
-                  aria-label={t("views.bizSubscriptions.upgrades.statusAria")}
-                />
-              </div>
-
-              <div style={{ width: "200px" }}>
-                <Select
-                  id="filtro-plan-deseado-upg"
-                  data-testid="select-plan-deseado-upg"
-                  opciones={opcionesPlan}
-                  value={planDeseadoUpgrades}
-                  onChange={(e) => actualizarParams({ plan_deseado_upg: e.target.value, page_upg: 1 })}
-                  aria-label={t("views.bizSubscriptions.upgrades.desiredPlanAria")}
-                />
-              </div>
-
-              <div style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                {t("views.bizSubscriptions.upgrades.autoOrderHint")}
-              </div>
+            <div className="kc-filter-item">
+              <Select
+                id="filtro-estado-upg"
+                data-testid="select-estado-upg"
+                opciones={opcionesEstadoUpgrade}
+                value={estadoUpgrades}
+                onChange={(e) => actualizarParams({ estado_upg: e.target.value, page_upg: 1 })}
+                aria-label={t("views.bizSubscriptions.upgrades.statusAria")}
+              />
             </div>
 
-            <Boton
-              variante="ghost"
-              tamano="sm"
-              onClick={() => refetchUpgrades()}
-              disabled={cargandoUpgrades || refrescandoUpgrades}
-              aria-label={t("views.bizSubscriptions.upgrades.refreshAria")}
-            >
-              {refrescandoUpgrades
-                ? t("common.actions.refreshing")
-                : t("views.bizSubscriptions.renewals.refreshLabel")}
-            </Boton>
+            <div className="kc-filter-item">
+              <Select
+                id="filtro-plan-deseado-upg"
+                data-testid="select-plan-deseado-upg"
+                opciones={opcionesPlan}
+                value={planDeseadoUpgrades}
+                onChange={(e) => actualizarParams({ plan_deseado_upg: e.target.value, page_upg: 1 })}
+                aria-label={t("views.bizSubscriptions.upgrades.desiredPlanAria")}
+              />
+            </div>
+
+            <div className="kc-filter-item-wide" style={{ fontSize: "0.8125rem", color: "var(--muted)", alignSelf: "center" }}>
+              {t("views.bizSubscriptions.upgrades.autoOrderHint")}
+            </div>
+
+            <div className="kc-filter-actions">
+              <Boton
+                variante="ghost"
+                tamano="sm"
+                className="kc-columns-toggle"
+                data-testid="toggle-columnas-completas"
+                aria-pressed={mostrarTodasColumnas}
+                aria-label={t("components.table.toggleColumnsAria")}
+                onClick={() => setMostrarTodasColumnas((prev) => !prev)}
+              >
+                {mostrarTodasColumnas
+                  ? t("components.table.compactColumns")
+                  : t("components.table.showAllColumns")}
+              </Boton>
+              <Boton
+                variante="ghost"
+                tamano="sm"
+                onClick={() => refetchUpgrades()}
+                disabled={cargandoUpgrades || refrescandoUpgrades}
+                aria-label={t("views.bizSubscriptions.upgrades.refreshAria")}
+              >
+                {refrescandoUpgrades
+                  ? t("common.actions.refreshing")
+                  : t("views.bizSubscriptions.renewals.refreshLabel")}
+              </Boton>
+            </div>
           </div>
 
           {/* Contenedor de Estado para Cola de Upgrades */}
@@ -856,124 +870,122 @@ export const BizSubscriptions: React.FC = () => {
                   backgroundColor: "var(--card)",
                   borderRadius: "var(--radius-md, 0.5rem)",
                   border: "1px solid var(--border)",
-                  overflow: "hidden",
+                  overflowX: "clip",
                 }}
               >
-                <div style={{ overflowX: "auto" }}>
-                  <Tabla aria-label={t("views.bizSubscriptions.upgrades.tableAria")}>
-                    <TablaEncabezado>
-                      <TablaFila>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colId")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colTenant")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colName")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colTransition")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colRequested")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colAge")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colPriority")}</TablaCeldaEncabezado>
-                        <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colStatus")}</TablaCeldaEncabezado>
-                      </TablaFila>
-                    </TablaEncabezado>
-                    <TablaCuerpo>
-                      {dataUpgrades.items.map((upg) => (
-                        <TablaFila key={upg.solicitud_id} data-testid={`fila-upgrade-${upg.solicitud_id}`}>
-                          <TablaCelda style={{ fontFamily: "monospace", fontSize: "0.8125rem" }}>
-                            {upg.solicitud_id}
-                          </TablaCelda>
+                <Tabla
+                  densidad="alta"
+                  mostrarTodasColumnas={mostrarTodasColumnas}
+                  aria-label={t("views.bizSubscriptions.upgrades.tableAria")}
+                >
+                  <TablaEncabezado>
+                    <TablaFila>
+                      <TablaCeldaEncabezado fija>{t("views.bizSubscriptions.upgrades.colId")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colTenant")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colName")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colTransition")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado prioridad="baja">{t("views.bizSubscriptions.upgrades.colRequested")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado prioridad="media">{t("views.bizSubscriptions.upgrades.colAge")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colPriority")}</TablaCeldaEncabezado>
+                      <TablaCeldaEncabezado>{t("views.bizSubscriptions.upgrades.colStatus")}</TablaCeldaEncabezado>
+                    </TablaFila>
+                  </TablaEncabezado>
+                  <TablaCuerpo>
+                    {dataUpgrades.items.map((upg) => (
+                      <TablaFila key={upg.solicitud_id} data-testid={`fila-upgrade-${upg.solicitud_id}`}>
+                        <TablaCelda fija style={{ fontFamily: "monospace", fontSize: "0.8125rem" }}>
+                          {upg.solicitud_id}
+                        </TablaCelda>
 
-                          <TablaCelda>
-                            <Link
-                              to={`/business/customers/${upg.tenant_id}`}
-                              style={{
-                                fontWeight: 600,
-                                color: "var(--accent, #38bdf8)",
-                                textDecoration: "none",
-                                fontFamily: "monospace",
-                              }}
-                            >
-                              {upg.tenant_id}
-                            </Link>
-                          </TablaCelda>
+                        <TablaCelda>
+                          <Link
+                            to={`/business/customers/${upg.tenant_id}`}
+                            style={{
+                              fontWeight: 600,
+                              color: "var(--accent, #38bdf8)",
+                              textDecoration: "none",
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {upg.tenant_id}
+                          </Link>
+                        </TablaCelda>
 
-                          <TablaCelda>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                              <span>{upg.razon_social}</span>
-                              {upg.enmascarado ? (
-                                <button
-                                  onClick={() => handleAbrirConcesion(upg.tenant_id, upg.razon_social)}
-                                  title={t("views.bizSubscriptions.maskedTooltip")}
-                                  style={{
-                                    background: "none",
-                                    border: "none",
-                                    padding: 0,
-                                    cursor: "pointer",
-                                  }}
-                                  data-testid={`btn-revelar-upg-${upg.solicitud_id}`}
-                                >
-                                  <Badge variante="warn">{t("common.states.masked")}</Badge>
-                                </button>
-                              ) : (
-                                <Badge variante="good">{t("common.states.unmasked")}</Badge>
-                              )}
-                            </div>
-                          </TablaCelda>
-
-                          <TablaCelda>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
-                              <Badge variante="neutro">{upg.plan_actual}</Badge>
-                              <span style={{ color: "var(--muted)" }}>→</span>
-                              <Badge variante="accent">{upg.plan_deseado}</Badge>
-                            </div>
-                          </TablaCelda>
-
-                          <TablaCelda style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                            {formatDate(upg.solicitado_el, undefined, lang)}
-                          </TablaCelda>
-
-                          <TablaCelda>
-                            <span style={{ fontWeight: 600 }}>
-                              {t("views.bizSubscriptions.upgrades.ageHours", { hours: upg.antiguedad_h })}
-                            </span>
-                          </TablaCelda>
-
-                          <TablaCelda>
-                            {upg.urgente ? (
-                              <Badge variante="bad" data-testid="badge-urgente">
-                                {t("views.bizSubscriptions.upgrades.urgent")}
-                              </Badge>
+                        <TablaCelda>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <span>{upg.razon_social}</span>
+                            {upg.enmascarado ? (
+                              <button
+                                onClick={() => handleAbrirConcesion(upg.tenant_id, upg.razon_social)}
+                                title={t("views.bizSubscriptions.maskedTooltip")}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  padding: 0,
+                                  cursor: "pointer",
+                                }}
+                                data-testid={`btn-revelar-upg-${upg.solicitud_id}`}
+                              >
+                                <Badge variante="warn">{t("common.states.masked")}</Badge>
+                              </button>
                             ) : (
-                              <Badge variante="neutro">{t("views.bizSubscriptions.upgrades.normal")}</Badge>
+                              <Badge variante="good">{t("common.states.unmasked")}</Badge>
                             )}
-                          </TablaCelda>
+                          </div>
+                        </TablaCelda>
 
-                          <TablaCelda>
-                            <Badge
-                              variante={
-                                upg.estado === "pendiente"
-                                  ? "warn"
-                                  : upg.estado === "atendida"
-                                  ? "good"
-                                  : "bad"
-                              }
-                            >
-                              {upg.estado}
+                        <TablaCelda>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+                            <Badge variante="neutro">{upg.plan_actual}</Badge>
+                            <span style={{ color: "var(--muted)" }}>→</span>
+                            <Badge variante="accent">{upg.plan_deseado}</Badge>
+                          </div>
+                        </TablaCelda>
+
+                        <TablaCelda prioridad="baja" style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
+                          {formatDate(upg.solicitado_el, undefined, lang)}
+                        </TablaCelda>
+
+                        <TablaCelda prioridad="media">
+                          <span style={{ fontWeight: 600 }}>
+                            {t("views.bizSubscriptions.upgrades.ageHours", { hours: upg.antiguedad_h })}
+                          </span>
+                        </TablaCelda>
+
+                        <TablaCelda>
+                          {upg.urgente ? (
+                            <Badge variante="bad" data-testid="badge-urgente">
+                              {t("views.bizSubscriptions.upgrades.urgent")}
                             </Badge>
-                          </TablaCelda>
-                        </TablaFila>
-                      ))}
-                    </TablaCuerpo>
-                  </Tabla>
-                </div>
+                          ) : (
+                            <Badge variante="neutro">{t("views.bizSubscriptions.upgrades.normal")}</Badge>
+                          )}
+                        </TablaCelda>
+
+                        <TablaCelda>
+                          <Badge
+                            variante={
+                              upg.estado === "pendiente"
+                                ? "warn"
+                                : upg.estado === "atendida"
+                                ? "good"
+                                : "bad"
+                            }
+                          >
+                            {upg.estado}
+                          </Badge>
+                        </TablaCelda>
+                      </TablaFila>
+                    ))}
+                  </TablaCuerpo>
+                </Tabla>
 
                 {/* Paginación de Solicitudes */}
                 <footer
+                  className="kc-pagination"
                   style={{
                     padding: "0.75rem 1rem",
                     borderTop: "1px solid var(--border)",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "1rem",
                     backgroundColor: "var(--surface)",
                   }}
                 >
