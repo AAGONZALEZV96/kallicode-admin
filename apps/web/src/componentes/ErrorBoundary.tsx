@@ -84,6 +84,7 @@ class ErrorBoundaryBase extends Component<ErrorBoundaryProps, ErrorBoundaryState
             }}
           >
             <div
+              aria-hidden="true"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -122,6 +123,7 @@ class ErrorBoundaryBase extends Component<ErrorBoundaryProps, ErrorBoundaryState
             </p>
 
             <div
+              aria-hidden="true"
               style={{
                 backgroundColor: "rgba(0, 0, 0, 0.25)",
                 padding: "0.75rem",

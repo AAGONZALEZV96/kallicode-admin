@@ -21,6 +21,7 @@ import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 import { Select } from "../componentes/Select";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
+import { useInsideAdminLayout } from "../componentes/AdminLayout";
 
 export interface OverviewClientes {
   activos: number;
@@ -76,6 +77,8 @@ const LIMITE_FRESCURA_MS = 6 * 60 * 60 * 1000; // 6 horas
 export const BizOverview: React.FC = () => {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage || i18n.language;
+  const insideLayout = useInsideAdminLayout();
+  const RootTag: React.ElementType = insideLayout ? "div" : "main";
   const { usuario } = useAuth();
   const [periodo, setPeriodo] = useState<PeriodoRango>("mes_actual");
   const [compararCon, setCompararCon] = useState<ComparacionRango>("periodo_anterior");
@@ -131,7 +134,7 @@ export const BizOverview: React.FC = () => {
   // 1. Pantalla de denegación de permisos RBAC
   if (rolNoAutorizado) {
     return (
-      <main
+      <RootTag
         className="biz-overview-access-denied"
         data-testid="overview-error"
         role="alert"
@@ -151,7 +154,7 @@ export const BizOverview: React.FC = () => {
         <p style={{ color: "var(--muted)", margin: "0.5rem 0" }}>
           {t("views.bizOverview.rbacDenied", { role: usuario?.role })}
         </p>
-      </main>
+      </RootTag>
     );
   }
 
@@ -189,7 +192,7 @@ export const BizOverview: React.FC = () => {
       alReintentar={() => void refetch()}
     >
       {data && (
-        <main
+        <RootTag
           className="biz-overview"
           aria-live="polite"
           style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
@@ -609,7 +612,7 @@ export const BizOverview: React.FC = () => {
           ))}
         </div>
       </section>
-    </main>
+    </RootTag>
       )}
     </ContenedorEstado>
   );

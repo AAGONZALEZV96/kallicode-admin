@@ -35,6 +35,7 @@ import {
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { SolicitudConcesionModal } from "../componentes/SolicitudConcesionModal";
 import { ControlExportarReporte } from "../componentes/ControlExportarReporte";
+import { useInsideAdminLayout } from "../componentes/AdminLayout";
 
 // ------------------------------------------------------------------ Interfaces de Datos
 export interface TokenPorTier {
@@ -103,6 +104,8 @@ export interface UsageTokensResponse {
 export const BizTokens: React.FC = () => {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage || i18n.language;
+  const insideLayout = useInsideAdminLayout();
+  const RbacTag: React.ElementType = insideLayout ? "div" : "main";
   const { usuario } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -302,7 +305,7 @@ export const BizTokens: React.FC = () => {
   // 1. Bloqueo Visual RBAC (403 ROL_STAFF_INSUFICIENTE)
   if (!esRolAutorizado) {
     return (
-      <main
+      <RbacTag
         className="biz-tokens-access-denied"
         data-testid="tokens-error"
         role="alert"
@@ -322,7 +325,7 @@ export const BizTokens: React.FC = () => {
         <p style={{ color: "var(--muted)", margin: "0.5rem 0" }}>
           {t("views.bizTokens.rbacDenied", { role: usuario?.role })}
         </p>
-      </main>
+      </RbacTag>
     );
   }
 
@@ -419,7 +422,7 @@ export const BizTokens: React.FC = () => {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <span style={{ fontSize: "1.5rem" }}>🚨</span>
+            <span aria-hidden="true" style={{ fontSize: "1.5rem" }}>🚨</span>
             <div>
               <strong style={{ display: "block", color: "var(--bad)" }}>
                 {t("views.bizTokens.discrepancyBanner.title")}
@@ -870,6 +873,7 @@ export const BizTokens: React.FC = () => {
                   data-testid="tabla-accesible-tiers"
                   style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}
                   summary={t("views.bizTokens.tiersPanel.a11yTableSummary")}
+                  aria-label={t("views.bizTokens.tiersPanel.a11yTableSummary")}
                 >
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--border)" }}>

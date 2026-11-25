@@ -20,6 +20,7 @@ export interface EstadoVacioProps extends React.HTMLAttributes<HTMLDivElement> {
   textoAccion?: string;
   accion?: React.ReactNode;
   compacto?: boolean;
+  nivelEncabezado?: "h2" | "h3";
   "data-testid"?: string;
 }
 
@@ -31,6 +32,7 @@ export const EstadoVacio: React.FC<EstadoVacioProps> = ({
   textoAccion,
   accion,
   compacto = false,
+  nivelEncabezado,
   className = "",
   style,
   "data-testid": dataTestId = "estado-vacio",
@@ -40,6 +42,7 @@ export const EstadoVacio: React.FC<EstadoVacioProps> = ({
   const tituloEfectivo = titulo ?? t("common.states.emptyTitle");
   const descripcionEfectiva = descripcion ?? t("common.states.emptyDescription");
   const textoAccionEfectivo = textoAccion ?? t("common.actions.clearFilters");
+  const TagEncabezado = nivelEncabezado ?? (compacto ? "h3" : "h2");
 
   return (
     <div
@@ -80,7 +83,7 @@ export const EstadoVacio: React.FC<EstadoVacioProps> = ({
       </div>
 
       {/* Título claro */}
-      <h3
+      <TagEncabezado
         style={{
           fontSize: compacto ? "var(--text-base, 14px)" : "var(--text-lg, 16px)",
           fontWeight: "var(--font-semibold, 600)",
@@ -89,7 +92,7 @@ export const EstadoVacio: React.FC<EstadoVacioProps> = ({
         }}
       >
         {tituloEfectivo}
-      </h3>
+      </TagEncabezado>
 
       {/* Descripción amigable */}
       <p

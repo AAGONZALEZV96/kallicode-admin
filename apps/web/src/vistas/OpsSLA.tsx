@@ -27,6 +27,7 @@ import { Select } from "../componentes/Select";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { DetalleRelojSLA, SlaResultado } from "../componentes/DetalleRelojSLA";
 import { ControlExportarReporte } from "../componentes/ControlExportarReporte";
+import { useInsideAdminLayout } from "../componentes/AdminLayout";
 
 export interface SLACaso {
   job_id: string;
@@ -256,6 +257,8 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage || i18n.language;
+  const insideLayout = useInsideAdminLayout();
+  const RbacTag: React.ElementType = insideLayout ? "div" : "main";
   const auth = useOptionalAuth();
   const usuario = auth?.usuario ?? null;
 
@@ -381,7 +384,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
 
   if (rolNoAutorizado) {
     return (
-      <main
+      <RbacTag
         className="view ops-sla"
         data-testid="ops-sla-rbac-bloqueado"
         role="alert"
@@ -400,7 +403,7 @@ const OpsSLAInterno: React.FC<OpsSLAInternoProps> = ({
         <p style={{ color: "var(--muted)", margin: 0 }}>
           {t("views.opsSla.rbacDenied", { role: usuario?.role })}
         </p>
-      </main>
+      </RbacTag>
     );
   }
 

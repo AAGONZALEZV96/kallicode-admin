@@ -27,6 +27,7 @@ import { Modal } from "../componentes/Modal";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { SolicitudConcesionModal } from "../componentes/SolicitudConcesionModal";
 import { ControlExportarReporte } from "../componentes/ControlExportarReporte";
+import { useInsideAdminLayout } from "../componentes/AdminLayout";
 import {
   Tabla,
   TablaEncabezado,
@@ -72,6 +73,8 @@ export interface ClientesResponse {
 export const BizCustomers: React.FC = () => {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage || i18n.language;
+  const insideLayout = useInsideAdminLayout();
+  const RootTag: React.ElementType = insideLayout ? "div" : "main";
   const { usuario } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -188,7 +191,7 @@ export const BizCustomers: React.FC = () => {
   // 1. Pantalla de denegación visual RBAC ante staff_operaciones
   if (rolNoAutorizado) {
     return (
-      <main
+      <RootTag
         className="biz-customers-access-denied"
         data-testid="customers-error"
         role="alert"
@@ -208,7 +211,7 @@ export const BizCustomers: React.FC = () => {
         <p style={{ color: "var(--muted)", margin: "0.5rem 0" }}>
           {t("views.bizCustomers.rbacDenied", { role: usuario?.role })}
         </p>
-      </main>
+      </RootTag>
     );
   }
 
@@ -265,7 +268,7 @@ export const BizCustomers: React.FC = () => {
       alReintentar={() => void refetch()}
     >
       {data && (
-        <main
+        <RootTag
           className="biz-customers"
           aria-live="polite"
           style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
@@ -460,7 +463,19 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("tenant_id") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                {t("views.bizCustomers.table.colTenant")}{iconoOrden("tenant_id")}
+                <button
+                  type="button"
+                  className="kc-sort-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    alternarOrden("tenant_id");
+                  }}
+                  aria-label={t("views.bizCustomers.table.sortColumnAria", {
+                    column: t("views.bizCustomers.table.colTenant"),
+                  })}
+                >
+                  {t("views.bizCustomers.table.colTenant")}{iconoOrden("tenant_id")}
+                </button>
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -468,7 +483,19 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("nombre") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                {t("views.bizCustomers.table.colName")}{iconoOrden("nombre")}
+                <button
+                  type="button"
+                  className="kc-sort-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    alternarOrden("nombre");
+                  }}
+                  aria-label={t("views.bizCustomers.table.sortColumnAria", {
+                    column: t("views.bizCustomers.table.colName"),
+                  })}
+                >
+                  {t("views.bizCustomers.table.colName")}{iconoOrden("nombre")}
+                </button>
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -476,7 +503,19 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("plan") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                {t("views.bizCustomers.table.colPlan")}{iconoOrden("plan")}
+                <button
+                  type="button"
+                  className="kc-sort-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    alternarOrden("plan");
+                  }}
+                  aria-label={t("views.bizCustomers.table.sortColumnAria", {
+                    column: t("views.bizCustomers.table.colPlan"),
+                  })}
+                >
+                  {t("views.bizCustomers.table.colPlan")}{iconoOrden("plan")}
+                </button>
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -484,7 +523,19 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("estado") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                {t("views.bizCustomers.table.colStatus")}{iconoOrden("estado")}
+                <button
+                  type="button"
+                  className="kc-sort-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    alternarOrden("estado");
+                  }}
+                  aria-label={t("views.bizCustomers.table.sortColumnAria", {
+                    column: t("views.bizCustomers.table.colStatus"),
+                  })}
+                >
+                  {t("views.bizCustomers.table.colStatus")}{iconoOrden("estado")}
+                </button>
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado numerico prioridad="baja">
@@ -498,7 +549,19 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("consumo") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                {t("views.bizCustomers.table.colUsage")}{iconoOrden("consumo")}
+                <button
+                  type="button"
+                  className="kc-sort-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    alternarOrden("consumo");
+                  }}
+                  aria-label={t("views.bizCustomers.table.sortColumnAria", {
+                    column: t("views.bizCustomers.table.colUsage"),
+                  })}
+                >
+                  {t("views.bizCustomers.table.colUsage")}{iconoOrden("consumo")}
+                </button>
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado
@@ -507,7 +570,19 @@ export const BizCustomers: React.FC = () => {
                 style={{ cursor: "pointer", userSelect: "none" }}
                 aria-sort={sort.startsWith("actualizado_en") ? (sort.endsWith("asc") ? "ascending" : "descending") : "none"}
               >
-                {t("views.bizCustomers.table.colLastActivity")}{iconoOrden("actualizado_en")}
+                <button
+                  type="button"
+                  className="kc-sort-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    alternarOrden("actualizado_en");
+                  }}
+                  aria-label={t("views.bizCustomers.table.sortColumnAria", {
+                    column: t("views.bizCustomers.table.colLastActivity"),
+                  })}
+                >
+                  {t("views.bizCustomers.table.colLastActivity")}{iconoOrden("actualizado_en")}
+                </button>
               </TablaCeldaEncabezado>
 
               <TablaCeldaEncabezado prioridad="media">
@@ -777,7 +852,7 @@ export const BizCustomers: React.FC = () => {
         razonSocial={tenantSeleccionado?.razon_social}
         onConcesionConcedida={() => void refetch()}
       />
-    </main>
+    </RootTag>
       )}
     </ContenedorEstado>
   );

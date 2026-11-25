@@ -35,6 +35,7 @@ import {
 } from "../componentes/Tabla";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { SolicitudConcesionModal } from "../componentes/SolicitudConcesionModal";
+import { useInsideAdminLayout } from "../componentes/AdminLayout";
 
 // ------------------------------------------------------------------ Tipos Suscripciones
 export interface SuscripcionItem {
@@ -92,6 +93,8 @@ export interface UpgradeRequestsResponse {
 export const BizSubscriptions: React.FC = () => {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage || i18n.language;
+  const insideLayout = useInsideAdminLayout();
+  const RbacTag: React.ElementType = insideLayout ? "div" : "main";
   const { usuario } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -287,7 +290,7 @@ export const BizSubscriptions: React.FC = () => {
   // ------------------------------------------------------------------ Bloqueo RBAC
   if (!esRolAutorizado) {
     return (
-      <main style={{ padding: "1.5rem" }}>
+      <RbacTag style={{ padding: "1.5rem" }}>
         <div
           data-testid="error-403-rol"
           role="alert"
@@ -318,7 +321,7 @@ export const BizSubscriptions: React.FC = () => {
             </Link>
           </div>
         </div>
-      </main>
+      </RbacTag>
     );
   }
 
@@ -540,14 +543,52 @@ export const BizSubscriptions: React.FC = () => {
                         fija
                         onClick={() => alternarOrdenSubs("tenant_id")}
                         style={{ cursor: "pointer" }}
+                        aria-sort={
+                          orderBySubs.startsWith("tenant_id")
+                            ? orderBySubs.endsWith("asc")
+                              ? "ascending"
+                              : "descending"
+                            : "none"
+                        }
                       >
-                        {t("views.bizSubscriptions.renewals.colTenant")}{getIndicadorOrden("tenant_id")}
+                        <button
+                          type="button"
+                          className="kc-sort-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alternarOrdenSubs("tenant_id");
+                          }}
+                          aria-label={t("views.bizSubscriptions.renewals.sortColumnAria", {
+                            column: t("views.bizSubscriptions.renewals.colTenant"),
+                          })}
+                        >
+                          {t("views.bizSubscriptions.renewals.colTenant")}{getIndicadorOrden("tenant_id")}
+                        </button>
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado
                         onClick={() => alternarOrdenSubs("nombre")}
                         style={{ cursor: "pointer" }}
+                        aria-sort={
+                          orderBySubs.startsWith("nombre")
+                            ? orderBySubs.endsWith("asc")
+                              ? "ascending"
+                              : "descending"
+                            : "none"
+                        }
                       >
-                        {t("views.bizSubscriptions.renewals.colName")}{getIndicadorOrden("nombre")}
+                        <button
+                          type="button"
+                          className="kc-sort-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alternarOrdenSubs("nombre");
+                          }}
+                          aria-label={t("views.bizSubscriptions.renewals.sortColumnAria", {
+                            column: t("views.bizSubscriptions.renewals.colName"),
+                          })}
+                        >
+                          {t("views.bizSubscriptions.renewals.colName")}{getIndicadorOrden("nombre")}
+                        </button>
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado prioridad="media">{t("views.bizSubscriptions.renewals.colPlan")}</TablaCeldaEncabezado>
                       <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colStatus")}</TablaCeldaEncabezado>
@@ -555,16 +596,54 @@ export const BizSubscriptions: React.FC = () => {
                       <TablaCeldaEncabezado
                         onClick={() => alternarOrdenSubs("renovacion")}
                         style={{ cursor: "pointer" }}
+                        aria-sort={
+                          orderBySubs.startsWith("renovacion")
+                            ? orderBySubs.endsWith("asc")
+                              ? "ascending"
+                              : "descending"
+                            : "none"
+                        }
                       >
-                        {t("views.bizSubscriptions.renewals.colRenew")}{getIndicadorOrden("renovacion")}
+                        <button
+                          type="button"
+                          className="kc-sort-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alternarOrdenSubs("renovacion");
+                          }}
+                          aria-label={t("views.bizSubscriptions.renewals.sortColumnAria", {
+                            column: t("views.bizSubscriptions.renewals.colRenew"),
+                          })}
+                        >
+                          {t("views.bizSubscriptions.renewals.colRenew")}{getIndicadorOrden("renovacion")}
+                        </button>
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado>{t("views.bizSubscriptions.renewals.colDays")}</TablaCeldaEncabezado>
                       <TablaCeldaEncabezado
                         prioridad="media"
                         onClick={() => alternarOrdenSubs("importe")}
                         style={{ cursor: "pointer" }}
+                        aria-sort={
+                          orderBySubs.startsWith("importe")
+                            ? orderBySubs.endsWith("asc")
+                              ? "ascending"
+                              : "descending"
+                            : "none"
+                        }
                       >
-                        {t("views.bizSubscriptions.renewals.colAmount")}{getIndicadorOrden("importe")}
+                        <button
+                          type="button"
+                          className="kc-sort-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alternarOrdenSubs("importe");
+                          }}
+                          aria-label={t("views.bizSubscriptions.renewals.sortColumnAria", {
+                            column: t("views.bizSubscriptions.renewals.colAmount"),
+                          })}
+                        >
+                          {t("views.bizSubscriptions.renewals.colAmount")}{getIndicadorOrden("importe")}
+                        </button>
                       </TablaCeldaEncabezado>
                       <TablaCeldaEncabezado prioridad="baja">{t("views.bizSubscriptions.renewals.colQuota")}</TablaCeldaEncabezado>
                     </TablaFila>
@@ -605,8 +684,10 @@ export const BizSubscriptions: React.FC = () => {
                               <span>{sub.razon_social}</span>
                               {sub.enmascarado ? (
                                 <button
+                                  type="button"
                                   onClick={() => handleAbrirConcesion(sub.tenant_id, sub.razon_social)}
                                   title={t("views.bizSubscriptions.maskedTooltip")}
+                                  aria-label={t("views.bizSubscriptions.revealAria", { tenantId: sub.tenant_id })}
                                   style={{
                                     background: "none",
                                     border: "none",
@@ -916,8 +997,10 @@ export const BizSubscriptions: React.FC = () => {
                             <span>{upg.razon_social}</span>
                             {upg.enmascarado ? (
                               <button
+                                type="button"
                                 onClick={() => handleAbrirConcesion(upg.tenant_id, upg.razon_social)}
                                 title={t("views.bizSubscriptions.maskedTooltip")}
+                                aria-label={t("views.bizSubscriptions.revealAria", { tenantId: upg.tenant_id })}
                                 style={{
                                   background: "none",
                                   border: "none",

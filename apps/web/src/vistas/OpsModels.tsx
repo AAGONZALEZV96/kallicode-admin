@@ -22,6 +22,7 @@ import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { Badge } from "../componentes/Badge";
 import { Boton } from "../componentes/Boton";
 import { Select } from "../componentes/Select";
+import { useInsideAdminLayout } from "../componentes/AdminLayout";
 import {
   Tabla,
   TablaEncabezado,
@@ -186,22 +187,22 @@ function calcularDeltaPorcentual(
 function estiloBadgeTier(tier: TierModelo): React.CSSProperties {
   if (tier === "flash") {
     return {
-      backgroundColor: "rgba(14, 165, 233, 0.16)",
-      color: "#0284c7",
-      border: "1px solid rgba(14, 165, 233, 0.4)",
+      backgroundColor: "var(--accent-soft)",
+      color: "var(--accent)",
+      border: "1px solid var(--accent)",
     };
   }
   if (tier === "pro") {
     return {
-      backgroundColor: "rgba(139, 92, 246, 0.16)",
-      color: "#7c3aed",
-      border: "1px solid rgba(139, 92, 246, 0.4)",
+      backgroundColor: "var(--purple-bg)",
+      color: "var(--purple)",
+      border: "1px solid var(--purple)",
     };
   }
   return {
-    backgroundColor: "rgba(245, 158, 11, 0.18)",
-    color: "#d97706",
-    border: "1px solid rgba(245, 158, 11, 0.45)",
+    backgroundColor: "var(--warn-bg)",
+    color: "var(--warn)",
+    border: "1px solid var(--warn)",
   };
 }
 
@@ -268,7 +269,11 @@ const TablaModelosSeccion: React.FC<TablaModelosSeccionProps> = ({
         </Boton>
       </div>
 
-      <Tabla densidad="alta" mostrarTodasColumnas={mostrarTodasColumnas}>
+      <Tabla
+        densidad="alta"
+        mostrarTodasColumnas={mostrarTodasColumnas}
+        ariaLabelRegion={t("views.opsModels.tables.scrollRegionAria", { title: titulo })}
+      >
         <TablaEncabezado>
           <TablaFila>
             <TablaCeldaEncabezado scope="col" fija>{t("views.opsModels.tables.colProvider")}</TablaCeldaEncabezado>
@@ -408,6 +413,8 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage || i18n.language;
+  const insideLayout = useInsideAdminLayout();
+  const RbacTag: React.ElementType = insideLayout ? "div" : "main";
   const auth = useOptionalAuth();
   const usuario = auth?.usuario ?? null;
 
@@ -590,7 +597,7 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
 
   if (rolNoAutorizado) {
     return (
-      <main
+      <RbacTag
         className="view ops-models"
         data-testid="ops-models-rbac-bloqueado"
         role="alert"
@@ -609,7 +616,7 @@ const OpsModelsInterno: React.FC<OpsModelsInternoProps> = ({
         <p style={{ color: "var(--muted)", margin: 0 }}>
           {t("views.opsModels.rbacDenied", { role: usuario?.role })}
         </p>
-      </main>
+      </RbacTag>
     );
   }
 

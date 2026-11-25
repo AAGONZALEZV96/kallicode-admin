@@ -23,6 +23,7 @@ import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { EstadoError } from "../componentes/EstadoError";
 import { Badge, BadgeVariante } from "../componentes/Badge";
 import { Boton } from "../componentes/Boton";
+import { useInsideAdminLayout } from "../componentes/AdminLayout";
 import {
   Tabla,
   TablaEncabezado,
@@ -324,6 +325,8 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage || i18n.language;
+  const insideLayout = useInsideAdminLayout();
+  const RbacTag: React.ElementType = insideLayout ? "div" : "main";
   const auth = useOptionalAuth();
   const usuario = auth?.usuario ?? null;
 
@@ -517,7 +520,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
 
   if (rolNoAutorizado) {
     return (
-      <main
+      <RbacTag
         className="view ops-agents"
         data-testid="ops-agents-rbac-bloqueado"
         role="alert"
@@ -536,7 +539,7 @@ const OpsAgentsInterno: React.FC<OpsAgentsInternoProps> = ({
         <p style={{ color: "var(--muted)", margin: 0 }}>
           {t("views.opsAgents.rbacDenied", { role: usuario?.role })}
         </p>
-      </main>
+      </RbacTag>
     );
   }
 

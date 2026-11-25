@@ -5,7 +5,7 @@
  * enlaces dinámicos según permisos RBAC y botón de cierre de sesión.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth, RolStaff } from "../estado/auth";
@@ -14,11 +14,20 @@ import { Badge } from "./Badge";
 import { Boton } from "./Boton";
 import { LogoKalliCode } from "./LogoKalliCode";
 
+const AdminLayoutContext = createContext<boolean>(false);
+
+export function useInsideAdminLayout(): boolean {
+  return useContext(AdminLayoutContext);
+}
+
 export const AdminLayout: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { usuario, logout, cargando } = useAuth();
   const location = useLocation();
   const [menuMovilAbierto, setMenuMovilAbierto] = useState<boolean>(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
+  const wasDrawerOpenRef = useRef<boolean>(false);
   const idiomaActual = normalizeLanguage(i18n.resolvedLanguage || i18n.language);
 
   const manejarCambioIdioma = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -87,14 +96,55 @@ export const AdminLayout: React.FC = () => {
     };
   }, []);
 
-  // Evitar scroll en fondo mientras el drawer móvil está abierto
+  // Evitar scroll en fondo y gestionar foco + focus trap dentro del drawer móvil
   useEffect(() => {
-    if (!menuMovilAbierto || typeof document === "undefined") return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
+    if (menuMovilAbierto) {
+      wasDrawerOpenRef.current = true;
+      const prevOverflow = typeof document !== "undefined" ? document.body.style.overflow : "";
+      if (typeof document !== "undefined") {
+        document.body.style.overflow = "hidden";
+      }
+
+      const focusables = drawerRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables && focusables.length > 0) {
+        focusables[0].focus();
+      }
+
+      const manejarTabDrawer = (e: KeyboardEvent) => {
+        if (e.key !== "Tab" || !drawerRef.current) return;
+        const items = Array.from(
+          drawerRef.current.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      };
+
+      window.addEventListener("keydown", manejarTabDrawer);
+      return () => {
+        window.removeEventListener("keydown", manejarTabDrawer);
+        if (typeof document !== "undefined") {
+          document.body.style.overflow = prevOverflow;
+        }
+      };
+    }
+
+    if (wasDrawerOpenRef.current) {
+      wasDrawerOpenRef.current = false;
+      mobileToggleRef.current?.focus();
+    }
+    return undefined;
   }, [menuMovilAbierto]);
 
   return (
@@ -102,6 +152,9 @@ export const AdminLayout: React.FC = () => {
       className="admin-shell"
       style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--bg, #0f172a)" }}
     >
+      <a href="#main-content" className="skip-link">
+        {t("layout.skipToContent")}
+      </a>
       {/* Header / Navbar Responsivo */}
       <header className="admin-header">
         <div className="admin-brand-wrap">
@@ -114,8 +167,8 @@ export const AdminLayout: React.FC = () => {
             <span>{t("layout.consoleTitle")}</span>
           </Link>
 
-          {/* Menú de Escritorio (>= 900px) */}
-          <nav className="nav-desktop">
+          {/* Menú de Escritorio (>= 1025px) */}
+          <nav className="nav-desktop" aria-label={t("layout.nav.desktopAria")}>
             {tienePermisoNegocio && (
               <>
                 <Link
@@ -309,6 +362,7 @@ export const AdminLayout: React.FC = () => {
             <Badge variante={getBadgeVariant(rol)}>{rol}</Badge>
           )}
           <button
+            ref={mobileToggleRef}
             type="button"
             className="nav-mobile-toggle"
             onClick={() => setMenuMovilAbierto((prev) => !prev)}
@@ -320,9 +374,15 @@ export const AdminLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Cajón Desplegable Móvil (< 900px) */}
+      {/* Cajón Desplegable Móvil (<= 1024px) */}
       {menuMovilAbierto && (
-        <div className="nav-mobile-drawer" role="dialog" aria-modal="true" aria-label={t("layout.mobile.drawerLabel")}>
+        <div
+          ref={drawerRef}
+          className="nav-mobile-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("layout.mobile.drawerLabel")}
+        >
           {usuario && (
             <div
               style={{
@@ -343,7 +403,7 @@ export const AdminLayout: React.FC = () => {
             </div>
           )}
 
-          <nav style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <nav aria-label={t("layout.nav.mobileAria")} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             {tienePermisoNegocio && (
               <>
                 <Link
@@ -445,8 +505,10 @@ export const AdminLayout: React.FC = () => {
       )}
 
       {/* Contenido Principal */}
-      <main className="admin-main">
-        <Outlet />
+      <main id="main-content" tabIndex={-1} className="admin-main">
+        <AdminLayoutContext.Provider value={true}>
+          <Outlet />
+        </AdminLayoutContext.Provider>
       </main>
     </div>
   );

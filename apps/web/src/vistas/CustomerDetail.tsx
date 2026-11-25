@@ -32,6 +32,7 @@ import { Boton } from "../componentes/Boton";
 import { Badge } from "../componentes/Badge";
 import { ContenedorEstado } from "../componentes/ContenedorEstado";
 import { SolicitudConcesionModal } from "../componentes/SolicitudConcesionModal";
+import { useInsideAdminLayout } from "../componentes/AdminLayout";
 import {
   Tabla,
   TablaEncabezado,
@@ -171,6 +172,8 @@ function obtenerBadgePlan(plan: string | undefined, t: (key: string) => string) 
 export const CustomerDetail: React.FC = () => {
   const { t, i18n: i18nInstance } = useTranslation();
   const lang = i18nInstance.resolvedLanguage || i18nInstance.language;
+  const insideLayout = useInsideAdminLayout();
+  const RbacTag: React.ElementType = insideLayout ? "div" : "main";
   const { tenant_id } = useParams<{ tenant_id: string }>();
   const { usuario } = useAuth();
 
@@ -207,7 +210,7 @@ export const CustomerDetail: React.FC = () => {
   // ------------------------------------------------------------------ 1. RBAC Bloqueado
   if (esRolOperaciones) {
     return (
-      <main className="customer-detail-page" style={{ padding: "var(--space-6)" }}>
+      <RbacTag className="customer-detail-page" style={{ padding: "var(--space-6)" }}>
         <div
           data-testid="error-403-rol"
           className="card"
@@ -235,7 +238,7 @@ export const CustomerDetail: React.FC = () => {
             </Link>
           </div>
         </div>
-      </main>
+      </RbacTag>
     );
   }
 
@@ -317,7 +320,7 @@ export const CustomerDetail: React.FC = () => {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-              <span>✅</span>
+              <span aria-hidden="true">✅</span>
               <span>{feedbackConcesion}</span>
             </div>
             <button
@@ -681,7 +684,10 @@ export const CustomerDetail: React.FC = () => {
           <h3 style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", color: "var(--muted)", marginBottom: "var(--space-2)" }}>
             {t("views.customerDetail.fields.historyTitle")}
           </h3>
-          <Tabla densidad="alta">
+          <Tabla
+            densidad="alta"
+            ariaLabelRegion={t("views.customerDetail.fields.historyTitle")}
+          >
             <TablaEncabezado>
               <TablaFila>
                 <TablaCeldaEncabezado fija>{t("views.customerDetail.fields.colCycle")}</TablaCeldaEncabezado>
@@ -745,7 +751,10 @@ export const CustomerDetail: React.FC = () => {
               </span>
             )}
           </header>
-          <Tabla densidad="alta">
+          <Tabla
+            densidad="alta"
+            ariaLabelRegion={t("views.customerDetail.sections.users", { count: usuarios.length })}
+          >
             <TablaEncabezado>
               <TablaFila>
                 <TablaCeldaEncabezado fija>{t("views.customerDetail.fields.colUserEmail")}</TablaCeldaEncabezado>
@@ -802,7 +811,10 @@ export const CustomerDetail: React.FC = () => {
               </span>
             )}
           </header>
-          <Tabla densidad="alta">
+          <Tabla
+            densidad="alta"
+            ariaLabelRegion={t("views.customerDetail.sections.integrations", { count: integraciones.length })}
+          >
             <TablaEncabezado>
               <TablaFila>
                 <TablaCeldaEncabezado fija>{t("views.customerDetail.fields.colType")}</TablaCeldaEncabezado>

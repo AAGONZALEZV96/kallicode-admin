@@ -26,14 +26,32 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveRef = useRef<HTMLElement | null>(null);
   const alCerrarRef = useRef(alCerrar);
   alCerrarRef.current = alCerrar;
 
-  // Mover foco al contenedor del modal únicamente cuando se abre por primera vez
+  // Mover foco al diálogo al abrir y restaurar al elemento origen al cerrar
   useEffect(() => {
-    if (abierto) {
+    if (!abierto) return;
+    previousActiveRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusables = modalRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusables && focusables.length > 0) {
+      focusables[0].focus();
+    } else {
       modalRef.current?.focus();
     }
+
+    return () => {
+      const prev = previousActiveRef.current;
+      if (prev && prev.isConnected) {
+        prev.focus();
+      }
+      previousActiveRef.current = null;
+    };
   }, [abierto]);
 
   useEffect(() => {
@@ -42,6 +60,35 @@ export const Modal: React.FC<ModalProps> = ({
     const manejarKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && cerrarConEscape) {
         alCerrarRef.current();
+        return;
+      }
+
+      if (e.key === "Tab" && modalRef.current) {
+        const focusables = Array.from(
+          modalRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => el.getAttribute("aria-hidden") !== "true");
+
+        if (focusables.length === 0) {
+          e.preventDefault();
+          modalRef.current.focus();
+          return;
+        }
+
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+
+        if (e.shiftKey) {
+          if (active === first || active === modalRef.current || !modalRef.current.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !modalRef.current.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
 

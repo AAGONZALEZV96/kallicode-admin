@@ -99,7 +99,10 @@
   },
   "layout": {
     "consoleTitle": "KalliCode Console",
+    "skipToContent": "Skip to main content",
     "nav": {
+      "desktopAria": "Primary navigation",
+      "mobileAria": "Mobile primary navigation",
       "overview": "Business Overview",
       "subscriptions": "Subscriptions",
       "tokens": "Token Usage",
@@ -391,6 +394,7 @@
         "colLastActivity": "Last Activity",
         "colPrivacy": "Privacy",
         "colActions": "Actions",
+        "sortColumnAria": "Sort by {{column}}",
         "viewDetailsAria": "View details for {{tenantId}}",
         "maskedTitle": "Data masked by privacy and default masking policy",
         "activeLines": "({{count}} act.)",
@@ -485,6 +489,7 @@
       "tabRenewals": "Renewals Radar",
       "tabUpgrades": "Upgrades Queue",
       "maskedTooltip": "Data masked by privacy policy. Click to request justified reveal.",
+      "revealAria": "Request data reveal for {{tenantId}}",
       "renewals": {
         "regionLabel": "Directory and Renewals Radar",
         "searchPlaceholder": "Search tenant or customer...",
@@ -497,6 +502,7 @@
         "emptyTitle": "No subscriptions found",
         "emptyDescription": "No contracts matched the applied commercial filters.",
         "tableAria": "Subscriptions list and renewals radar",
+        "sortColumnAria": "Sort by {{column}}",
         "colTenant": "Organization (Tenant)",
         "colName": "Legal Name",
         "colPlan": "Plan",
@@ -813,6 +819,7 @@
         "standardSubtitle": "Standard operational execution aggregated by selected window, never mixed with Fable.",
         "fableTitle": "Fable Tier — Advanced Reasoning (Strict Segregation)",
         "fableSubtitle": "Reported independently: its calls, latencies, and rates are never averaged with Flash or Pro.",
+        "scrollRegionAria": "Scrollable table: {{title}}",
         "colProvider": "Provider",
         "colModel": "Model",
         "colTier": "Tier",

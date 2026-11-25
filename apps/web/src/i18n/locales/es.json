@@ -99,7 +99,10 @@
   },
   "layout": {
     "consoleTitle": "KalliCode Consola",
+    "skipToContent": "Saltar al contenido principal",
     "nav": {
+      "desktopAria": "Navegación principal",
+      "mobileAria": "Navegación móvil principal",
       "overview": "Panel Negocio",
       "subscriptions": "Suscripciones",
       "tokens": "Consumo Tokens",
@@ -391,6 +394,7 @@
         "colLastActivity": "Última Actividad",
         "colPrivacy": "Privacidad",
         "colActions": "Acciones",
+        "sortColumnAria": "Ordenar por {{column}}",
         "viewDetailsAria": "Ver detalles de {{tenantId}}",
         "maskedTitle": "Dato enmascarado por política de privacidad y enmascaramiento",
         "activeLines": "({{count}} act.)",
@@ -485,6 +489,7 @@
       "tabRenewals": "Radar de Renovaciones",
       "tabUpgrades": "Cola de Upgrades",
       "maskedTooltip": "Dato enmascarado por política de privacidad. Clic para solicitar revelación justificada.",
+      "revealAria": "Solicitar revelación de datos para {{tenantId}}",
       "renewals": {
         "regionLabel": "Directorio y Radar de Renovaciones",
         "searchPlaceholder": "Buscar tenant o cliente...",
@@ -497,6 +502,7 @@
         "emptyTitle": "No se encontraron suscripciones",
         "emptyDescription": "No existen contratos que coincidan con los filtros comerciales aplicados.",
         "tableAria": "Listado de suscripciones y radar de renovaciones",
+        "sortColumnAria": "Ordenar por {{column}}",
         "colTenant": "Organización (Tenant)",
         "colName": "Razón Social",
         "colPlan": "Plan",
@@ -813,6 +819,7 @@
         "standardSubtitle": "Ejecución operativa estándar agregada por ventana seleccionada, sin mezcla con Fable.",
         "fableTitle": "Tier Fable — Razonamiento Avanzado (Segregación Estricta)",
         "fableSubtitle": "Reportado de forma independiente: sus llamadas, latencias y tarifas no se promedian con Flash ni Pro.",
+        "scrollRegionAria": "Tabla desplazable: {{title}}",
         "colProvider": "Proveedor",
         "colModel": "Modelo",
         "colTier": "Tier",
