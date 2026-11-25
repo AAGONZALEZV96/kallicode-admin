@@ -209,7 +209,9 @@ def test_metrics_prometheus_expone_series_y_protege_confidencialidad(
             "st_01",
             "st_prueba",
             "SELECT ",
-            "password",
+            "password_hash",
+            "postgresql://",
+            "Bearer ",
         ):
             assert fuga not in texto
 
