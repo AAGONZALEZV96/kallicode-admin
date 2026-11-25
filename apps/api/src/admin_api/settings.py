@@ -16,6 +16,7 @@ si alguna de las dos apunta a un superusuario (véase `verificar_arranque`).
 
 from __future__ import annotations
 
+import ipaddress
 import os
 from functools import lru_cache
 
@@ -105,6 +106,12 @@ class AdminSettings(BaseSettings):
     allowed_hosts: str = "localhost,admin.internal.kallicode.com"
     trusted_proxies: str = "10.0.0.0/8"
 
+    # --- observabilidad Prometheus y salud (KC-ADM-B6-08) ---
+    metrics_enabled: bool = True
+    metrics_allow_cidrs: str = "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128"
+    metrics_bearer_token: str | None = None
+    health_check_blob_remote: bool = False
+
     @field_validator("database_url_app", "database_url_ro")
     @classmethod
     def _sin_superusuario(cls, v: str) -> str:
@@ -126,6 +133,28 @@ class AdminSettings(BaseSettings):
     @property
     def hosts_permitidos(self) -> list[str]:
         return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
+
+    @property
+    def redes_proxies_confiables(
+        self,
+    ) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+        redes: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+        for raw in self.trusted_proxies.split(","):
+            cidr = raw.strip()
+            if cidr:
+                redes.append(ipaddress.ip_network(cidr, strict=False))
+        return redes
+
+    @property
+    def redes_metricas_permitidas(
+        self,
+    ) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+        redes: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+        for raw in self.metrics_allow_cidrs.split(","):
+            cidr = raw.strip()
+            if cidr:
+                redes.append(ipaddress.ip_network(cidr, strict=False))
+        return redes
 
     def resolve_telemetry_base_url(self) -> str:
         """Resuelve la URL base del servicio de telemetría (Equipo 2).

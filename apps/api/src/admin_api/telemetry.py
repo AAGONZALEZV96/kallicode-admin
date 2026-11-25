@@ -24,6 +24,15 @@ from kallicode_core.logging import log
 from kallicode_core.seguridad import emitir_svc_token
 
 from .errors import telemetria_no_disponible
+from .metrics import (
+    ADMIN_METRICS_REGISTRY,
+    obtener_ruta_normalizada,
+    registrar_accion_personal_metrica,
+    registrar_fallo_dependencia,
+    registrar_frescura_agregados,
+    registrar_peticion_http,
+    renderizar_metricas_prometheus,
+)
 from .settings import AdminSettings, get_admin_settings
 
 _AGENT_COUNTER_KEYS = (
@@ -47,6 +56,7 @@ class _TelemetryCircuitBreaker:
         if self._open_until is None:
             return
         if time.monotonic() < self._open_until:
+            registrar_fallo_dependencia("telemetry_circuit_breaker")
             raise telemetria_no_disponible()
         # Ventana de enfriamiento agotada: permite una sonda de recuperación.
         self._open_until = None
@@ -59,6 +69,7 @@ class _TelemetryCircuitBreaker:
         self._consecutive_failures += 1
         if self._consecutive_failures >= max(1, threshold):
             self._open_until = time.monotonic() + max(0.0, cooldown_s)
+            registrar_fallo_dependencia("telemetry_circuit_breaker")
             log.warning(
                 "admin.ops.telemetria_circuito_abierto",
                 fallos_consecutivos=self._consecutive_failures,
@@ -103,14 +114,17 @@ async def _pedir(ruta: str, params: dict[str, Any] | None = None) -> dict[str, A
             )
     except httpx.HTTPError as exc:
         _breaker.record_failure(s.telemetry_cb_failure_threshold, s.telemetry_cb_cooldown_s)
+        registrar_fallo_dependencia("telemetria")
         log.warning("admin.telemetria.inalcanzable", ruta=ruta, excepcion=type(exc).__name__)
         raise telemetria_no_disponible() from exc
 
     if r.status_code >= 500:
         _breaker.record_failure(s.telemetry_cb_failure_threshold, s.telemetry_cb_cooldown_s)
+        registrar_fallo_dependencia("telemetria")
         log.warning("admin.telemetria.error_servidor", ruta=ruta, status=r.status_code)
         raise telemetria_no_disponible()
     if r.status_code >= 400:
+        registrar_fallo_dependencia("telemetria")
         log.warning("admin.telemetria.rechazada", ruta=ruta, status=r.status_code)
         raise telemetria_no_disponible()
 
@@ -118,11 +132,13 @@ async def _pedir(ruta: str, params: dict[str, Any] | None = None) -> dict[str, A
         raw_payload = r.json()
     except ValueError as exc:
         _breaker.record_failure(s.telemetry_cb_failure_threshold, s.telemetry_cb_cooldown_s)
+        registrar_fallo_dependencia("telemetria")
         log.warning("admin.telemetria.payload_invalido", ruta=ruta)
         raise telemetria_no_disponible() from exc
 
     if not isinstance(raw_payload, dict):
         _breaker.record_failure(s.telemetry_cb_failure_threshold, s.telemetry_cb_cooldown_s)
+        registrar_fallo_dependencia("telemetria")
         log.warning("admin.telemetria.payload_invalido", ruta=ruta)
         raise telemetria_no_disponible()
 
@@ -145,11 +161,27 @@ def _comprobar_frescura(datos: dict[str, Any], campo: str) -> int | None:
         return None
     edad = max(0, int((datetime.now(UTC) - ts).total_seconds()))
     if edad > s.telemetry_max_age_s:
+        registrar_fallo_dependencia("telemetria")
         log.warning("admin.telemetria.desactualizada", antiguedad_s=edad)
         raise telemetria_no_disponible(edad)
     if edad > s.telemetry_warn_age_s:
         log.warning("admin.ops.telemetria_desactualizada", antiguedad_s=edad)
     return edad
+
+
+__all__ = [
+    "ADMIN_METRICS_REGISTRY",
+    "agentes",
+    "colas",
+    "obtener_ruta_normalizada",
+    "proveedores",
+    "registrar_accion_personal_metrica",
+    "registrar_fallo_dependencia",
+    "registrar_frescura_agregados",
+    "registrar_peticion_http",
+    "renderizar_metricas_prometheus",
+    "reset_circuit_breaker",
+]
 
 
 async def agentes(ventana: str = "1h", etapa: str | None = None) -> dict[str, Any]:
