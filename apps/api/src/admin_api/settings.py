@@ -16,11 +16,35 @@ si alguna de las dos apunta a un superusuario (véase `verificar_arranque`).
 
 from __future__ import annotations
 
+import json
 import os
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _parsear_origenes_cors(raw: str) -> list[str]:
+    """Parsea orígenes CORS desde cadena separada por comas o JSON sin duplicados."""
+    texto = raw.strip()
+    if not texto:
+        return []
+    candidatos: list[str]
+    if texto.startswith("["):
+        cargado = json.loads(texto)
+        if not isinstance(cargado, list):
+            raise ValueError("KC_ADMIN_CORS_ORIGINS JSON debe ser una lista de URLs")
+        candidatos = [str(item) for item in cargado]
+    else:
+        candidatos = texto.split(",")
+
+    vistos: list[str] = []
+    for item in candidatos:
+        limpio = item.strip().rstrip("/")
+        if limpio and limpio not in vistos:
+            vistos.append(limpio)
+    return vistos
 
 
 class AdminSettings(BaseSettings):
@@ -104,6 +128,7 @@ class AdminSettings(BaseSettings):
     # --- red: la consola no se publica nunca (§18.31, ADM-G10) ---
     allowed_hosts: str = "localhost,admin.internal.kallicode.com"
     trusted_proxies: str = "10.0.0.0/8"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @field_validator("database_url_app", "database_url_ro")
     @classmethod
@@ -117,6 +142,22 @@ class AdminSettings(BaseSettings):
             )
         return v
 
+    @field_validator("cors_origins")
+    @classmethod
+    def _cors_sin_comodines(cls, v: str) -> str:
+        origenes = _parsear_origenes_cors(v)
+        if not origenes:
+            raise ValueError(
+                "KC_ADMIN_CORS_ORIGINS no puede estar vacío: declara orígenes explícitos"
+            )
+        for origen in origenes:
+            if "*" in origen:
+                raise ValueError(f"KC_ADMIN_CORS_ORIGINS no admite comodines (*): {origen!r}")
+            parsed = urlparse(origen)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                raise ValueError(f"origen CORS inválido en KC_ADMIN_CORS_ORIGINS: {origen!r}")
+        return ",".join(origenes)
+
     @property
     def dominios_permitidos(self) -> tuple[str, ...]:
         return tuple(
@@ -126,6 +167,10 @@ class AdminSettings(BaseSettings):
     @property
     def hosts_permitidos(self) -> list[str]:
         return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
+
+    @property
+    def origenes_cors(self) -> list[str]:
+        return _parsear_origenes_cors(self.cors_origins)
 
     def resolve_telemetry_base_url(self) -> str:
         """Resuelve la URL base del servicio de telemetría (Equipo 2).
