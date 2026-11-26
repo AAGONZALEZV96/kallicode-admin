@@ -242,6 +242,21 @@ async def test_se_detecta_la_supresion_de_un_tramo_intermedio(
                 text("DELETE FROM admin.staff_actions WHERE staff_id = :sid"),
                 {"sid": empleado["id"]},
             )
+            await conn.execute(
+                text(
+                    """
+                UPDATE admin.staff_action_head
+                SET last_seal = coalesce(
+                        (SELECT seal FROM admin.staff_actions
+                         ORDER BY occurred_at DESC, id DESC LIMIT 1),
+                        ''
+                    ),
+                    events = (SELECT count(*) FROM admin.staff_actions),
+                    updated_at = now()
+                WHERE lock_id = 1
+                """
+                )
+            )
             await conn.execute(text(enable_trigger))
         await engine_su.dispose()
 
@@ -322,6 +337,21 @@ async def test_se_detecta_la_reescritura_con_prev_seal_ajustado(
             await conn.execute(
                 text("DELETE FROM admin.staff_actions WHERE staff_id = :sid"),
                 {"sid": empleado["id"]},
+            )
+            await conn.execute(
+                text(
+                    """
+                UPDATE admin.staff_action_head
+                SET last_seal = coalesce(
+                        (SELECT seal FROM admin.staff_actions
+                         ORDER BY occurred_at DESC, id DESC LIMIT 1),
+                        ''
+                    ),
+                    events = (SELECT count(*) FROM admin.staff_actions),
+                    updated_at = now()
+                WHERE lock_id = 1
+                """
+                )
             )
             await conn.execute(text(enable_trigger))
         await engine_su.dispose()

@@ -13,9 +13,9 @@
 
 El presente informe formaliza la auditoría técnica, funcional, de accesibilidad y de usabilidad en escenario real de guardia sobre las tres pantallas operativas de la consola de administración de KalliCode:
 
-1. **`ops-agents`** ([OpsAgents.tsx](apps/web/src/vistas/OpsAgents.tsx)) — Estado de agentes de producción, etapas del pipeline y colas Redis Streams.
-2. **`ops-models`** ([OpsModels.tsx](apps/web/src/vistas/OpsModels.tsx)) — Disponibilidad, latencia, tasa de error, escalados LLM y salud de dependencias core.
-3. **`ops-sla`** ([OpsSLA.tsx](apps/web/src/vistas/OpsSLA.tsx) y [DetalleRelojSLA.tsx](apps/web/src/componentes/DetalleRelojSLA.tsx)) — Cumplimiento de niveles de servicio, riesgos (`> 75 %`) y explicabilidad del reloj por tramos.
+1. **`ops-agents`** ([OpsAgents.tsx](../../apps/web/src/vistas/OpsAgents.tsx)) — Estado de agentes de producción, etapas del pipeline y colas Redis Streams.
+2. **`ops-models`** ([OpsModels.tsx](../../apps/web/src/vistas/OpsModels.tsx)) — Disponibilidad, latencia, tasa de error, escalados LLM y salud de dependencias core.
+3. **`ops-sla`** ([OpsSLA.tsx](../../apps/web/src/vistas/OpsSLA.tsx) y [DetalleRelojSLA.tsx](../../apps/web/src/componentes/DetalleRelojSLA.tsx)) — Cumplimiento de niveles de servicio, riesgos (`> 75 %`) y explicabilidad del reloj por tramos.
 
 ### Dictamen Formal de Operabilidad
 

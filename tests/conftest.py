@@ -151,8 +151,37 @@ def esquema(dsn: str) -> str:
         INSERT INTO admin.staff (id, email, full_name, role, status,
                                  password_hash, totp_secret, totp_enrolled_at)
         VALUES ('st_prueba', 'st_prueba@kallicode.com', 'Empleado Prueba',
-                'staff_admin', 'active', 'hash', 'totp', now())
+                'staff_admin', 'active', 'hash', 'totp', now()),
+               ('st_eval_admin', 'admin@kallicode.com', 'Evaluador Admin',
+                'staff_admin', 'active',
+                '$argon2id$v=19$m=65536,t=3,p=4$MWrpg+hrlKlq9rjN+Ybynw$'
+                'Jry3GbnDjC8deOgYYueWiK9n61DkPzRLYQSyXpP06jI',
+                'JBSWY3DPEHPK3PXP', now()),
+               ('st_eval_soporte', 'soporte@kallicode.com', 'Evaluador Soporte',
+                'staff_soporte', 'active',
+                '$argon2id$v=19$m=65536,t=3,p=4$MWrpg+hrlKlq9rjN+Ybynw$'
+                'Jry3GbnDjC8deOgYYueWiK9n61DkPzRLYQSyXpP06jI',
+                'JBSWY3DPEHPK3PXP', now()),
+               ('st_eval_operaciones', 'operaciones@kallicode.com', 'Evaluador Ops',
+                'staff_operaciones', 'active',
+                '$argon2id$v=19$m=65536,t=3,p=4$MWrpg+hrlKlq9rjN+Ybynw$'
+                'Jry3GbnDjC8deOgYYueWiK9n61DkPzRLYQSyXpP06jI',
+                'JBSWY3DPEHPK3PXP', now()),
+               ('st_eval_negocio', 'negocio@kallicode.com', 'Evaluador Negocio',
+                'staff_negocio', 'active',
+                '$argon2id$v=19$m=65536,t=3,p=4$MWrpg+hrlKlq9rjN+Ybynw$'
+                'Jry3GbnDjC8deOgYYueWiK9n61DkPzRLYQSyXpP06jI',
+                'JBSWY3DPEHPK3PXP', now())
         ON CONFLICT (id) DO NOTHING;
+        INSERT INTO admin.staff_recovery_codes (staff_id, code_hash)
+        SELECT s.id, c.h
+        FROM (VALUES ('st_eval_admin'), ('st_eval_soporte'),
+                     ('st_eval_operaciones'), ('st_eval_negocio')) AS s(id)
+        CROSS JOIN (VALUES
+            ('8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'),
+            ('481f6cc0511143ccdd7e2d1b1b94faf0a700a8b49cd13922a70b5ae28acaa8c5')
+        ) AS c(h)
+        ON CONFLICT DO NOTHING;
         INSERT INTO core.organizations
             (id, nombre, idioma, timezone, despliegue, fabrica_activa)
         VALUES ('org_acme', 'Acme Logística S.L.', 'es', 'Europe/Madrid', 'cloud', true),
