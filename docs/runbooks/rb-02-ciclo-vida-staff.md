@@ -1,6 +1,6 @@
 # Runbook RB-02: Ciclo de Vida y Revocación de Emergencia de Personal (`staff`)
 
-- **Manual Maestro:** [admin_console_ops.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/admin_console_ops.md)
+- **Manual Maestro:** [admin_console_ops.md](admin_console_ops.md)
 - **Alcance:** Alta por invitación, cambio de rol, revocación inmediata de sesiones JWT en Redis y PostgreSQL, revocación de concesiones activas (`admin.access_grants`) y desactivación de cuentas (`staff_admin`).
 
 ---
@@ -28,14 +28,14 @@ curl -sS -X PATCH "https://admin.internal.kallicode.com/admin/v1/staff/${STAFF_I
   -H "Content-Type: application/json" \
   -d '{"estado":"deactivated","motivo":"Revocacion de emergencia por incidente de seguridad"}'
 ```
-Efectos automáticos verificados en [staff.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/staff.py#L290-L399):
+Efectos automáticos verificados en [staff.py](../../apps/api/src/admin_api/routers/staff.py#L290-L399):
 - Actualiza `admin.staff.status = 'deactivated'` (`staff_actual()` rechaza toda petición posterior del empleado con HTTP `403` código **`STAFF_DESACTIVADO`**).
 - Revoca todos sus refresh tokens vigentes en `admin.staff_refresh_tokens` (`revoked_reason = 'desactivado'`).
 - Revoca automáticamente todas sus concesiones activas en `admin.access_grants` (`revoked_reason = 'personal desactivado'`).
 - Registra evento `staff_managed` en `admin.staff_actions` y log crítico `staff.desactivado`.
 
 ### Paso 2 — Cortar en Redis cualquier Access Token JWT emitido antes de la revocación
-- Cada access token (`KC_ADMIN_STAFF_ACCESS_TOKEN_TTL_MIN = 15` min) valida en `staff_actual()` ([deps.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/deps.py#L135-L159)):
+- Cada access token (`KC_ADMIN_STAFF_ACCESS_TOKEN_TTL_MIN = 15` min) valida en `staff_actual()` ([deps.py](../../apps/api/src/admin_api/deps.py#L135-L159)):
   1. Presencia en lista de denegación por `jti`: clave **`admin:denylist:{jti}`**.
   2. Marca de revocación global por empleado: clave **`admin:staff:{staff_id}:revoked_at`** (`iat <= revoked_at` → HTTP `401` **`TOKEN_INVALIDO`**).
   3. Estado vigente en `admin.staff` (`status != 'active'` → HTTP `403` **`STAFF_DESACTIVADO`**).

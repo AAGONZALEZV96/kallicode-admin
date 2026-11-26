@@ -1,6 +1,6 @@
 # Runbook RB-03: Detección e Investigación de Patrones Anómalos de Acceso Cross-Tenant
 
-- **Manual Maestro:** [admin_console_ops.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/admin_console_ops.md)
+- **Manual Maestro:** [admin_console_ops.md](admin_console_ops.md)
 - **Alcance:** Auditoría de lecturas cross-tenant en `admin.staff_actions` y en la cadena central del tenant (`audit.audit_events`, `audit.chain_heads`), verificación SHA-256 e integridad end-to-end.
 
 ---
@@ -48,7 +48,7 @@
 ## 3. Protocolo de Contención y Preservación de Evidencia
 
 1. **Si se confirma acceso no justificado o anomalía de comportamiento:**
-   - Ejecutar inmediatamente el Runbook **[RB-02](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/rb-02-ciclo-vida-staff.md)**: revocar concesiones activas (`DELETE /admin/v1/access-grants/{grant_id}`), desactivar al empleado (`PATCH /admin/v1/staff/{staff_id}`) y cortar sesiones en Redis.
+   - Ejecutar inmediatamente el Runbook **[RB-02](rb-02-ciclo-vida-staff.md)**: revocar concesiones activas (`DELETE /admin/v1/access-grants/{grant_id}`), desactivar al empleado (`PATCH /admin/v1/staff/{staff_id}`) y cortar sesiones en Redis.
 2. **Exportación formal de evidencias forenses** (`POST /admin/v1/audit/staff-actions/exports`, rol `staff_admin`):
    ```bash
    curl -sS -X POST "https://admin.internal.kallicode.com/admin/v1/audit/staff-actions/exports" \

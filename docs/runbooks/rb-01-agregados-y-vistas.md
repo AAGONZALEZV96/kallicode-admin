@@ -1,6 +1,6 @@
 # Runbook RB-01: Fallo o Retraso en Refresco de Vistas Materializadas y Agregados
 
-- **Manual Maestro:** [admin_console_ops.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/admin_console_ops.md)
+- **Manual Maestro:** [admin_console_ops.md](admin_console_ops.md)
 - **Alcance:** Tablas `admin.agg_*`, `admin.sla_cases`, `admin.agg_sla_compliance`, tabla de control `admin.aggregate_state` y trabajos `refrescar_agregados` / `evaluar_sla` en `admin_workers`.
 
 ---

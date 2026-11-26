@@ -1,13 +1,13 @@
 # Runbook RB-04: Interrupción y Recuperación de Telemetría Operativa del Pipeline
 
-- **Manual Maestro:** [admin_console_ops.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/admin_console_ops.md)
-- **Alcance:** Cliente de telemetría interna en [telemetry.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/telemetry.py) (`_TelemetryCircuitBreaker`), endpoints `/admin/v1/ops/agents`, `/admin/v1/ops/queues`, `/admin/v1/ops/models` y contrato con Equipo 2.
+- **Manual Maestro:** [admin_console_ops.md](admin_console_ops.md)
+- **Alcance:** Cliente de telemetría interna en [telemetry.py](../../apps/api/src/admin_api/telemetry.py) (`_TelemetryCircuitBreaker`), endpoints `/admin/v1/ops/agents`, `/admin/v1/ops/queues`, `/admin/v1/ops/models` y contrato con Equipo 2.
 
 ---
 
 ## 1. Distinción Crítica: «Sin Trabajo» vs «Sin Telemetría»
 
-Antes de abrir incidente con Plataforma (Equipo 2), distinguir ambos estados en [ops.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/ops.py) y [telemetry.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/telemetry.py):
+Antes de abrir incidente con Plataforma (Equipo 2), distinguir ambos estados en [ops.py](../../apps/api/src/admin_api/routers/ops.py) y [telemetry.py](../../apps/api/src/admin_api/telemetry.py):
 
 | Condición | Respuesta en `/admin/v1/ops/agents` y `/queues` | Respuesta en `/admin/v1/health` | Diagnóstico |
 | :--- | :--- | :--- | :--- |
