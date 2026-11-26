@@ -2,13 +2,13 @@
 
 - **Ticket:** `[KC-ADM-B6-10]` — Épica EAD6 (Sprint 12 / Hito M6)
 - **Alcance:** Consola interna de administración (`/admin/v1`), workers en segundo plano (`admin_workers`) y capa de datos segregada (`admin.*` / `core.*` / `audit.*`).
-- **Principio rector:** Cero exposición pública (red privada / VPN corporativa, véase [001-arquitectura-consola.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/adr/001-arquitectura-consola.md) y `infra/network.bicep`). Toda referencia técnica en este manual ha sido verificada en el código fuente del monorepo.
+- **Principio rector:** Cero exposición pública (red privada / VPN corporativa, véase [001-arquitectura-consola.md](../adr/001-arquitectura-consola.md) y `infra/network.bicep`). Toda referencia técnica en este manual ha sido verificada en el código fuente del monorepo.
 
 ---
 
 ## 1. Topología Operativa y Separación de Conexiones
 
-La API FastAPI ([main.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/main.py)) y los workers ([admin_workers.main](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/workers/src/admin_workers/main.py)) operan con tres roles de PostgreSQL 16 sin `BYPASSRLS` ni superusuario:
+La API FastAPI ([main.py](../../apps/api/src/admin_api/main.py)) y los workers ([admin_workers.main](../../apps/workers/src/admin_workers/main.py)) operan con tres roles de PostgreSQL 16 sin `BYPASSRLS` ni superusuario:
 
 | Canal / Pool | Variable / Propietario | Rol PostgreSQL | Propósito y Límites |
 | :--- | :--- | :--- | :--- |
@@ -20,7 +20,7 @@ La API FastAPI ([main.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps
 
 ## 2. Catálogo Verificado de Variables de Entorno
 
-Variables declaradas en [settings.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/settings.py), [sla.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/workers/src/admin_workers/sla.py), [.env.example](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/.env.example) y [Makefile](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/Makefile):
+Variables declaradas en [settings.py](../../apps/api/src/admin_api/settings.py), [sla.py](../../apps/workers/src/admin_workers/sla.py), [.env.example](../../.env.example) y [Makefile](../../Makefile):
 
 ### 2.1 Entorno, Base de Datos y Red Privada
 - `KC_ADMIN_ENV`: `local` | `dev` | `staging` | `prod`
@@ -66,10 +66,10 @@ Variables declaradas en [settings.py](file:///home/aagonzalezv/CAPSTONE/kallicod
 
 | Runbook | Escenario Operativo | Archivo |
 | :--- | :--- | :--- |
-| **RB-01** | Fallo o retraso en el refresco de vistas materializadas y agregados (`admin.agg_*`, `admin.sla_cases`, worker) | [rb-01-agregados-y-vistas.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/rb-01-agregados-y-vistas.md) |
-| **RB-02** | Gestión del ciclo de vida y revocación de emergencia de personal (`staff`, sesiones Redis y `access_grants`) | [rb-02-ciclo-vida-staff.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/rb-02-ciclo-vida-staff.md) |
-| **RB-03** | Detección e investigación de patrones anómalos de acceso cross-tenant y verificación SHA-256 | [rb-03-auditoria-cross-tenant.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/rb-03-auditoria-cross-tenant.md) |
-| **RB-04** | Interrupción y recuperación de la telemetría operativa del pipeline (Equipo 2 y circuit breaker) | [rb-04-telemetria-pipeline.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/rb-04-telemetria-pipeline.md) |
+| **RB-01** | Fallo o retraso en el refresco de vistas materializadas y agregados (`admin.agg_*`, `admin.sla_cases`, worker) | [rb-01-agregados-y-vistas.md](rb-01-agregados-y-vistas.md) |
+| **RB-02** | Gestión del ciclo de vida y revocación de emergencia de personal (`staff`, sesiones Redis y `access_grants`) | [rb-02-ciclo-vida-staff.md](rb-02-ciclo-vida-staff.md) |
+| **RB-03** | Detección e investigación de patrones anómalos de acceso cross-tenant y verificación SHA-256 | [rb-03-auditoria-cross-tenant.md](rb-03-auditoria-cross-tenant.md) |
+| **RB-04** | Interrupción y recuperación de la telemetría operativa del pipeline (Equipo 2 y circuit breaker) | [rb-04-telemetria-pipeline.md](rb-04-telemetria-pipeline.md) |
 
 ---
 
