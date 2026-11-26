@@ -111,6 +111,28 @@ def test_cabeceras_seguridad_en_rechazo_de_host_invalido() -> None:
     _assert_cabeceras_seguridad(r_400)
 
 
+def test_dockerfile_y_render_hostname_listos_para_despliegue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Dockerfile instala prometheus-client y soporta RENDER_EXTERNAL_HOSTNAME."""
+    from pathlib import Path
+
+    dockerfile = (Path(__file__).resolve().parents[1] / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    assert "prometheus-client" in dockerfile
+
+    monkeypatch.delenv("KC_ADMIN_ALLOWED_HOSTS", raising=False)
+    monkeypatch.setenv("RENDER_EXTERNAL_HOSTNAME", "kallicode-admin-api.onrender.com")
+    s_render = AdminSettings()
+    assert "kallicode-admin-api.onrender.com" in s_render.hosts_permitidos
+    assert "127.0.0.1" in s_render.hosts_permitidos
+
+    monkeypatch.setenv("KC_ADMIN_ALLOWED_HOSTS", "admin.internal.kallicode.com")
+    s_privado = AdminSettings()
+    assert s_privado.hosts_permitidos == ["admin.internal.kallicode.com"]
+
+
 # =========================================================================
 # 2. CORS restringido sin comodines (KC_ADMIN_CORS_ORIGINS)
 # =========================================================================
