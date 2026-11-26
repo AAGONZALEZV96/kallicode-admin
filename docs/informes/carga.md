@@ -4,7 +4,7 @@
 - **Épica:** `EAD6` — Endurecimiento, Red Privada, Observabilidad & Release MVP (Hito M6)
 - **Responsable:** ADM1 (Lead Full-Stack & Arquitectura · Equipo E6)
 - **Estado del Dictamen:** **APROBADO — Latencia global `p95 = 314.59 ms` (< 500 ms), `0%` errores 5xx, `100%` checks exitosos, `0` deadlocks y `0` bloqueos no concedidos sobre `core.*`**
-- **Artefactos verificables:** [k6_admin_load.js](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/tests/load/k6_admin_load.js), [seed_and_tokens.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/tests/load/seed_and_tokens.py), [orchestrate_load.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/tests/load/orchestrate_load.py) y [test_load_performance.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/tests/test_load_performance.py)
+- **Artefactos verificables:** [k6_admin_load.js](../../tests/load/k6_admin_load.js), [seed_and_tokens.py](../../tests/load/seed_and_tokens.py), [orchestrate_load.py](../../tests/load/orchestrate_load.py) y [test_load_performance.py](../../tests/test_load_performance.py)
 
 ---
 
@@ -25,7 +25,7 @@ Esta campaña verifica empíricamente bajo **50 usuarios virtuales (VUs) concurr
 - **Organizaciones y planes:** 20–24 organizaciones activas (`org_load_00`..`org_load_23`) distribuidas uniformemente entre los planes `starter`, `growth` y `enterprise` (más las organizaciones base `org_acme` y `org_globex`).
 - **Actividad por tenant:** suscripciones activas, ciclos de facturación (`core.usage_cycles`), consumo de tokens por tier (`flash`, `pro`, `fable` en `core.usage_tokens`), tickets (`core.tickets`), ejecuciones (`core.jobs`) y tramos cronológicos de reloj SLA (`admin.sla_clock_segments`).
 - **Pool de 50 identidades de personal (`st_load_00`..`st_load_49`)**:
-  - Dado que [deps.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/deps.py#L305-L319) impone rate limiting por empleado (`limite_rl4 = 300 req/min` y `limite_vivo = 60 req/min` en `/ops/agents` y `/ops/models`), cada VU de los 50 concurrentes recibe su propio JWT RS256 válido con `typ="staff"`, `iss="kallicode-admin"`, `aud="admin-v1"` y `mfa` reciente.
+  - Dado que [deps.py](../../apps/api/src/admin_api/deps.py) impone rate limiting por empleado (`limite_rl4 = 300 req/min` y `limite_vivo = 60 req/min` en `/ops/agents` y `/ops/models`), cada VU de los 50 concurrentes recibe su propio JWT RS256 válido con `typ="staff"`, `iss="kallicode-admin"`, `aud="admin-v1"` y `mfa` reciente.
 
 ### 2.2 Escenarios configurados en `tests/load/k6_admin_load.js`
 1. **`escenario_1_agregados_negocio`** (`ramping-vus` 0→20→50 VUs, meseta de 50 VUs durante 60s, bajada a 0): ejercita `/admin/v1/business/summary`, `/admin/v1/business/overview`, `/admin/v1/business/customers` y `/admin/v1/business/usage/tokens`.
