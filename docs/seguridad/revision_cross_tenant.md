@@ -4,7 +4,7 @@
 - **Épica:** `EAD6` — Endurecimiento, Red Privada, Observabilidad & Release MVP (Hito M6)
 - **Responsables:** ADM2 (Backend, Datos & Seguridad · Equipo E6) en revisión conjunta con Equipo 5 (Testing & Seguridad)
 - **Estado del Dictamen:** **APROBADO — 0 vulnerabilidades abiertas de elevación de privilegios o lectura no autorizada**
-- **Suites de Verificación Automática:** [tests/test_no_leak.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/tests/test_no_leak.py) y [tests/test_adversario.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/tests/test_adversario.py)
+- **Suites de Verificación Automática:** [tests/test_no_leak.py](../../tests/test_no_leak.py) y [tests/test_adversario.py](../../tests/test_adversario.py)
 
 ---
 
@@ -13,9 +13,9 @@
 La Consola de Administración (`kallicode-admin`) constituye la única excepción gobernada al aislamiento por inquilino (*Row-Level Security*) de la plataforma KalliCode. A diferencia de un fallo funcional ordinario, un defecto en los privilegios de base de datos o en las políticas RLS del canal analítico produce una **fuga silenciosa**: la consulta no falla, sino que expone filas o columnas adicionales sin alertar al operador.
 
 Antes del corte de Release Candidate (Hito M6), se ha ejecutado una auditoría adversaria sobre las tres barreras técnicas que contienen el acceso cross-tenant:
-1. **Aislamiento de roles y privilegios por columna en PostgreSQL 16** (`kallicode_admin_ro`, `kallicode_admin_app` y `kallicode_admin_agg`) definidos en [002_read_role.sql](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/db/002_read_role.sql), [003_business_aggregates.sql](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/db/003_business_aggregates.sql), [004_sla.sql](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/db/004_sla.sql) y [005_staff_audit_central_migration.sql](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/db/005_staff_audit_central_migration.sql).
-2. **Enmascaramiento por defecto en servidor y revelación acotada por concesión temporal** (`admin.access_grants`) implementados en [masking.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/masking.py), [deps.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/deps.py), [business.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/business.py), [ops.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/ops.py) y [grants.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/grants.py).
-3. **Auditoría append-only doblemente encadenada** en `admin.staff_actions` (`trg_staff_actions_immutable`) y en la cadena central del tenant (`audit.audit_events` y `audit.chain_heads` con `actor_tipo = 'staff'`) implementada en [audit.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/audit.py).
+1. **Aislamiento de roles y privilegios por columna en PostgreSQL 16** (`kallicode_admin_ro`, `kallicode_admin_app` y `kallicode_admin_agg`) definidos en [002_read_role.sql](../../db/002_read_role.sql), [003_business_aggregates.sql](../../db/003_business_aggregates.sql), [004_sla.sql](../../db/004_sla.sql) y [005_staff_audit_central_migration.sql](../../db/005_staff_audit_central_migration.sql).
+2. **Enmascaramiento por defecto en servidor y revelación acotada por concesión temporal** (`admin.access_grants`) implementados en [masking.py](../../apps/api/src/admin_api/masking.py), [deps.py](../../apps/api/src/admin_api/deps.py), [business.py](../../apps/api/src/admin_api/routers/business.py), [ops.py](../../apps/api/src/admin_api/routers/ops.py) y [grants.py](../../apps/api/src/admin_api/routers/grants.py).
+3. **Auditoría append-only doblemente encadenada** en `admin.staff_actions` (`trg_staff_actions_immutable`) y en la cadena central del tenant (`audit.audit_events` y `audit.chain_heads` con `actor_tipo = 'staff'`) implementada en [audit.py](../../apps/api/src/admin_api/audit.py).
 
 ---
 
@@ -85,11 +85,11 @@ Las siguientes tablas carecen tanto de privilegios `GRANT SELECT` como de polít
 ## 3. Auditoría de Enmascaramiento por Defecto y Concesiones (`admin.access_grants`)
 
 1. **Enmascaramiento en servidor antes de serializar**:
-   - [masking.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/masking.py) aplica el enmascaramiento antes de construir el sobre HTTP:
+   - [masking.py](../../apps/api/src/admin_api/masking.py) aplica el enmascaramiento antes de construir el sobre HTTP:
      - `PII_NEGOCIO`: `razon_social`, `nombre`, `dominio`, `comentario`, `conexion_nombre`, `email`, `correo`.
      - `PII_EXPEDIENTE`: `ticket_numero`, `numero`, `usuarios`, `integraciones`, `titulo` (las listas `usuarios` e `integraciones` se reemplazan por `None` conservando solo `usuarios_total` e `integraciones_total`).
      - `PII_CODIGO`: `diff`, `contenido`, `entrada`, `salida`, `fragmento`.
-   - En `/admin/v1/ops/sla` ([ops.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/ops.py#L574-L580)), `_tenant_visible` enmascara también `tenant_id` (`org_globex` → `o••••`) y el número de ticket cuando el empleado no posee concesión activa `datos_negocio` sobre ese tenant.
+   - En `/admin/v1/ops/sla` ([ops.py](../../apps/api/src/admin_api/routers/ops.py)), `_tenant_visible` enmascara también `tenant_id` (`org_globex` → `o••••`) y el número de ticket cuando el empleado no posee concesión activa `datos_negocio` sobre ese tenant.
 2. **Evaluación fila a fila por tenant e intransferibilidad**:
    - En listados multi-tenant (`/business/customers`, `/business/subscriptions`, `/business/upgrade-requests`, `/business/tokens`, `/ops/sla`), `enmascarar_filas` evalúa las concesiones vigentes del empleado autenticado (`st.id`) **para cada `tenant_id` individual**.
    - Una concesión activa sobre `org_acme` desenmascara únicamente la fila de `org_acme` y mantiene ofuscadas las filas de `org_globex` y del resto de organizaciones.
@@ -103,7 +103,7 @@ Las siguientes tablas carecen tanto de privilegios `GRANT SELECT` como de polít
 ## 4. Auditoría del Sellado Criptográfico e Integración con Cadena Central
 
 - **Doble registro transaccional**:
-  - Toda acción administrativa y toda lectura desenmascarada por concesión invoca `registrar_accion` / `registrar_lectura` en [audit.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/audit.py), reutilizando la sesión `db` activa (cumpliendo la regla anti-deadlocks §2.5 de [AGENTS.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/AGENTS.md)).
+  - Toda acción administrativa y toda lectura desenmascarada por concesión invoca `registrar_accion` / `registrar_lectura` en [audit.py](../../apps/api/src/admin_api/audit.py), reutilizando la sesión `db` activa (cumpliendo la regla anti-deadlocks §2.5 de [AGENTS.md](../../AGENTS.md)).
   - Se inserta el registro en `admin.staff_actions` con sello SHA-256 encadenado local y, cuando `tenant_id IS NOT NULL`, se replica en la misma transacción hacia `audit.audit_events` y `audit.chain_heads` con semántica canónica:
     - `actor`: `{"typ": "staff", "staff_id": "...", "rol": "..."}`
     - `sello_n = SHA-256(sello_n-1 || canonico(evento_n))`
@@ -129,4 +129,4 @@ Las siguientes tablas carecen tanto de privilegios `GRANT SELECT` como de polít
 
 ## 6. Conclusión y Sign-Off de Seguridad (Hito M6)
 
-Todas las comprobaciones estáticas, de catálogo de PostgreSQL (`admin.validate_read_role()`), de no-fuga (`tests/test_no_leak.py`) y de ataques adversarios (`tests/test_adversario.py`) finalizan con **0 vulnerabilidades abiertas**. El modelo de acceso cross-tenant cumple íntegramente las reglas innegociables de [AGENTS.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/AGENTS.md) y queda aprobado para el cierre del Bloque 6 (Release MVP M6).
+Todas las comprobaciones estáticas, de catálogo de PostgreSQL (`admin.validate_read_role()`), de no-fuga (`tests/test_no_leak.py`) y de ataques adversarios (`tests/test_adversario.py`) finalizan con **0 vulnerabilidades abiertas**. El modelo de acceso cross-tenant cumple íntegramente las reglas innegociables de [AGENTS.md](../../AGENTS.md) y queda aprobado para el cierre del Bloque 6 (Release MVP M6).
