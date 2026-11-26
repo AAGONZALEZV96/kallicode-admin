@@ -113,6 +113,17 @@ def test_runbooks_archivos_obligatorios_y_enlaces_existen() -> None:
     for rb in ARCHIVOS_RUNBOOK_ESPERADOS[1:]:
         assert rb in maestro, f"El manual maestro debe referenciar a {rb}"
 
+    patron_enlace = re.compile(r"\]\(([^)]+)\)")
+    for nombre, texto in docs.items():
+        assert "file://" not in texto, f"Ruta local file:// prohibida en {nombre}"
+        assert "/home/" not in texto, f"Ruta local /home/ prohibida en {nombre}"
+        for destino in patron_enlace.findall(texto):
+            if destino.startswith(("http://", "https://", "#")):
+                continue
+            ruta_rel = (RUNBOOKS_DIR / destino.split("#", 1)[0]).resolve()
+            assert ruta_rel.exists(), f"Enlace relativo roto {destino!r} en {nombre}"
+            assert ruta_rel.is_relative_to(ROOT), f"Enlace fuera del repo: {destino!r}"
+
 
 # =============================================================================
 # 2. Consistencia estricta contra código fuente y OpenAPI (AGENTS.md §8.3)
