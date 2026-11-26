@@ -333,3 +333,48 @@ async def test_los_agregados_no_amplian_el_alcance(db: Any) -> None:
     """,
     )
     assert ejecutables == [], f"el rol de lectura puede ejecutar refrescos: {ejecutables}"
+
+
+async def test_el_rol_de_escritura_solo_lee_id_en_core_organizations(db: Any) -> None:
+    """En el esquema core, kallicode_admin_app solo tiene SELECT sobre organizations.id."""
+    concedidas = await _filas(
+        db,
+        """
+        SELECT c.relname, a.attname
+        FROM pg_attribute a
+        JOIN pg_class c ON c.oid = a.attrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'core'
+          AND c.relkind IN ('r', 'p', 'v', 'm')
+          AND a.attnum > 0 AND NOT a.attisdropped
+          AND has_column_privilege('kallicode_admin_app', c.oid, a.attnum, 'SELECT')
+        ORDER BY c.relname, a.attname
+    """,
+    )
+    assert concedidas == [("organizations", "id")], (
+        "kallicode_admin_app tiene SELECT sobre columnas de core no autorizadas: "
+        f"{concedidas}"
+    )
+
+
+async def test_esquema_audit_privilegios_minimos_y_sin_dml_en_ro(db_ro: Any) -> None:
+    """En audit.*, kallicode_admin_ro solo tiene SELECT por columna y cero DML."""
+    from sqlalchemy.exc import DBAPIError, InternalError, ProgrammingError
+
+    dml_audit = await _filas(
+        db_ro,
+        """
+        SELECT c.relname, p.priv
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        CROSS JOIN (VALUES ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE')) AS p(priv)
+        WHERE n.nspname = 'audit' AND c.relkind IN ('r', 'p')
+          AND CASE WHEN p.priv IN ('INSERT', 'UPDATE')
+                   THEN has_any_column_privilege('kallicode_admin_ro', c.oid, p.priv)
+                   ELSE has_table_privilege('kallicode_admin_ro', c.oid, p.priv) END
+    """,
+    )
+    assert dml_audit == [], f"kallicode_admin_ro tiene DML en esquema audit: {dml_audit}"
+
+    with pytest.raises((ProgrammingError, InternalError, DBAPIError)):
+        await db_ro.execute(text("DELETE FROM audit.audit_events WHERE actor_tipo = 'staff'"))
