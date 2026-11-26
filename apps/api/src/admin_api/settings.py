@@ -173,7 +173,16 @@ class AdminSettings(BaseSettings):
 
     @property
     def hosts_permitidos(self) -> list[str]:
-        return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
+        hosts = [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
+        # En Render, si no se definió KC_ADMIN_ALLOWED_HOSTS explícitamente,
+        # permitimos el hostname gestionado y loopback para healthchecks internos.
+        if "KC_ADMIN_ALLOWED_HOSTS" not in os.environ:
+            render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+            if render_host:
+                for extra in (render_host, "127.0.0.1"):
+                    if extra not in hosts:
+                        hosts.append(extra)
+        return hosts
 
     @property
     def origenes_cors(self) -> list[str]:
