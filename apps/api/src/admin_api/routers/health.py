@@ -29,6 +29,8 @@ from sqlalchemy import text
 
 from ..db import admin_session, read_session, uno
 from ..deps import redis
+from ..metrics import registrar_fallo_dependencia, registrar_frescura_agregados
+from ..servicios.blob import _credencial
 from ..settings import get_admin_settings
 
 router = APIRouter(prefix="/admin/v1", tags=["Salud"])
@@ -75,6 +77,24 @@ async def _telemetria() -> bool:
         return False
 
 
+async def _blob() -> bool:
+    try:
+        cuenta, contenedor = _credencial()
+        if not cuenta or not contenedor:
+            return False
+        s = get_admin_settings()
+        if not s.health_check_blob_remote:
+            return True
+        async with httpx.AsyncClient(timeout=2.0) as c:
+            r = await c.head(
+                f"{cuenta.rstrip('/')}/{contenedor}",
+                params={"restype": "container"},
+            )
+        return r.status_code < 500
+    except Exception:
+        return False
+
+
 async def _frescura_agregados() -> int | None:
     """Antigüedad en segundos del refresco más viejo entre las vistas."""
     try:
@@ -102,11 +122,26 @@ async def health(response: Response) -> dict[str, Any]:
     postgres = await _postgres()
     lectura = await _lectura()
     cache = await _redis()
+    blob = await _blob()
     telemetria = await _telemetria()
     edad = await _frescura_agregados()
 
-    criticas_ok = postgres and lectura and cache
+    if edad is not None:
+        registrar_frescura_agregados("global", edad)
+
+    criticas_ok = postgres and lectura and cache and blob
     agregados_ok = edad is None or edad <= s.aggregate_stale_s
+
+    for nombre, ok in (
+        ("postgres", postgres),
+        ("lectura_analitica", lectura),
+        ("cache", cache),
+        ("blob", blob),
+        ("telemetria", telemetria),
+        ("agregados", agregados_ok),
+    ):
+        if not ok:
+            registrar_fallo_dependencia(nombre)
 
     if not criticas_ok:
         estado = "no_disponible"
@@ -125,6 +160,7 @@ async def health(response: Response) -> dict[str, Any]:
             postgres=postgres,
             lectura=lectura,
             cache=cache,
+            blob=blob,
             telemetria=telemetria,
         )
         _ultimo_estado = estado
@@ -135,6 +171,7 @@ async def health(response: Response) -> dict[str, Any]:
             "postgres": postgres,
             "lectura_analitica": lectura,
             "cache": cache,
+            "blob": blob,
             "telemetria": telemetria,
             "agregados": agregados_ok,
         },

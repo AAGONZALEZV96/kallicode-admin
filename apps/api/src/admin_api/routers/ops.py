@@ -579,7 +579,9 @@ def _tenant_visible(st: Staff, tenant_id: str) -> tuple[str, bool]:
     return enmascarado, True
 
 
-async def _registrar_lecturas_sla(st: Staff, endpoint: str, tenants: set[str]) -> None:
+async def _registrar_lecturas_sla(
+    st: Staff, endpoint: str, tenants: set[str], resource: str | None = None
+) -> None:
     """Registra en `admin.staff_actions` cada lectura desbloqueada por concesión activa."""
     alcanzados = tenants & set(st.grant_detalle)
     if not alcanzados:
@@ -596,6 +598,7 @@ async def _registrar_lecturas_sla(st: Staff, endpoint: str, tenants: set[str]) -
                 grant_id=grant_id,
                 scope=alcance,
                 reason=motivo,
+                resource=resource or f"sla:{tenant}",
                 ip=st.ip,
                 user_agent=st.user_agent,
                 request_id=st.request_id,
@@ -1191,7 +1194,12 @@ async def sla_case(
     if objetivo_raw is None:
         raise sla_sin_definicion(plan_cod)
 
-    await _registrar_lecturas_sla(st, f"GET /admin/v1/ops/sla/cases/{job_id}", {raw_tenant_id})
+    await _registrar_lecturas_sla(
+        st,
+        f"GET /admin/v1/ops/sla/cases/{job_id}",
+        {raw_tenant_id},
+        resource=f"sla:case:{job_id}",
+    )
 
     objetivo_h = float(objetivo_raw)
     bruto_h = round(float(fuente["bruto_h"]), 2)

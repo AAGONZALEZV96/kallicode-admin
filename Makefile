@@ -1,4 +1,4 @@
-.PHONY: up down sync lint format test test-int no-fuga
+.PHONY: up down sync lint format test test-int no-fuga load-test
 
 # Levanta la infraestructura de datos local
 up:
@@ -44,3 +44,9 @@ no-fuga:
 	KC_ADMIN_TEST_DSN="postgresql://postgres:postgres@localhost:5433/kallicode_test" \
 	KC_ADMIN_REDIS_URL="redis://localhost:6380/1" \
 	uv run pytest tests/test_no_leak.py -v --no-cov
+
+# Pruebas de carga concurrente (50 VUs) y contención SECURITY DEFINER (Ticket KC-ADM-B6-07)
+load-test:
+	KC_ADMIN_TEST_DSN="postgresql://postgres:postgres@localhost:5433/kallicode_test" \
+	KC_ADMIN_REDIS_URL="redis://localhost:6380/1" \
+	uv run pytest tests/test_load_performance.py -v --no-cov

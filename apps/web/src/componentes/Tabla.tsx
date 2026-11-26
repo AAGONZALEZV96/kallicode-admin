@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 export type DensidadTabla = "normal" | "alta";
+export type PrioridadColumna = "alta" | "media" | "baja";
 
 export interface TablaProps extends React.TableHTMLAttributes<HTMLTableElement> {
   cabeceraFija?: boolean;
@@ -9,6 +10,8 @@ export interface TablaProps extends React.TableHTMLAttributes<HTMLTableElement> 
   densidad?: DensidadTabla;
   envoltura?: boolean;
   envolturaClassName?: string;
+  mostrarTodasColumnas?: boolean;
+  ariaLabelRegion?: string;
   cargando?: boolean;
   textoCarga?: string;
   estadoVacio?: React.ReactNode;
@@ -20,6 +23,8 @@ export const Tabla: React.FC<TablaProps> = ({
   densidad = "normal",
   envoltura = true,
   envolturaClassName = "",
+  mostrarTodasColumnas = false,
+  ariaLabelRegion,
   cargando = false,
   textoCarga,
   estadoVacio,
@@ -28,6 +33,43 @@ export const Tabla: React.FC<TablaProps> = ({
   ...props
 }) => {
   const { t } = useTranslation();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [scrollState, setScrollState] = useState<{ left: boolean; right: boolean }>({
+    left: false,
+    right: false,
+  });
+
+  const actualizarIndicadoresScroll = useCallback(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+    const hasLeft = el.scrollLeft > 2;
+    const hasRight = maxScroll > 2 && el.scrollLeft < maxScroll - 2;
+    setScrollState((prev) =>
+      prev.left === hasLeft && prev.right === hasRight ? prev : { left: hasLeft, right: hasRight }
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!envoltura) return;
+    actualizarIndicadoresScroll();
+
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => actualizarIndicadoresScroll());
+      observer.observe(el);
+    }
+
+    window.addEventListener("resize", actualizarIndicadoresScroll);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", actualizarIndicadoresScroll);
+    };
+  }, [envoltura, actualizarIndicadoresScroll, children, mostrarTodasColumnas]);
+
   const textoCargaEfectivo = textoCarga ?? t("common.states.loading");
   const clasesTabla = [
     "kc-table",
@@ -80,8 +122,25 @@ export const Tabla: React.FC<TablaProps> = ({
   );
 
   if (envoltura) {
+    const clasesEnvoltura = [
+      "table-container",
+      mostrarTodasColumnas && "tabla-mostrar-todas",
+      envolturaClassName,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
     return (
-      <div className={`table-container ${envolturaClassName}`.trim()}>
+      <div
+        ref={wrapperRef}
+        className={clasesEnvoltura}
+        role="region"
+        tabIndex={0}
+        aria-label={ariaLabelRegion ?? props["aria-label"] ?? t("components.table.regionLabel")}
+        data-scroll-left={String(scrollState.left)}
+        data-scroll-right={String(scrollState.right)}
+        onScroll={actualizarIndicadoresScroll}
+      >
         {contenido}
       </div>
     );
@@ -104,24 +163,48 @@ export const TablaFila: React.FC<React.HTMLAttributes<HTMLTableRowElement>> = (p
 
 export interface TablaCeldaEncabezadoProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
   numerico?: boolean;
+  fija?: boolean;
+  prioridad?: PrioridadColumna;
 }
 
 export const TablaCeldaEncabezado: React.FC<TablaCeldaEncabezadoProps> = ({
   numerico = false,
+  fija = false,
+  prioridad = "alta",
   className = "",
   ...props
-}) => (
-  <th className={`${numerico ? "num" : ""} ${className}`.trim()} {...props} />
-);
+}) => {
+  const clases = [
+    numerico && "num",
+    fija && "kc-col-sticky",
+    prioridad !== "alta" && `kc-col-priority-${prioridad}`,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return <th className={clases || undefined} {...props} />;
+};
 
 export interface TablaCeldaProps extends React.TdHTMLAttributes<HTMLTableCellElement> {
   numerico?: boolean;
+  fija?: boolean;
+  prioridad?: PrioridadColumna;
 }
 
 export const TablaCelda: React.FC<TablaCeldaProps> = ({
   numerico = false,
+  fija = false,
+  prioridad = "alta",
   className = "",
   ...props
-}) => (
-  <td className={`${numerico ? "num" : ""} ${className}`.trim()} {...props} />
-);
+}) => {
+  const clases = [
+    numerico && "num",
+    fija && "kc-col-sticky",
+    prioridad !== "alta" && `kc-col-priority-${prioridad}`,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return <td className={clases || undefined} {...props} />;
+};

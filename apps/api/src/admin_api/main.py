@@ -29,6 +29,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
@@ -39,13 +40,101 @@ from kallicode_core.logging import (
     limpiar_contexto,
     log,
 )
+from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from . import db as dbmod
 from .deps import cerrar_redis
-from .settings import get_admin_settings
+from .metrics import obtener_ruta_normalizada, registrar_peticion_http
+from .settings import AdminSettings, get_admin_settings
 
 MAX_BODY_BYTES = 2 * 1024 * 1024  # 2 MB: la consola no recibe adjuntos
+
+SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
+    ("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload"),
+    ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    (
+        "Content-Security-Policy",
+        "default-src 'self'; frame-ancestors 'none'; object-src 'none'",
+    ),
+    ("Referrer-Policy", "strict-origin-when-cross-origin"),
+    ("Permissions-Policy", "geolocation=(), camera=(), microphone=()"),
+    ("Cache-Control", "no-store"),
+)
+_HEADERS_REVELADORES: frozenset[bytes] = frozenset({b"server", b"x-powered-by"})
+
+
+class SecurityHeadersMiddleware:
+    """Inyecta cabeceras HTTP de seguridad y suprime cabeceras identificadoras."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def _send_hardened(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                message["headers"] = [
+                    (k, v)
+                    for k, v in message.get("headers", [])
+                    if k.lower() not in _HEADERS_REVELADORES
+                ]
+                headers = MutableHeaders(scope=message)
+                for nombre, valor in SECURITY_HEADERS:
+                    headers[nombre] = valor
+            await send(message)
+
+        await self.app(scope, receive, _send_hardened)
+
+
+class DynamicCORSMiddleware:
+    """Delega en CORSMiddleware sincronizado con KC_ADMIN_CORS_ORIGINS."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+        self._clave: tuple[str, ...] | None = None
+        self._delegate: CORSMiddleware | None = None
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        s = get_admin_settings()
+        clave = tuple(s.origenes_cors)
+        if self._delegate is None or self._clave != clave:
+            self._delegate = CORSMiddleware(self.app, **construir_cors_kwargs(s))
+            self._clave = clave
+        await self._delegate(scope, receive, send)
+
+
+class DynamicTrustedHostMiddleware:
+    """Delega en TrustedHostMiddleware sincronizado con KC_ADMIN_ALLOWED_HOSTS."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+        self._clave: tuple[str, ...] | None = None
+        self._delegate: TrustedHostMiddleware | None = None
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        hosts = tuple(get_admin_settings().hosts_permitidos)
+        if self._delegate is None or self._clave != hosts:
+            self._delegate = TrustedHostMiddleware(self.app, allowed_hosts=list(hosts))
+            self._clave = hosts
+        await self._delegate(scope, receive, send)
+
+
+def construir_cors_kwargs(settings: AdminSettings | None = None) -> dict[str, Any]:
+    """Construye la configuración estricta de CORSMiddleware desde KC_ADMIN_CORS_ORIGINS."""
+    cfg = settings or get_admin_settings()
+    return {
+        "allow_origins": cfg.origenes_cors,
+        "allow_credentials": True,
+        "allow_methods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        "allow_headers": ["Authorization", "Content-Type", "X-Trace-Id", "X-Requested-With"],
+        "expose_headers": ["X-Trace-Id", "Content-Disposition"],
+    }
 
 
 @asynccontextmanager
@@ -78,7 +167,32 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=get_admin_settings().hosts_permitidos)
+
+def _respuesta_error_interno(
+    request: Request,
+    exc: Exception,
+    trace_id: str,
+    latencia_ms: float | None = None,
+) -> JSONResponse:
+    """Registra la traza completa internamente y devuelve respuesta 500 sanitizada."""
+    log.error(
+        "admin.error_no_controlado",
+        exc_info=True,
+        trace_id=trace_id,
+        metodo=request.method,
+        ruta=request.url.path,
+        excepcion=type(exc).__name__,
+        latencia_ms=latencia_ms,
+    )
+    return JSONResponse(
+        status_code=500,
+        content=_sobre(
+            "ERROR_INTERNO",
+            "Ha ocurrido un error interno del servidor.",
+            trace_id,
+        ),
+        headers={"X-Trace-Id": trace_id},
+    )
 
 
 # ------------------------------------------------------------- middleware
@@ -87,13 +201,20 @@ async def contexto_y_cabeceras(
     request: Request,
     call_next: Callable[[Request], Awaitable[JSONResponse]],
 ) -> JSONResponse:
-    """Traza, contexto de log, cabeceras de seguridad y límite de cuerpo."""
+    """Traza, contexto de log y límite de tamaño de cuerpo."""
     trace_id = request.headers.get("x-trace-id") or f"tr_{uuid.uuid4().hex[:24]}"
     request.state.trace_id = trace_id
     bind_contexto(trace_id=trace_id)
+    inicio = time.perf_counter()
 
     largo = request.headers.get("content-length")
     if largo and int(largo) > MAX_BODY_BYTES:
+        registrar_peticion_http(
+            request.method,
+            obtener_ruta_normalizada(request),
+            413,
+            time.perf_counter() - inicio,
+        )
         limpiar_contexto()
         return JSONResponse(
             status_code=413,
@@ -103,59 +224,42 @@ async def contexto_y_cabeceras(
                 trace_id,
                 {"maximo_bytes": MAX_BODY_BYTES},
             ),
+            headers={"X-Trace-Id": trace_id},
         )
 
-    inicio = time.perf_counter()
     try:
         resp = await call_next(request)
     except Exception as exc:
-        latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-        log.error(
-            "admin.error_no_controlado",
-            metodo=request.method,
-            ruta=request.url.path,
-            latencia_ms=latencia_ms,
-            excepcion=type(exc).__name__,
+        duracion_s = time.perf_counter() - inicio
+        latencia_ms = round(duracion_s * 1000, 2)
+        registrar_peticion_http(
+            request.method,
+            obtener_ruta_normalizada(request),
+            500,
+            duracion_s,
         )
         limpiar_contexto()
-        return JSONResponse(
-            status_code=500,
-            content=_sobre(
-                "ERROR_INTERNO",
-                "Se ha producido un error interno. Contacta con la plataforma indicando "
-                "el identificador de traza.",
-                trace_id,
-            ),
-            headers={
-                "X-Trace-Id": trace_id,
-                "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-                "X-Content-Type-Options": "nosniff",
-                "X-Frame-Options": "DENY",
-                "Referrer-Policy": "no-referrer",
-                "Content-Security-Policy": (
-                    "default-src 'self'; img-src 'self' data:; style-src 'self'; "
-                    "script-src 'self'; frame-ancestors 'none'; base-uri 'none'"
-                ),
-                "Cache-Control": "no-store",
-            },
-        )
+        return _respuesta_error_interno(request, exc, trace_id, latencia_ms=latencia_ms)
     finally:
         limpiar_contexto()
 
-    latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-    log.info("http", metodo=request.method, ruta=request.url.path, latencia_ms=latencia_ms)
-
-    resp.headers["X-Trace-Id"] = trace_id
-    resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    resp.headers["X-Content-Type-Options"] = "nosniff"
-    resp.headers["X-Frame-Options"] = "DENY"
-    resp.headers["Referrer-Policy"] = "no-referrer"
-    resp.headers["Content-Security-Policy"] = (
-        "default-src 'self'; img-src 'self' data:; style-src 'self'; "
-        "script-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+    duracion_s = time.perf_counter() - inicio
+    latencia_ms = round(duracion_s * 1000, 2)
+    registrar_peticion_http(
+        request.method,
+        obtener_ruta_normalizada(request),
+        resp.status_code,
+        duracion_s,
     )
-    resp.headers["Cache-Control"] = "no-store"
+    log.info("http", metodo=request.method, ruta=request.url.path, latencia_ms=latencia_ms)
+    resp.headers["X-Trace-Id"] = trace_id
     return resp
+
+
+# Pila de middlewares (LIFO en Starlette: SecurityHeadersMiddleware queda más externo)
+app.add_middleware(DynamicCORSMiddleware)
+app.add_middleware(DynamicTrustedHostMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 def _sobre(
@@ -235,17 +339,7 @@ async def _validacion(request: Request, exc: RequestValidationError) -> JSONResp
 async def _no_controlado(request: Request, exc: Exception) -> JSONResponse:
     """Los 5xx no exponen ni el nombre de la excepción (§3.6, defecto BE-F39)."""
     trace_id = getattr(request.state, "trace_id", "") or f"tr_{uuid.uuid4().hex[:24]}"
-    log.error("admin.error_no_controlado", ruta=request.url.path, excepcion=type(exc).__name__)
-    return JSONResponse(
-        status_code=500,
-        content=_sobre(
-            "ERROR_INTERNO",
-            "Se ha producido un error interno. Contacta con la plataforma indicando "
-            "el identificador de traza.",
-            trace_id,
-        ),
-        headers={"X-Trace-Id": trace_id},
-    )
+    return _respuesta_error_interno(request, exc, trace_id)
 
 
 # ----------------------------------------------------------------- routers
@@ -255,9 +349,20 @@ def registrar_routers() -> None:
     Se hace en una función para que las pruebas puedan construir la aplicación
     sin arrancar el ciclo de vida completo.
     """
-    from .routers import admin_audit, audit, auth, business, grants, health, ops, staff
+    from .routers import (
+        admin_audit,
+        audit,
+        auth,
+        business,
+        grants,
+        health,
+        metrics,
+        ops,
+        staff,
+    )
 
     app.include_router(health.router)  # §18.31
+    app.include_router(metrics.router)  # KC-ADM-B6-08 · Observabilidad Prometheus
     app.include_router(auth.router)  # §18.1 – §18.8
     app.include_router(staff.router)  # §18.9 – §18.12
     app.include_router(grants.router)  # §18.13 – §18.15

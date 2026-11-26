@@ -1,0 +1,417 @@
+/* ==========================================================================
+   responsive.css — Diseño Adaptable de Tablas Densas e Interfaz de Consola
+   Ticket: KC-ADM-B6-09 (Épica EAD6)
+   Breakpoints: <= 1024px (Tablet/Desktop compacto), <= 768px (Tablet vertical),
+                <= 600px (Móvil / 375px)
+   ========================================================================== */
+
+/* Contención global sin romper position: sticky */
+html,
+body,
+#root,
+.admin-shell {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.admin-main {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.card,
+.kc-view-container,
+.customer-detail-page,
+.biz-customers,
+.biz-overview,
+.ops-agents,
+.ops-models,
+.ops-sla {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.kc-view-container {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 1025px) {
+  .kc-view-container {
+    padding: var(--space-6);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Navegación y Cabecera (AdminLayout <= 1024px vs >= 1025px)
+   -------------------------------------------------------------------------- */
+.admin-header {
+  gap: 0.75rem;
+}
+
+.admin-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.admin-brand-link {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text, #f8fafc);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.admin-brand-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1024px) {
+  .nav-desktop {
+    display: none !important;
+  }
+
+  .nav-user-desktop {
+    display: none !important;
+  }
+
+  .mobile-controls {
+    display: flex !important;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+  }
+
+  .nav-mobile-drawer {
+    display: flex;
+    top: 64px;
+    height: calc(100dvh - 64px);
+    bottom: auto;
+  }
+}
+
+@media (min-width: 1025px) {
+  .nav-desktop {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+  }
+
+  .nav-desktop a {
+    white-space: nowrap;
+  }
+
+  .nav-user-desktop {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  .mobile-controls {
+    display: none !important;
+  }
+
+  .nav-mobile-drawer {
+    display: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-brand-link {
+    font-size: 1rem;
+  }
+
+  .mobile-controls .badge {
+    max-width: 132px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Tablas Densas: Scroll autónomo, Sombras de indicación, Sticky Column y Colapso
+   -------------------------------------------------------------------------- */
+.table-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: none;
+  transition: box-shadow var(--transition-fast);
+}
+
+.table-container[data-scroll-left="true"]:not([data-scroll-right="true"]) {
+  box-shadow: var(--shadow-table-scroll-left);
+}
+
+.table-container[data-scroll-right="true"]:not([data-scroll-left="true"]) {
+  box-shadow: var(--shadow-table-scroll-right);
+}
+
+.table-container[data-scroll-left="true"][data-scroll-right="true"] {
+  box-shadow: var(--shadow-table-scroll-left), var(--shadow-table-scroll-right);
+}
+
+.table-container:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.kc-columns-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (min-width: 1025px) {
+  .kc-columns-toggle {
+    display: none !important;
+  }
+}
+
+/* Columna Fija Prioritaria y Colapso Responsivo (<= 1024px) */
+@media (max-width: 1024px) {
+  .kc-table th.kc-col-sticky,
+  .kc-table td.kc-col-sticky {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background-color: var(--surface);
+  }
+
+  .kc-table thead th.kc-col-sticky {
+    z-index: 4;
+  }
+
+  .kc-table.striped tbody tr:nth-child(even) td.kc-col-sticky {
+    background-color: var(--surface);
+  }
+
+  .kc-table tbody tr:hover td.kc-col-sticky {
+    background-color: var(--surface2);
+  }
+
+  .table-container[data-scroll-left="true"] th.kc-col-sticky,
+  .table-container[data-scroll-left="true"] td.kc-col-sticky {
+    box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.35);
+    border-right: var(--border-width) solid var(--border);
+  }
+
+  .table-container:not(.tabla-mostrar-todas) .kc-col-priority-baja {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .table-container:not(.tabla-mostrar-todas) .kc-col-priority-media {
+    display: none;
+  }
+
+  .kc-table.tabla-densa th,
+  .kc-table.tabla-densa td {
+    padding: 6px 8px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Filtros, Barras de Herramientas, Pestañas y Paginación Adaptables
+   -------------------------------------------------------------------------- */
+.kc-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.kc-filter-item {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+
+.kc-filter-item-wide {
+  flex: 1.5 1 220px;
+  min-width: 0;
+}
+
+.kc-filter-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.kc-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  max-width: 100%;
+}
+
+.kc-tabs-scroll {
+  display: flex;
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.kc-tabs-scroll button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.kc-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.kc-pagination-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kc-pagination-size {
+  min-width: 120px;
+}
+
+.kc-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 1rem;
+}
+
+.kc-grid-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-5);
+}
+
+@media (max-width: 1024px) {
+  .kc-filter-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 0.75rem;
+  }
+
+  .kc-filter-item,
+  .kc-filter-item-wide {
+    width: 100%;
+  }
+
+  .kc-filter-actions {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 600px) {
+  .kc-filter-bar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .kc-pagination {
+    align-items: stretch;
+  }
+
+  .kc-pagination-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .kc-live-refresh-select {
+    min-width: 0 !important;
+    flex: 1 1 160px;
+    max-width: 100%;
+  }
+
+  .kc-live-refresh-status {
+    margin-left: 0 !important;
+    flex-basis: 100%;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Modales y Grids Internos Adaptables
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+  padding: var(--space-3);
+}
+
+.modal {
+  width: 100%;
+  max-width: min(var(--modal-max-width, 640px), calc(100vw - 24px)) !important;
+  max-height: min(92dvh, 92vh);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-head,
+.modal-foot {
+  flex-shrink: 0;
+}
+
+.modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.kc-modal-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.875rem;
+}
+
+.kc-sla-equation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 768px) {
+  .kc-sla-equation-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .modal-overlay {
+    padding: var(--space-2);
+  }
+
+  .modal {
+    max-width: calc(100vw - 16px) !important;
+    max-height: min(94dvh, 94vh);
+    border-radius: var(--radius-md);
+  }
+
+  .kc-modal-grid-2,
+  .kc-sla-equation-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

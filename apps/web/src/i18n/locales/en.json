@@ -257,6 +257,12 @@
         "indisponibilidad_proveedor_llm": "LLM provider unavailability",
         "otro": "Other justified pause"
       }
+    },
+    "table": {
+      "regionLabel": "Horizontally scrollable data table",
+      "showAllColumns": "Show all columns",
+      "compactColumns": "Compact view",
+      "toggleColumnsAria": "Toggle secondary columns visibility on smaller screens"
     }
   },
   "auth": {

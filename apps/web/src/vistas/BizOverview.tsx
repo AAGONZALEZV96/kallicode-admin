@@ -261,18 +261,15 @@ export const BizOverview: React.FC = () => {
       {/* Controles de Periodo y Comparación */}
       <section
         aria-label={t("views.bizOverview.filters.regionLabel")}
+        className="kc-filter-bar"
         style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "flex-end",
-          gap: "1rem",
           padding: "1rem",
           backgroundColor: "var(--card)",
           borderRadius: "var(--radius-md)",
           border: "1px solid var(--border)",
         }}
       >
-        <div style={{ minWidth: "180px" }}>
+        <div className="kc-filter-item">
           <Select
             id="filtro-periodo"
             etiqueta={t("views.bizOverview.filters.periodLabel")}
@@ -282,7 +279,7 @@ export const BizOverview: React.FC = () => {
           />
         </div>
 
-        <div style={{ minWidth: "220px" }}>
+        <div className="kc-filter-item-wide">
           <Select
             id="filtro-comparacion"
             etiqueta={t("views.bizOverview.filters.compareLabel")}
@@ -292,7 +289,7 @@ export const BizOverview: React.FC = () => {
           />
         </div>
 
-        <div style={{ marginLeft: "auto", alignSelf: "flex-end" }}>
+        <div className="kc-filter-actions" style={{ marginLeft: "auto" }}>
           <Boton
             variante="ghost"
             tamano="sm"

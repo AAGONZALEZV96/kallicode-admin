@@ -8,6 +8,7 @@ import "./i18n";
 import App from "./App";
 import "./estilos/tokens.css";
 import "./estilos/globales.css";
+import "./estilos/responsive.css";
 
 async function iniciarAplicacion(): Promise<void> {
   if (import.meta.env.VITE_MOCK === "true") {

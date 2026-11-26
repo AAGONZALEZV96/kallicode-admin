@@ -24,6 +24,7 @@ dependencies = [
     "azure-storage-blob>=12.24,<13",    # informes exportables (§18.22, §18.23)
     "azure-identity>=1.19,<2",
     "email-validator>=2.3.0",
+    "prometheus-client>=0.21,<1",
 ]
 
 [project.optional-dependencies]
