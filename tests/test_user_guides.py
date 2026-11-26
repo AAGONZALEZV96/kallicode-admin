@@ -92,13 +92,14 @@ def test_user_guides_archivos_obligatorios_y_enlaces_existen() -> None:
 
     patron_enlace = re.compile(r"\]\(([^)]+)\)")
     for nombre, texto in guias.items():
+        assert "file://" not in texto, f"Ruta local file:// prohibida en {nombre}"
+        assert "/home/" not in texto, f"Ruta local /home/ prohibida en {nombre}"
         for destino in patron_enlace.findall(texto):
-            if destino.startswith("file://"):
-                ruta_local = Path(destino.removeprefix("file://").split("#", 1)[0])
-                assert ruta_local.exists(), f"Enlace roto {destino!r} en {nombre}"
-            elif destino.endswith(".md"):
-                ruta_rel = (USER_GUIDES_DIR / destino.split("#", 1)[0]).resolve()
-                assert ruta_rel.exists(), f"Enlace relativo roto {destino!r} en {nombre}"
+            if destino.startswith(("http://", "https://", "#")):
+                continue
+            ruta_rel = (USER_GUIDES_DIR / destino.split("#", 1)[0]).resolve()
+            assert ruta_rel.exists(), f"Enlace relativo roto {destino!r} en {nombre}"
+            assert ruta_rel.is_relative_to(REPO_ROOT), f"Enlace fuera del repo: {destino!r}"
 
 
 def test_user_guides_rutas_spa_existen_en_app_router() -> None:

@@ -1,18 +1,18 @@
 # Guía de Usuario: Administración de Consola (`staff_admin`)
 
-- **Manual Maestro:** [admin_manual.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/user_guides/admin_manual.md)
-- **Manual Operativo y Runbooks:** [admin_console_ops.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/admin_console_ops.md)
+- **Manual Maestro:** [admin_manual.md](admin_manual.md)
+- **Manual Operativo y Runbooks:** `docs/runbooks/admin_console_ops.md`
 - **Propósito del rol:** Supervisión global sobre las 7 pantallas operativas de negocio y operaciones, más administración exclusiva del ciclo de vida del personal interno, revocación de concesiones ajenas y auditoría forense cross-tenant.
 
 ---
 
 ## 1. Cobertura en la Interfaz SPA
 
-En [AppRouter.tsx](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/web/src/router/AppRouter.tsx) y [AdminLayout.tsx](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/web/src/componentes/AdminLayout.tsx), el rol `staff_admin` hereda acceso de lectura y navegación sobre las **7 pantallas operativas** (más la ficha 360°):
+En [AppRouter.tsx](../../apps/web/src/router/AppRouter.tsx) y [AdminLayout.tsx](../../apps/web/src/componentes/AdminLayout.tsx), el rol `staff_admin` hereda acceso de lectura y navegación sobre las **7 pantallas operativas** (más la ficha 360°):
 - **Negocio (`/overview` por defecto al entrar):** `/overview`, `/business/overview`, `/business/customers`, `/business/customers/:tenant_id`, `/business/subscriptions`, `/business/tokens` (y alias `/customers`, `/customers/:tenant_id`, `/subscriptions`, `/tokens`).
 - **Operaciones:** `/ops/agents`, `/ops/models`, `/ops/sla`.
 
-Para el detalle funcional de cada pantalla consulta las guías correspondientes: [guia_soporte.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/user_guides/guia_soporte.md), [guia_operaciones.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/user_guides/guia_operaciones.md) y [guia_negocio.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/user_guides/guia_negocio.md).
+Para el detalle funcional de cada pantalla consulta las guías correspondientes: [guia_soporte.md](guia_soporte.md), [guia_operaciones.md](guia_operaciones.md) y [guia_negocio.md](guia_negocio.md).
 
 > **Transparencia de arquitectura actual:** `staff_admin` tampoco posee acceso en claro permanente a datos de cliente. Si necesitas desenmascarar una ficha o listado en la SPA, debes solicitar una concesión temporal en `SolicitudConcesionModal` (`POST /admin/v1/access-grants`) exactamente igual que el resto del personal.
 
@@ -20,7 +20,7 @@ Para el detalle funcional de cada pantalla consulta las guías correspondientes:
 
 ## 2. Operaciones Exclusivas de `staff_admin` vía API REST (`/admin/v1`)
 
-En la versión actual de la SPA ([AppRouter.tsx](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/web/src/router/AppRouter.tsx)), las funciones de administración de personal, control global de concesiones y auditoría de acciones (`audit-actions`) se operan directamente contra los endpoints autenticados y protegidos por RBAC (`staff_admin`) del backend FastAPI ([staff.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/staff.py), [grants.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/grants.py) y [admin_audit.py](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/api/src/admin_api/routers/admin_audit.py)):
+En la versión actual de la SPA ([AppRouter.tsx](../../apps/web/src/router/AppRouter.tsx)), las funciones de administración de personal, control global de concesiones y auditoría de acciones (`audit-actions`) se operan directamente contra los endpoints autenticados y protegidos por RBAC (`staff_admin`) del backend FastAPI ([staff.py](../../apps/api/src/admin_api/routers/staff.py), [grants.py](../../apps/api/src/admin_api/routers/grants.py) y [admin_audit.py](../../apps/api/src/admin_api/routers/admin_audit.py)):
 
 ### 2.1 Gestión del Ciclo de Vida del Personal (`/admin/v1/staff*`)
 1. **Invitar nuevo miembro de personal (`POST /admin/v1/staff/invitations`):**
@@ -46,4 +46,4 @@ En la versión actual de la SPA ([AppRouter.tsx](file:///home/aagonzalezv/CAPSTO
    - Devuelve el motivo íntegro, `lecturas` por concesión y la bandera criptográfica **`verificado`** (si aparece en `false`, activar inmediatamente el runbook **RB-03**).
 2. **Exportar evidencias forenses (`POST /admin/v1/audit/staff-actions/exports`):**
    - Genera un fichero `csv` en segundo plano con todos los eventos, sellos y estado de verificación para auditorías internas o respuestas ante incidentes.
-   - Para procedimientos completos de contención, revocación masiva en Redis y verificación SQL de cadenas SHA-256, sigue **RB-02** y **RB-03** en [admin_console_ops.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/runbooks/admin_console_ops.md).
+   - Para procedimientos completos de contención, revocación masiva en Redis y verificación SQL de cadenas SHA-256, sigue **RB-02** y **RB-03** en `docs/runbooks/admin_console_ops.md`.

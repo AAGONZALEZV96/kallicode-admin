@@ -1,13 +1,13 @@
 # Guía de Usuario: Soporte (`staff_soporte`)
 
-- **Manual Maestro:** [admin_manual.md](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/docs/user_guides/admin_manual.md)
+- **Manual Maestro:** [admin_manual.md](admin_manual.md)
 - **Propósito del rol:** Atención al cliente, diagnóstico de incidencias sobre cuentas concretas y gestión de revelaciones justificadas y temporales bajo cumplimiento RGPD.
 
 ---
 
 ## 1. Pantallas Autorizadas y Navegación
 
-Al iniciar sesión e introducir el código **TOTP** en `/mfa`, el sistema te autentica con el rol `staff_soporte` y habilita en la barra de navegación superior ([AdminLayout.tsx](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/web/src/componentes/AdminLayout.tsx)) el acceso exclusivo al módulo de clientes:
+Al iniciar sesión e introducir el código **TOTP** en `/mfa`, el sistema te autentica con el rol `staff_soporte` y habilita en la barra de navegación superior ([AdminLayout.tsx](../../apps/web/src/componentes/AdminLayout.tsx)) el acceso exclusivo al módulo de clientes:
 
 | Vista | Ruta SPA | Alias Soportado | Permiso |
 |---|---|---|---|
@@ -22,13 +22,13 @@ Al iniciar sesión e introducir el código **TOTP** en `/mfa`, el sistema te aut
 ## 2. Flujo Operativo Paso a Paso
 
 ### Paso 1 — Localizar al Cliente en `/business/customers`
-Consulta el endpoint `GET /admin/v1/business/customers` desde la tabla de clientes ([BizCustomers.tsx](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/web/src/vistas/BizCustomers.tsx)):
+Consulta el endpoint `GET /admin/v1/business/customers` desde la tabla de clientes ([BizCustomers.tsx](../../apps/web/src/vistas/BizCustomers.tsx)):
 1. **Filtrar y buscar:** usa los selectores de **Plan** (`starter`, `growth`, `enterprise`), **Estado** (`activa`, `periodo_gracia`, `suspendida`, `finalizada`) y la caja de búsqueda por texto (`q`) con sincronización en URL.
 2. **Interpretar los datos enmascarados por defecto:** verás la columna `razon_social` protegida (por ejemplo `A•••• S.L.`) junto al badge `enmascarado`. Esto confirma que aún no hay una concesión activa para ese `tenant_id`.
 3. **Abrir la ficha 360°:** haz clic en la fila o enlace del cliente para navegar a `/business/customers/:tenant_id`.
 
 ### Paso 2 — Analizar la Ficha 360° (`CustomerDetail`)
-La ficha ([CustomerDetail.tsx](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/web/src/vistas/CustomerDetail.tsx)) consulta `GET /admin/v1/business/customers/{tenant_id}` y presenta 6 bloques ejecutivos:
+La ficha ([CustomerDetail.tsx](../../apps/web/src/vistas/CustomerDetail.tsx)) consulta `GET /admin/v1/business/customers/{tenant_id}` y presenta 6 bloques ejecutivos:
 1. **Identificación y Suscripción:** `tenant_id`, razón social, dominio, fecha de alta, plan contratado, estado, fecha de renovación y solicitudes pendientes.
 2. **Líneas de Producción:** contratadas vs activas y utilización media del ciclo.
 3. **Consumo del Ciclo e Histórico:** LOC, tokens, porcentaje de cuota consumida y tendencia de los últimos 6 ciclos.
@@ -38,7 +38,7 @@ La ficha ([CustomerDetail.tsx](file:///home/aagonzalezv/CAPSTONE/kallicode-admin
 
 ### Paso 3 — Solicitar Concesión Temporal y Justificada (`POST /admin/v1/access-grants`)
 Si el caso de soporte requiere ver la razón social real, usuarios o integraciones conectadas:
-1. Pulsa el botón contextual de **Solicitar acceso / Revelar datos** para abrir [SolicitudConcesionModal.tsx](file:///home/aagonzalezv/CAPSTONE/kallicode-admin/apps/web/src/componentes/SolicitudConcesionModal.tsx).
+1. Pulsa el botón contextual de **Solicitar acceso / Revelar datos** para abrir [SolicitudConcesionModal.tsx](../../apps/web/src/componentes/SolicitudConcesionModal.tsx).
 2. Completa el formulario respetando las validaciones de cumplimiento:
    - **Motivo (`motivo`):** escribe una explicación concreta de al menos **20 caracteres** (hasta `500`), evitando palabras genéricas («revisión», «prueba», «soporte»).
    - **Referencia de ticket (`referencia`):** introduce el código verificable de incidencia (por ejemplo `SUP-1042` o `KC-812`) o inclúyelo dentro del motivo.
