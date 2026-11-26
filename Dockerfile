@@ -25,7 +25,7 @@ RUN uv venv /app/.venv \
     "redis>=5.2,<6" "pyjwt[crypto]>=2.10,<3" "argon2-cffi>=23.1,<24" \
     "pyotp>=2.9,<3" "qrcode[pil]>=8.0,<9" "httpx>=0.28,<0.29" \
     "azure-storage-blob>=12.24,<13" "azure-identity>=1.19,<2" \
-    "email-validator>=2.3.0" 
+    "email-validator>=2.3.0" "prometheus-client>=0.21,<1" 
 
 ENV PATH="/app/.venv/bin:$PATH" \ 
     PYTHONPATH="/app/apps/api/src:/app/apps/workers/src" 
